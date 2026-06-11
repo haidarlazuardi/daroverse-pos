@@ -1,0 +1,545 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  CASHIER
+}
+
+enum OrderStatus {
+  PENDING
+  HOLD
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  QRIS
+  CARD
+  TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+}
+
+enum StockMovementType {
+  IN
+  OUT
+  WASTE
+  ADJUSTMENT
+  TRANSFER
+  SALE
+  PURCHASE
+  OPNAME
+  REFUND
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  APPROVED
+  COMPLETED
+  CANCELLED
+}
+
+enum IngredientType {
+  RAW
+  PREPPED
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum ExpenseCategory {
+  UTILITIES
+  SUPPLIES
+  OPERATIONAL
+  TRANSPORT
+  MAINTENANCE
+  SALARY
+  OTHER
+}
+
+enum AssetCondition {
+  GOOD
+  FAIR
+  POOR
+  BROKEN
+  DISPOSED
+}
+
+enum OpnameStatus {
+  DRAFT
+  COMPLETED
+}
+
+// ─── Users ───────────────────────────────────────────
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(CASHIER)
+  pin       String?
+  active    Boolean  @default(true)
+  outletId  String?
+  outlet    Outlet?  @relation(fields: [outletId], references: [id])
+  orders    Order[]
+  shifts    Shift[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+// ─── Outlets ─────────────────────────────────────────
+
+model Outlet {
+  id             String          @id @default(cuid())
+  name           String
+  address        String?
+  phone          String?
+  taxRate        Float           @default(0.11) // Configurable tax rate
+  taxInclusive   Boolean         @default(false) // Tax inclusive pricing
+  active         Boolean         @default(true)
+  users          User[]
+  products       OutletProduct[]
+  stockLevels    StockLevel[]
+  orders         Order[]
+  stockMovements StockMovement[]
+  purchaseOrders PurchaseOrder[]
+  shifts         Shift[]
+  expenses       Expense[]
+  assets         Asset[]
+  stockOpnames   StockOpname[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@map("outlets")
+}
+
+// ─── App Settings ────────────────────────────────────
+
+model AppSetting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+  label String?
+
+  @@map("app_settings")
+}
+
+// ─── Categories ──────────────────────────────────────
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String
+  color     String    @default("#22c55e")
+  icon      String?
+  sortOrder Int       @default(0)
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("categories")
+}
+
+// ─── Products ────────────────────────────────────────
+
+model Product {
+  id          String          @id @default(cuid())
+  name        String
+  sku         String?         @unique
+  categoryId  String
+  category    Category        @relation(fields: [categoryId], references: [id])
+  price       Float
+  cost        Float           @default(0)
+  image       String?
+  active      Boolean         @default(true)
+  recipe      Recipe?
+  orderItems  OrderItem[]
+  outlets     OutletProduct[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@map("products")
+}
+
+model OutletProduct {
+  id        String  @id @default(cuid())
+  outletId  String
+  outlet    Outlet  @relation(fields: [outletId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  available Boolean @default(true)
+
+  @@unique([outletId, productId])
+  @@map("outlet_products")
+}
+
+// ─── Recipes ─────────────────────────────────────────
+
+model Recipe {
+  id           String       @id @default(cuid())
+  productId    String?      @unique
+  product      Product?     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  ingredientId String?      @unique // For prepped ingredient sub-recipes
+  ingredient   Ingredient?  @relation("PrepRecipe", fields: [ingredientId], references: [id], onDelete: Cascade)
+  yieldQty     Float?       // How much the prep recipe yields
+  yieldUnit    String?      // Unit of yield
+  items        RecipeItem[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@map("recipes")
+}
+
+model RecipeItem {
+  id           String     @id @default(cuid())
+  recipeId     String
+  recipe       Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredientId String
+  ingredient   Ingredient @relation("RecipeUsage", fields: [ingredientId], references: [id])
+  quantity     Float
+
+  @@unique([recipeId, ingredientId])
+  @@map("recipe_items")
+}
+
+// ─── Ingredients ─────────────────────────────────────
+
+model Ingredient {
+  id             String              @id @default(cuid())
+  name           String
+  type           IngredientType      @default(RAW)
+  unit           String              // Primary unit: g, ml, pcs
+  purchaseUnit   String?             // Purchase unit: kg, L, box
+  conversionRate Float?              // purchaseUnit → unit (e.g. 1000 for kg→g)
+  minStock       Float               @default(0)
+  latestPrice    Float               @default(0) // Per primary unit
+  active         Boolean             @default(true)
+  prepRecipe     Recipe?             @relation("PrepRecipe") // If PREPPED, has a sub-recipe
+  recipeItems    RecipeItem[]        @relation("RecipeUsage") // Used in product recipes
+  stockLevels    StockLevel[]
+  stockMovements StockMovement[]
+  purchaseItems  PurchaseOrderItem[]
+  opnameItems    StockOpnameItem[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@map("ingredients")
+}
+
+// ─── Stock Levels ────────────────────────────────────
+
+model StockLevel {
+  id           String     @id @default(cuid())
+  outletId     String
+  outlet       Outlet     @relation(fields: [outletId], references: [id])
+  ingredientId String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  quantity     Float      @default(0)
+  lastUpdated  DateTime   @default(now())
+
+  @@unique([outletId, ingredientId])
+  @@map("stock_levels")
+}
+
+// ─── Stock Movements ─────────────────────────────────
+
+model StockMovement {
+  id           String            @id @default(cuid())
+  outletId     String
+  outlet       Outlet            @relation(fields: [outletId], references: [id])
+  ingredientId String
+  ingredient   Ingredient        @relation(fields: [ingredientId], references: [id])
+  type         StockMovementType
+  quantity     Float
+  reference    String?
+  notes        String?
+  costPerUnit  Float?
+  createdBy    String?
+  createdAt    DateTime          @default(now())
+
+  @@index([outletId, ingredientId])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+// ─── Stock Opname ────────────────────────────────────
+
+model StockOpname {
+  id        String            @id @default(cuid())
+  outletId  String
+  outlet    Outlet            @relation(fields: [outletId], references: [id])
+  status    OpnameStatus      @default(DRAFT)
+  notes     String?
+  items     StockOpnameItem[]
+  createdBy String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@map("stock_opnames")
+}
+
+model StockOpnameItem {
+  id           String      @id @default(cuid())
+  opnameId     String
+  opname       StockOpname @relation(fields: [opnameId], references: [id], onDelete: Cascade)
+  ingredientId String
+  ingredient   Ingredient  @relation(fields: [ingredientId], references: [id])
+  systemQty    Float       // What system says
+  actualQty    Float       // What was counted
+  difference   Float       // actual - system
+  notes        String?
+
+  @@unique([opnameId, ingredientId])
+  @@map("stock_opname_items")
+}
+
+// ─── Discounts ───────────────────────────────────────
+
+model Discount {
+  id          String       @id @default(cuid())
+  name        String       // "Member 10%", "Promo Ramadan"
+  type        DiscountType
+  value       Float        // 10 for 10%, or 5000 for Rp5.000
+  active      Boolean      @default(true)
+  minOrder    Float?       // Minimum order to apply
+  maxDiscount Float?       // Cap for percent discounts
+  validFrom   DateTime?
+  validTo     DateTime?
+  orders      Order[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("discounts")
+}
+
+// ─── Orders ──────────────────────────────────────────
+
+model Order {
+  id            String      @id @default(cuid())
+  orderNumber   String      @unique
+  outletId      String
+  outlet        Outlet      @relation(fields: [outletId], references: [id])
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  shiftId       String?
+  shift         Shift?      @relation(fields: [shiftId], references: [id])
+  customerId    String?
+  customer      Customer?   @relation(fields: [customerId], references: [id])
+  discountId    String?
+  discountRef   Discount?   @relation(fields: [discountId], references: [id])
+  status        OrderStatus @default(PENDING)
+  subtotal      Float       @default(0)
+  tax           Float       @default(0)
+  taxRate       Float       @default(0.11)
+  discount      Float       @default(0)
+  discountLabel String?
+  total         Float       @default(0)
+  costTotal     Float       @default(0)
+  profit        Float       @default(0)
+  notes         String?
+  splitGroup    String?     // Group ID for split bills
+  splitIndex    Int?        // Which split (1, 2, 3...)
+  refundedAt    DateTime?
+  refundReason  String?
+  refundBy      String?
+  items         OrderItem[]
+  payment       Payment?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([outletId, createdAt])
+  @@index([status])
+  @@index([shiftId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float
+  cost      Float   @default(0)
+  subtotal  Float
+  notes     String?
+
+  @@map("order_items")
+}
+
+// ─── Payments ────────────────────────────────────────
+
+model Payment {
+  id        String        @id @default(cuid())
+  orderId   String        @unique
+  order     Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method    PaymentMethod
+  status    PaymentStatus @default(PENDING)
+  amount    Float
+  received  Float         @default(0)
+  change    Float         @default(0)
+  reference String?
+  createdAt DateTime      @default(now())
+
+  @@map("payments")
+}
+
+// ─── Shifts / Cash Management ────────────────────────
+
+model Shift {
+  id            String    @id @default(cuid())
+  outletId      String
+  outlet        Outlet    @relation(fields: [outletId], references: [id])
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  openedAt      DateTime  @default(now())
+  closedAt      DateTime?
+  openingCash   Float     @default(0) // Modal kembalian
+  closingCash   Float?    // Actual cash counted at close
+  expectedCash  Float?    // System calculated
+  difference    Float?    // closingCash - expectedCash
+  cashSales     Float     @default(0)
+  qrisSales     Float     @default(0)
+  totalSales    Float     @default(0)
+  totalExpenses Float     @default(0)
+  notes         String?
+  orders        Order[]
+  expenses      Expense[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([outletId, openedAt])
+  @@map("shifts")
+}
+
+// ─── Expenses ────────────────────────────────────────
+
+model Expense {
+  id          String          @id @default(cuid())
+  outletId    String
+  outlet      Outlet          @relation(fields: [outletId], references: [id])
+  shiftId     String?
+  shift       Shift?          @relation(fields: [shiftId], references: [id])
+  category    ExpenseCategory
+  description String
+  amount      Float
+  paidBy      String?
+  receipt     String?
+  createdBy   String?
+  createdAt   DateTime        @default(now())
+
+  @@index([outletId, createdAt])
+  @@map("expenses")
+}
+
+// ─── Assets / Inventaris Barang ──────────────────────
+
+model Asset {
+  id            String         @id @default(cuid())
+  name          String
+  code          String?        @unique // Asset code
+  outletId      String
+  outlet        Outlet         @relation(fields: [outletId], references: [id])
+  category      String         // Peralatan, Elektronik, Furnitur, etc.
+  condition     AssetCondition @default(GOOD)
+  purchaseDate  DateTime?
+  purchasePrice Float?
+  currentValue  Float?
+  supplier      String?
+  location      String?        // "Dapur", "Bar", "Kasir"
+  notes         String?
+  active        Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([outletId])
+  @@map("assets")
+}
+
+// ─── Suppliers ───────────────────────────────────────
+
+model Supplier {
+  id             String          @id @default(cuid())
+  name           String
+  contactPerson  String?
+  phone          String?
+  email          String?
+  address        String?
+  active         Boolean         @default(true)
+  purchaseOrders PurchaseOrder[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@map("suppliers")
+}
+
+// ─── Purchase Orders ─────────────────────────────────
+
+model PurchaseOrder {
+  id          String              @id @default(cuid())
+  poNumber    String              @unique
+  outletId    String
+  outlet      Outlet              @relation(fields: [outletId], references: [id])
+  supplierId  String
+  supplier    Supplier            @relation(fields: [supplierId], references: [id])
+  status      PurchaseOrderStatus @default(DRAFT)
+  totalAmount Float               @default(0)
+  notes       String?
+  items       PurchaseOrderItem[]
+  approvedAt  DateTime?
+  completedAt DateTime?
+  createdBy   String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  ingredientId    String
+  ingredient      Ingredient    @relation(fields: [ingredientId], references: [id])
+  quantity        Float
+  unitPrice       Float
+  totalPrice      Float
+  receivedQty     Float         @default(0)
+
+  @@map("purchase_order_items")
+}
+
+// ─── Customers ───────────────────────────────────────
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  email     String?
+  orders    Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("customers")
+}
