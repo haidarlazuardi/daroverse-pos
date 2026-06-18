@@ -45,7 +45,7 @@ export const POST = withAuth(async (req) => {
     },
   });
   return success(discount, 201);
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);
 
 export const PUT = withAuth(async (req) => {
   const { id, ...data } = await req.json();
@@ -65,7 +65,7 @@ export const PUT = withAuth(async (req) => {
     },
   });
   return success(discount);
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);
 
 export const DELETE = withAuth(async (req) => {
   const { searchParams } = new URL(req.url);
@@ -74,4 +74,4 @@ export const DELETE = withAuth(async (req) => {
 
   await prisma.discount.update({ where: { id }, data: { active: false } });
   return success({ deleted: true });
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);

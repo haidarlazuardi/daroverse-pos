@@ -6,7 +6,6 @@ import { getLowStockAlerts } from '@/lib/stock-engine';
 export const GET = withAuth(async (req, user) => {
   const { searchParams } = new URL(req.url);
   const period = searchParams.get('period') || 'today';
-  const outletId = searchParams.get('outletId') || user.outletId;
 
   // Date range
   const now = new Date();
@@ -32,7 +31,6 @@ export const GET = withAuth(async (req, user) => {
     status: 'COMPLETED',
     createdAt: { gte: from, lte: now },
   };
-  if (outletId) where.outletId = outletId;
 
   // Core metrics
   const orders = await prisma.order.findMany({ where });
@@ -121,10 +119,7 @@ export const GET = withAuth(async (req, user) => {
     .sort((a, b) => a.date.localeCompare(b.date));
 
   // Low stock alerts
-  let alerts: unknown[] = [];
-  if (outletId) {
-    alerts = await getLowStockAlerts(outletId);
-  }
+  const alerts: unknown[] = await getLowStockAlerts();
 
   return success({
     summary: {
@@ -142,4 +137,4 @@ export const GET = withAuth(async (req, user) => {
     alerts,
     period,
   });
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);

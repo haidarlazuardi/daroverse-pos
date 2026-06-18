@@ -12,6 +12,8 @@ export default function StockOpnamePage() {
   const [activeOpname, setActiveOpname] = useState<any>(null);
   const [editItems, setEditItems] = useState<any[]>([]);
   const [viewMode, setViewMode] = useState(false); // true = viewing completed, false = editing draft
+  const [newLoc, setNewLoc] = useState('BAR');
+  const [newTier, setNewTier] = useState('');
 
   const load = useCallback(async () => {
     try { setOpnames(await api.get('/api/stock-opname')); } catch (e) { console.error(e); }
@@ -22,7 +24,7 @@ export default function StockOpnamePage() {
 
   const createOpname = async () => {
     try {
-      const opname = await api.post('/api/stock-opname', { action: 'create' });
+      const opname = await api.post('/api/stock-opname', { action: 'create', location: newLoc, tier: newTier || undefined });
       setActiveOpname(opname); setEditItems((opname as any).items || []); setViewMode(false);
     } catch (e: any) { alert(e.message || 'Failed'); }
   };
@@ -61,7 +63,23 @@ export default function StockOpnamePage() {
             <h2 className="page-title">Stock Opname</h2>
             <p className="page-subtitle">Physical stock count — the single source of truth for adjustments</p>
           </div>
-          {!activeOpname && <Button onClick={createOpname}>+ New Stock Count</Button>}
+          {!activeOpname && (
+            <div className="flex items-end gap-2">
+              <div>
+                <label className="label">Lokasi</label>
+                <select value={newLoc} onChange={e => setNewLoc(e.target.value)} className="select">
+                  <option value="GUDANG">Gudang</option><option value="BAR">Bar</option><option value="KITCHEN">Dapur</option>
+                </select>
+              </div>
+              <div>
+                <label className="label">Tier (opsional)</label>
+                <select value={newTier} onChange={e => setNewTier(e.target.value)} className="select">
+                  <option value="">Semua</option><option value="A">A (harian)</option><option value="B">B (mingguan)</option><option value="C">C (bulanan)</option>
+                </select>
+              </div>
+              <Button onClick={createOpname}>+ Hitung stok</Button>
+            </div>
+          )}
         </div>
 
         {loading ? <Loader /> : !activeOpname ? (

@@ -9,11 +9,9 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const active = searchParams.get('active');
-  const outletId = searchParams.get('outletId') || user.outletId;
   const limit = parseInt(searchParams.get('limit') || '20');
 
   const where: Record<string, unknown> = {};
-  if (outletId) where.outletId = outletId;
   if (active === 'true') where.closedAt = null;
   if (user.role === 'CASHIER') where.userId = user.userId;
 
@@ -21,7 +19,6 @@ export async function GET(req: NextRequest) {
     where,
     include: {
       user: { select: { name: true, email: true } },
-      outlet: { select: { name: true } },
       _count: { select: { orders: true, expenses: true } },
     },
     orderBy: { openedAt: 'desc' },
@@ -39,9 +36,6 @@ export async function POST(req: NextRequest) {
 
   // OPEN SHIFT
   if (action === 'open') {
-    const outletId = user.outletId;
-    if (!outletId) return error('No outlet assigned');
-
     // Check if user already has an open shift
     const existing = await prisma.shift.findFirst({
       where: { userId: user.userId, closedAt: null },
@@ -50,12 +44,11 @@ export async function POST(req: NextRequest) {
 
     const shift = await prisma.shift.create({
       data: {
-        outletId,
         userId: user.userId,
         openingCash: parseFloat(openingCash) || 0,
         notes,
       },
-      include: { user: { select: { name: true } }, outlet: { select: { name: true } } },
+      include: { user: { select: { name: true } } },
     });
     return success(shift, 201);
   }
@@ -74,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     if (!shift) return error('Shift not found');
     if (shift.closedAt) return error('Shift already closed');
-    if (shift.userId !== user.userId && user.role !== 'ADMIN') return error('Not your shift');
+    if (shift.userId !== user.userId && user.role !== 'SUPER_ADMIN') return error('Not your shift');
 
     // Calculate totals
     let cashSales = 0, qrisSales = 0, totalSales = 0;
@@ -101,7 +94,7 @@ export async function POST(req: NextRequest) {
         totalExpenses,
         notes: notes || shift.notes,
       },
-      include: { user: { select: { name: true } }, outlet: { select: { name: true } } },
+      include: { user: { select: { name: true } } },
     });
     return success(updated);
   }

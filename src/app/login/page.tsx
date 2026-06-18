@@ -18,7 +18,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user) {
-      router.replace(user.role === 'ADMIN' ? '/dashboard' : '/pos');
+      router.replace(user.role === 'SUPER_ADMIN' ? '/dashboard' : '/pos');
     }
   }, [user, router]);
 

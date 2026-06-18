@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
       include: {
         category: true,
         recipe: { include: { items: { include: { ingredient: true } } } },
+        modifierGroups: { orderBy: { sortOrder: 'asc' }, include: { options: { orderBy: { sortOrder: 'asc' } } } },
       },
       orderBy: { name: 'asc' },
     });
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
 export const POST = withAuth(async (req) => {
   try {
     const body = await req.json();
-    const { name, sku, categoryId, price, image, recipe } = body;
+    const { name, sku, categoryId, price, image, recipe, station, takeawayCharge, packagingIngredientId, modifierGroups } = body;
 
     if (!name || (!categoryId && !body.recommendOnly)) return error('Name and category are required');
 
@@ -80,7 +81,12 @@ export const POST = withAuth(async (req) => {
     const finalPrice = price ? parseFloat(price) : Math.ceil((calculatedCost / 0.6) / 1000) * 1000;
 
     const product = await prisma.product.create({
-      data: { name, sku: sku || null, categoryId, price: finalPrice, cost: calculatedCost, image: image || null },
+      data: {
+        name, sku: sku || null, categoryId, price: finalPrice, cost: calculatedCost, image: image || null,
+        station: station === 'FOOD' ? 'FOOD' : 'DRINK',
+        takeawayCharge: takeawayCharge ? parseFloat(String(takeawayCharge)) : 0,
+        packagingIngredientId: packagingIngredientId || null,
+      },
     });
 
     if (recipe?.items?.length) {
@@ -92,12 +98,8 @@ export const POST = withAuth(async (req) => {
       });
     }
 
-    const outlets = await prisma.outlet.findMany();
-    if (outlets.length) {
-      await prisma.outletProduct.createMany({
-        data: outlets.map((o: any) => ({ outletId: o.id, productId: product.id })),
-        skipDuplicates: true,
-      });
+    if (Array.isArray(modifierGroups) && modifierGroups.length) {
+      await createModifierGroups(product.id, modifierGroups);
     }
 
     return success(product, 201);
@@ -105,11 +107,11 @@ export const POST = withAuth(async (req) => {
     console.error('Product create error:', e);
     return error(e.message || 'Failed to create product', 500);
   }
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);
 
 export const PUT = withAuth(async (req) => {
   try {
-    const { id, recipe: newRecipe, ...data } = await req.json();
+    const { id, recipe: newRecipe, modifierGroups: newGroups, ...data } = await req.json();
     if (!id) return error('Product ID is required');
 
     const updateData: Record<string, unknown> = {};
@@ -119,6 +121,9 @@ export const PUT = withAuth(async (req) => {
     if (data.price !== undefined) updateData.price = parseFloat(data.price);
     if (data.image !== undefined) updateData.image = data.image;
     if (data.active !== undefined) updateData.active = data.active;
+    if (data.station !== undefined) updateData.station = data.station === 'FOOD' ? 'FOOD' : 'DRINK';
+    if (data.takeawayCharge !== undefined) updateData.takeawayCharge = parseFloat(data.takeawayCharge) || 0;
+    if (data.packagingIngredientId !== undefined) updateData.packagingIngredientId = data.packagingIngredientId || null;
 
     if (newRecipe) {
       await prisma.recipe.deleteMany({ where: { productId: id } });
@@ -141,22 +146,27 @@ export const PUT = withAuth(async (req) => {
       }
     }
 
+    if (Array.isArray(newGroups)) {
+      await prisma.modifierGroup.deleteMany({ where: { productId: id } });
+      if (newGroups.length) await createModifierGroups(id, newGroups);
+    }
+
     const product = await prisma.product.update({
       where: { id }, data: updateData,
-      include: { category: true, recipe: { include: { items: { include: { ingredient: true } } } } },
+      include: { category: true, recipe: { include: { items: { include: { ingredient: true } } } }, modifierGroups: { include: { options: true } } },
     });
 
     return success(product);
   } catch (e: any) {
     return error(e.message || 'Failed to update product', 500);
   }
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);
 
 // DELETE: Soft delete - deactivate instead of hard delete
 export async function DELETE(req: NextRequest) {
   try {
     const user = authenticate(req);
-    if (!user || user.role !== 'ADMIN') return error('Forbidden', 403);
+    if (!user || user.role !== 'SUPER_ADMIN') return error('Forbidden', 403);
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
@@ -167,5 +177,33 @@ export async function DELETE(req: NextRequest) {
   } catch (e: any) {
     console.error('Product delete error:', e);
     return error(e.message || 'Failed to delete', 500);
+  }
+}
+
+
+// Create per-product modifier groups + options from a payload array.
+async function createModifierGroups(productId: string, groups: any[]) {
+  for (const [gi, g] of groups.entries()) {
+    await prisma.modifierGroup.create({
+      data: {
+        productId,
+        name: g.name,
+        selectionType: g.selectionType === 'MULTI' ? 'MULTI' : 'SINGLE',
+        required: !!g.required,
+        sortOrder: g.sortOrder ?? gi,
+        options: {
+          create: (g.options || []).map((o: any, oi: number) => ({
+            name: o.name,
+            effect: o.effect === 'ADD' ? 'ADD' : 'ADJUST',
+            targetIngredientId: o.targetIngredientId || null,
+            multiplier: o.multiplier !== undefined && o.multiplier !== '' && o.multiplier !== null ? parseFloat(String(o.multiplier)) : null,
+            addQty: o.addQty !== undefined && o.addQty !== '' && o.addQty !== null ? parseFloat(String(o.addQty)) : null,
+            priceDelta: o.priceDelta ? parseFloat(String(o.priceDelta)) : 0,
+            isDefault: !!o.isDefault,
+            sortOrder: o.sortOrder ?? oi,
+          })),
+        },
+      },
+    });
   }
 }

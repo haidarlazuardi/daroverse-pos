@@ -4,7 +4,6 @@ import { success, error, withAuth } from '@/lib/api-helpers';
 
 export const GET = withAuth(async (req, user) => {
   const { searchParams } = new URL(req.url);
-  const outletId = searchParams.get('outletId') || user.outletId;
   const type = searchParams.get('type'); // RAW | PREPPED
   const search = searchParams.get('search');
 
@@ -15,19 +14,19 @@ export const GET = withAuth(async (req, user) => {
   const ingredients = await prisma.ingredient.findMany({
     where,
     include: {
-      stockLevels: outletId ? { where: { outletId } } : true,
+      stockLevels: true,
       prepRecipe: { include: { items: { include: { ingredient: true } } } },
     },
     orderBy: { name: 'asc' },
   });
 
   return success(ingredients);
-}, ['ADMIN']);
+}); // any authenticated user (staff picker / cek stok)
 
 export const POST = withAuth(async (req) => {
   try {
     const body = await req.json();
-    const { name, type, unit, purchaseUnit, conversionRate, minStock, latestPrice, prepRecipe } = body;
+    const { name, type, unit, purchaseUnit, conversionRate, packUnit, packFactor, transferStep, defaultLocation, countTier, opnameTolerance, isPackaging, minStock, latestPrice, prepRecipe } = body;
 
     if (!name || !unit) return error('Name and unit are required');
 
@@ -40,6 +39,13 @@ export const POST = withAuth(async (req) => {
     if (type && (type === 'RAW' || type === 'PREPPED')) createData.type = type;
     if (purchaseUnit && purchaseUnit.trim()) createData.purchaseUnit = purchaseUnit.trim();
     if (conversionRate && parseFloat(String(conversionRate)) > 0) createData.conversionRate = parseFloat(String(conversionRate));
+    if (packUnit && String(packUnit).trim()) createData.packUnit = String(packUnit).trim();
+    if (packFactor && parseFloat(String(packFactor)) > 0) createData.packFactor = parseFloat(String(packFactor));
+    if (transferStep && parseFloat(String(transferStep)) > 0) createData.transferStep = parseFloat(String(transferStep));
+    if (defaultLocation && ['GUDANG','BAR','KITCHEN'].includes(defaultLocation)) createData.defaultLocation = defaultLocation;
+    if (countTier && ['A','B','C'].includes(countTier)) createData.countTier = countTier;
+    if (opnameTolerance !== undefined && opnameTolerance !== '') createData.opnameTolerance = parseFloat(String(opnameTolerance)) || 0;
+    if (isPackaging !== undefined) createData.isPackaging = !!isPackaging;
     if (minStock !== undefined && minStock !== '') createData.minStock = parseFloat(String(minStock)) || 0;
     if (latestPrice !== undefined && latestPrice !== '') createData.latestPrice = parseFloat(String(latestPrice)) || 0;
 
@@ -74,21 +80,18 @@ export const POST = withAuth(async (req) => {
       await prisma.ingredient.update({ where: { id: ingredient.id }, data: { latestPrice: costPerUnit } });
     }
 
-    // Create stock levels for all outlets
-    const outlets = await prisma.outlet.findMany();
-    if (outlets.length) {
-      await prisma.stockLevel.createMany({
-        data: outlets.map((o: any) => ({ outletId: o.id, ingredientId: ingredient.id, quantity: 0 })),
-        skipDuplicates: true,
-      });
-    }
+    // Seed a stock row per location (Gudang/Bar/Kitchen)
+    await prisma.stockLevel.createMany({
+      data: (['GUDANG', 'BAR', 'KITCHEN'] as const).map((location) => ({ location, ingredientId: ingredient.id, quantity: 0 })),
+      skipDuplicates: true,
+    });
 
     return success(ingredient, 201);
   } catch (e: any) {
     console.error('Ingredient create error:', e);
     return error(e?.message || 'Failed to create ingredient', 500);
   }
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);
 
 export const PUT = withAuth(async (req) => {
   const { id, prepRecipe, ...data } = await req.json();
@@ -100,6 +103,13 @@ export const PUT = withAuth(async (req) => {
   if (data.unit !== undefined) updateData.unit = data.unit;
   if (data.purchaseUnit !== undefined) updateData.purchaseUnit = data.purchaseUnit || null;
   if (data.conversionRate !== undefined) updateData.conversionRate = data.conversionRate ? parseFloat(data.conversionRate) : null;
+  if (data.packUnit !== undefined) updateData.packUnit = data.packUnit || null;
+  if (data.packFactor !== undefined) updateData.packFactor = data.packFactor ? parseFloat(data.packFactor) : null;
+  if (data.transferStep !== undefined) updateData.transferStep = data.transferStep ? parseFloat(data.transferStep) : null;
+  if (data.defaultLocation !== undefined) updateData.defaultLocation = data.defaultLocation || null;
+  if (data.countTier !== undefined) updateData.countTier = data.countTier;
+  if (data.opnameTolerance !== undefined) updateData.opnameTolerance = data.opnameTolerance !== '' ? parseFloat(data.opnameTolerance) : null;
+  if (data.isPackaging !== undefined) updateData.isPackaging = !!data.isPackaging;
   if (data.minStock !== undefined) updateData.minStock = parseFloat(data.minStock);
   if (data.latestPrice !== undefined) updateData.latestPrice = parseFloat(data.latestPrice);
 
@@ -109,7 +119,7 @@ export const PUT = withAuth(async (req) => {
   });
 
   return success(ingredient);
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);
 
 export const DELETE = withAuth(async (req) => {
   const { searchParams } = new URL(req.url);
@@ -118,4 +128,4 @@ export const DELETE = withAuth(async (req) => {
 
   await prisma.ingredient.update({ where: { id }, data: { active: false } });
   return success({ deleted: true });
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);

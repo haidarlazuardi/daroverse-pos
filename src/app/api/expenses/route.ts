@@ -2,20 +2,19 @@ import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error } from '@/lib/api-helpers';
 import { authenticate } from '@/lib/auth';
+import { ensureCan } from '@/lib/permissions';
 
 export async function GET(req: NextRequest) {
   const user = authenticate(req);
   if (!user) return error('Unauthorized', 401);
-  if (user.role !== 'ADMIN') return error('Forbidden', 403);
+  if (user.role !== 'SUPER_ADMIN') return error('Forbidden', 403);
 
   const { searchParams } = new URL(req.url);
-  const outletId = searchParams.get('outletId') || user.outletId;
   const from = searchParams.get('from');
   const to = searchParams.get('to');
   const category = searchParams.get('category');
 
   const where: Record<string, unknown> = {};
-  if (outletId) where.outletId = outletId;
   if (category) where.category = category;
   if (from || to) {
     where.createdAt = {};
@@ -25,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   const expenses = await prisma.expense.findMany({
     where,
-    include: { outlet: { select: { name: true } }, shift: { select: { id: true } } },
+    include: { shift: { select: { id: true } } },
     orderBy: { createdAt: 'desc' },
   });
 
@@ -39,12 +38,10 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = authenticate(req);
   if (!user) return error('Unauthorized', 401);
+  { const d = await ensureCan(user, 'expense'); if (d) return error(d, 403); }
 
   const { category, description, amount, paidBy, shiftId } = await req.json();
   if (!category || !description || !amount) return error('Category, description, and amount are required');
-
-  const outletId = user.outletId;
-  if (!outletId) return error('No outlet assigned');
 
   // Auto-link to active shift if not provided
   let finalShiftId = shiftId;
@@ -57,7 +54,6 @@ export async function POST(req: NextRequest) {
 
   const expense = await prisma.expense.create({
     data: {
-      outletId,
       shiftId: finalShiftId,
       category,
       description,
@@ -72,7 +68,7 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const user = authenticate(req);
-  if (!user || user.role !== 'ADMIN') return error('Forbidden', 403);
+  if (!user || user.role !== 'SUPER_ADMIN') return error('Forbidden', 403);
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');

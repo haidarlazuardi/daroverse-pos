@@ -9,7 +9,6 @@ export const GET = withAuth(async (req, user) => {
   const to = searchParams.get('to');
   const month = searchParams.get('month'); // YYYY-MM
   const year = searchParams.get('year');   // YYYY
-  const outletId = searchParams.get('outletId') || user.outletId;
 
   // ─── Build date filter ─────────────────────────────
   let dateFrom: Date;
@@ -36,7 +35,6 @@ export const GET = withAuth(async (req, user) => {
     status: 'COMPLETED',
     createdAt: { gte: dateFrom, lte: dateTo },
   };
-  if (outletId) baseWhere.outletId = outletId;
 
   // ─── Fetch orders once ─────────────────────────────
   const orders = await prisma.order.findMany({
@@ -154,7 +152,6 @@ export const GET = withAuth(async (req, user) => {
       status: 'COMPLETED',
       createdAt: { gte: ytdFrom, lte: ytdTo > now ? now : ytdTo },
     };
-    if (outletId) ytdWhere.outletId = outletId;
 
     const ytdOrders = await prisma.order.findMany({
       where: ytdWhere,
@@ -313,7 +310,6 @@ export const GET = withAuth(async (req, user) => {
       status: 'COMPLETED',
       createdAt: { gte: prevFrom, lte: prevTo },
     };
-    if (outletId) prevWhere.outletId = outletId;
 
     const prevOrders = await prisma.order.findMany({ where: prevWhere });
 
@@ -397,4 +393,4 @@ export const GET = withAuth(async (req, user) => {
   }
 
   return error('Invalid report type. Use: summary, daily, monthly, ytd, category, payment, comparison, product');
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);

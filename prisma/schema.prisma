@@ -7,17 +7,36 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Enums ───────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  ENUMS
+// ═══════════════════════════════════════════════════════
 
 enum Role {
-  ADMIN
+  SUPER_ADMIN
   CASHIER
 }
 
+// 3 stock locations within the single business.
+// Multi-outlet dropped — `location` is now the only stock dimension.
+enum StockLocation {
+  GUDANG // central receiving (PO lands here)
+  BAR // drinks station
+  KITCHEN // food station
+}
+
+enum Station {
+  FOOD
+  DRINK
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+}
+
 enum OrderStatus {
-  PENDING
-  HOLD
-  COMPLETED
+  OPEN // running bill — items can still be added (stock already deducted)
+  COMPLETED // paid & closed
   CANCELLED
   REFUNDED
 }
@@ -36,32 +55,59 @@ enum PaymentStatus {
 }
 
 enum StockMovementType {
-  IN
-  OUT
-  WASTE
-  ADJUSTMENT
-  TRANSFER
-  SALE
-  PURCHASE
-  OPNAME
-  REFUND
+  PURCHASE // PO received into GUDANG (+)
+  TRANSFER // GUDANG → BAR/KITCHEN (logged as two rows: out + in)
+  PRODUCTION // raw consumed (−) / prepped produced (+) via a ProductionOrder
+  SALE // deducted on order item (−)
+  REFUND // sale reversal (+)
+  WASTE // discarded / spoilage (−)
+  OPNAME // stock-count reconciliation (±)
+  ADJUSTMENT // manual correction (±)
 }
 
 enum PurchaseOrderStatus {
   DRAFT
-  APPROVED
   COMPLETED
   CANCELLED
 }
 
 enum IngredientType {
-  RAW
-  PREPPED
+  RAW // bought from suppliers
+  PREPPED // produced in-house via a batch recipe (has prepRecipe)
+}
+
+// Cycle-counting weight tier (drives count frequency, not value).
+enum CountTier {
+  A // fastest drift — count daily (prepped batches, expensive raw)
+  B // medium — weekly (opened raw)
+  C // slow — monthly (sealed warehouse stock)
+}
+
+enum ModifierSelection {
+  SINGLE // pick one (Sweetness, Ice, Serving)
+  MULTI // pick any (Add-on)
+}
+
+enum ModifierEffect {
+  ADJUST // scale a target ingredient by `multiplier` (e.g. Less = 0.5)
+  ADD // add `addQty` of a target ingredient (e.g. Cup, Whip cream)
+}
+
+enum ProductionStatus {
+  DRAFT
+  COMPLETED
+  CANCELLED
 }
 
 enum DiscountType {
   PERCENT
   FIXED
+}
+
+enum LoyaltyTxType {
+  EARN
+  REDEEM
+  ADJUST
 }
 
 enum ExpenseCategory {
@@ -87,64 +133,44 @@ enum OpnameStatus {
   COMPLETED
 }
 
-// ─── Users ───────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  USERS  (2 roles only: SUPER_ADMIN, CASHIER)
+// ═══════════════════════════════════════════════════════
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      Role     @default(CASHIER)
-  pin       String?
-  active    Boolean  @default(true)
-  outletId  String?
-  outlet    Outlet?  @relation(fields: [outletId], references: [id])
-  orders    Order[]
-  shifts    Shift[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id               String            @id @default(cuid())
+  email            String            @unique
+  password         String
+  name             String
+  role             Role              @default(CASHIER)
+  pin              String?
+  active           Boolean           @default(true)
+  orders           Order[]
+  shifts           Shift[]
+  productionOrders ProductionOrder[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@map("users")
 }
 
-// ─── Outlets ─────────────────────────────────────────
-
-model Outlet {
-  id             String          @id @default(cuid())
-  name           String
-  address        String?
-  phone          String?
-  taxRate        Float           @default(0.11) // Configurable tax rate
-  taxInclusive   Boolean         @default(false) // Tax inclusive pricing
-  active         Boolean         @default(true)
-  users          User[]
-  products       OutletProduct[]
-  stockLevels    StockLevel[]
-  orders         Order[]
-  stockMovements StockMovement[]
-  purchaseOrders PurchaseOrder[]
-  shifts         Shift[]
-  expenses       Expense[]
-  assets         Asset[]
-  stockOpnames   StockOpname[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-
-  @@map("outlets")
-}
-
-// ─── App Settings ────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  APP SETTINGS  (global config: tax rate, service rate,
+//  takeaway charge default, business name, etc.)
+// ═══════════════════════════════════════════════════════
 
 model AppSetting {
-  id    String @id @default(cuid())
-  key   String @unique
+  id    String  @id @default(cuid())
+  key   String  @unique
   value String
   label String?
 
   @@map("app_settings")
 }
 
-// ─── Categories ──────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  CATEGORIES & PRODUCTS
+// ═══════════════════════════════════════════════════════
 
 model Category {
   id        String    @id @default(cuid())
@@ -159,49 +185,84 @@ model Category {
   @@map("categories")
 }
 
-// ─── Products ────────────────────────────────────────
-
 model Product {
-  id          String          @id @default(cuid())
-  name        String
-  sku         String?         @unique
-  categoryId  String
-  category    Category        @relation(fields: [categoryId], references: [id])
-  price       Float
-  cost        Float           @default(0)
-  image       String?
-  active      Boolean         @default(true)
-  recipe      Recipe?
-  orderItems  OrderItem[]
-  outlets     OutletProduct[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  id         String   @id @default(cuid())
+  name       String
+  sku        String?  @unique
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  station    Station  @default(DRINK) // FOOD → Kitchen, DRINK → Bar (deduction + print routing)
+  price      Float
+  cost       Float    @default(0) // cached COGS (recomputed from recipe)
+  image      String?
+  active     Boolean  @default(true)
+
+  // Take-away handling
+  takeawayCharge        Float       @default(0) // per-item charge when TAKEAWAY (e.g. 2000 for food)
+  packagingIngredientId String? // consumable deducted when TAKEAWAY (e.g. food box). Drinks use the Serving modifier instead.
+  packagingIngredient   Ingredient? @relation("ProductPackaging", fields: [packagingIngredientId], references: [id])
+
+  recipe         Recipe? // serving recipe (prepped/raw → product)
+  modifierGroups ModifierGroup[] // per-product groups (Sweetness, Ice, Serving, Add-on)
+  orderItems     OrderItem[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
   @@map("products")
 }
 
-model OutletProduct {
-  id        String  @id @default(cuid())
-  outletId  String
-  outlet    Outlet  @relation(fields: [outletId], references: [id])
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-  available Boolean @default(true)
+// ═══════════════════════════════════════════════════════
+//  MODIFIERS  (reusable groups, attached to many products)
+//  Sweetness/Ice/Serving = SINGLE select; Add-on = MULTI.
+// ═══════════════════════════════════════════════════════
 
-  @@unique([outletId, productId])
-  @@map("outlet_products")
+model ModifierGroup {
+  id            String            @id @default(cuid())
+  productId     String // per-product (not reusable) — duplicate per product as chosen
+  product       Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name          String // "Sweetness", "Ice", "Serving", "Add-on"
+  selectionType ModifierSelection @default(SINGLE)
+  required      Boolean           @default(false)
+  sortOrder     Int               @default(0)
+  options       ModifierOption[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([productId])
+  @@map("modifier_groups")
 }
 
-// ─── Recipes ─────────────────────────────────────────
+model ModifierOption {
+  id                 String         @id @default(cuid())
+  groupId            String
+  group              ModifierGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name               String // "Normal", "Less", "No sugar", "Cup", "Whip cream"
+  effect             ModifierEffect @default(ADJUST)
+  targetIngredientId String? // ingredient affected (gula, ice, cup, whip cream)
+  targetIngredient   Ingredient?    @relation("ModifierTarget", fields: [targetIngredientId], references: [id])
+  multiplier         Float? // ADJUST: 1.0 normal / 0.5 less / 0 none
+  addQty             Float? // ADD: base-unit qty added (e.g. 1 cup, 15 ml whip cream)
+  priceDelta         Float          @default(0) // add-on price (Rp)
+  isDefault          Boolean        @default(false) // pre-selected on the modifier sheet
+  sortOrder          Int            @default(0)
+
+  @@map("modifier_options")
+}
+
+// ═══════════════════════════════════════════════════════
+//  RECIPES  (one model, two roles via the target it attaches to)
+//    • productId  set → SERVING recipe (per portion)
+//    • ingredientId set → BATCH/PREP recipe (per standard yield)
+// ═══════════════════════════════════════════════════════
 
 model Recipe {
   id           String       @id @default(cuid())
   productId    String?      @unique
   product      Product?     @relation(fields: [productId], references: [id], onDelete: Cascade)
-  ingredientId String?      @unique // For prepped ingredient sub-recipes
+  ingredientId String?      @unique // PREPPED ingredient this batch recipe produces
   ingredient   Ingredient?  @relation("PrepRecipe", fields: [ingredientId], references: [id], onDelete: Cascade)
-  yieldQty     Float?       // How much the prep recipe yields
-  yieldUnit    String?      // Unit of yield
+  yieldQty     Float? // batch recipe: how much base-unit one standard batch yields
+  yieldUnit    String?
   items        RecipeItem[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
@@ -215,78 +276,139 @@ model RecipeItem {
   recipe       Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   ingredientId String
   ingredient   Ingredient @relation("RecipeUsage", fields: [ingredientId], references: [id])
-  quantity     Float
+  quantity     Float // in the ingredient's base unit
 
   @@unique([recipeId, ingredientId])
   @@map("recipe_items")
 }
 
-// ─── Ingredients ─────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  INGREDIENTS  (multi-level UoM: base → pack → carton)
+// ═══════════════════════════════════════════════════════
 
 model Ingredient {
-  id             String              @id @default(cuid())
-  name           String
-  type           IngredientType      @default(RAW)
-  unit           String              // Primary unit: g, ml, pcs
-  purchaseUnit   String?             // Purchase unit: kg, L, box
-  conversionRate Float?              // purchaseUnit → unit (e.g. 1000 for kg→g)
-  minStock       Float               @default(0)
-  latestPrice    Float               @default(0) // Per primary unit
-  active         Boolean             @default(true)
-  prepRecipe     Recipe?             @relation("PrepRecipe") // If PREPPED, has a sub-recipe
-  recipeItems    RecipeItem[]        @relation("RecipeUsage") // Used in product recipes
-  stockLevels    StockLevel[]
-  stockMovements StockMovement[]
-  purchaseItems  PurchaseOrderItem[]
-  opnameItems    StockOpnameItem[]
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
+  id   String         @id @default(cuid())
+  name String
+  type IngredientType @default(RAW)
+
+  // ── Unit model ──
+  // Everything internal (stock, recipes, movements) is stored in `unit` (base).
+  // pack & carton are display lenses with factors to base.
+  unit           String // BASE unit: g / ml / pcs
+  packUnit       String? // e.g. "pack"
+  packFactor     Float? // base units per pack (e.g. 1000 ml)
+  purchaseUnit   String? // CARTON/buy unit, e.g. "karton" / "kg"
+  conversionRate Float? // base units per purchaseUnit (e.g. 12000 ml/karton)
+  transferStep   Float? // transfers must be multiples of this many base units (= packFactor for sealed; null = free/curah)
+
+  // ── Stock policy ──
+  defaultLocation StockLocation? // where it normally lives (BAR/KITCHEN) — used as default in transfer/production
+  countTier       CountTier      @default(C) // cycle-count frequency tier
+  opnameTolerance Float? // |difference| under this auto-accepts as shrinkage; above → flag
+  minStock        Float          @default(0)
+  latestPrice     Float          @default(0) // per BASE unit
+  isPackaging     Boolean        @default(false) // cup, box, lid — consumable packaging
+  active          Boolean        @default(true)
+
+  // ── Relations ──
+  prepRecipe      Recipe?               @relation("PrepRecipe") // if PREPPED → batch recipe
+  recipeItems     RecipeItem[]          @relation("RecipeUsage") // used in product/batch recipes
+  modifierTargets ModifierOption[]      @relation("ModifierTarget")
+  packagingFor    Product[]             @relation("ProductPackaging")
+  stockLevels     StockLevel[]
+  stockMovements  StockMovement[]
+  purchaseItems   PurchaseOrderItem[]
+  opnameItems     StockOpnameItem[]
+  productionMade  ProductionOrder[]     @relation("ProducedIngredient") // PREPPED produced by these orders
+  productionUsed  ProductionOrderItem[] @relation("ConsumedIngredient") // raw consumed in production
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 
   @@map("ingredients")
 }
 
-// ─── Stock Levels ────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  STOCK  (keyed by ingredient × location)
+// ═══════════════════════════════════════════════════════
 
 model StockLevel {
-  id           String     @id @default(cuid())
-  outletId     String
-  outlet       Outlet     @relation(fields: [outletId], references: [id])
-  ingredientId String
-  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
-  quantity     Float      @default(0)
-  lastUpdated  DateTime   @default(now())
+  id            String        @id @default(cuid())
+  ingredientId  String
+  ingredient    Ingredient    @relation(fields: [ingredientId], references: [id])
+  location      StockLocation
+  quantity      Float         @default(0) // in base unit
+  lastUpdated   DateTime      @default(now())
+  lastCountedAt DateTime? // for cycle-count scheduling
 
-  @@unique([outletId, ingredientId])
+  @@unique([ingredientId, location])
+  @@index([location])
   @@map("stock_levels")
 }
 
-// ─── Stock Movements ─────────────────────────────────
-
 model StockMovement {
   id           String            @id @default(cuid())
-  outletId     String
-  outlet       Outlet            @relation(fields: [outletId], references: [id])
   ingredientId String
   ingredient   Ingredient        @relation(fields: [ingredientId], references: [id])
   type         StockMovementType
-  quantity     Float
-  reference    String?
+  location     StockLocation // location whose stock changed
+  toLocation   StockLocation? // for TRANSFER: destination (location = source)
+  quantity     Float // signed: + increases, − decreases the `location` stock
+  reference    String? // orderId / poId / productionId / opnameId
   notes        String?
   costPerUnit  Float?
   createdBy    String?
   createdAt    DateTime          @default(now())
 
-  @@index([outletId, ingredientId])
+  @@index([ingredientId, location])
+  @@index([type, createdAt])
   @@index([createdAt])
   @@map("stock_movements")
 }
 
-// ─── Stock Opname ────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  PRODUCTION ORDERS  (the missing link: raw → prepped stock)
+//  Consumes raw at a location, produces PREPPED stock there.
+// ═══════════════════════════════════════════════════════
+
+model ProductionOrder {
+  id              String                @id @default(cuid())
+  number          String                @unique
+  ingredientId    String // the PREPPED ingredient produced
+  ingredient      Ingredient            @relation("ProducedIngredient", fields: [ingredientId], references: [id])
+  location        StockLocation
+  batchMultiplier Float                 @default(1) // × the batch recipe's standard yield
+  plannedYield    Float // batchMultiplier × recipe.yieldQty (base unit)
+  actualYield     Float? // counted when finished (≤ or ≠ planned → variance/waste)
+  status          ProductionStatus      @default(DRAFT)
+  items           ProductionOrderItem[] // snapshot of raw consumed
+  notes           String?
+  createdBy       String?
+  user            User?                 @relation(fields: [createdBy], references: [id])
+  createdAt       DateTime              @default(now())
+  completedAt     DateTime?
+
+  @@index([status])
+  @@map("production_orders")
+}
+
+model ProductionOrderItem {
+  id                String          @id @default(cuid())
+  productionOrderId String
+  productionOrder   ProductionOrder @relation(fields: [productionOrderId], references: [id], onDelete: Cascade)
+  ingredientId      String // raw consumed
+  ingredient        Ingredient      @relation("ConsumedIngredient", fields: [ingredientId], references: [id])
+  quantity          Float // base unit consumed (recipe qty × batchMultiplier)
+
+  @@map("production_order_items")
+}
+
+// ═══════════════════════════════════════════════════════
+//  STOCK OPNAME  (cycle counting, per location)
+// ═══════════════════════════════════════════════════════
 
 model StockOpname {
   id        String            @id @default(cuid())
-  outletId  String
-  outlet    Outlet            @relation(fields: [outletId], references: [id])
+  location  StockLocation
   status    OpnameStatus      @default(DRAFT)
   notes     String?
   items     StockOpnameItem[]
@@ -294,6 +416,7 @@ model StockOpname {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
 
+  @@index([location])
   @@map("stock_opnames")
 }
 
@@ -303,25 +426,29 @@ model StockOpnameItem {
   opname       StockOpname @relation(fields: [opnameId], references: [id], onDelete: Cascade)
   ingredientId String
   ingredient   Ingredient  @relation(fields: [ingredientId], references: [id])
-  systemQty    Float       // What system says
-  actualQty    Float       // What was counted
-  difference   Float       // actual - system
+  systemQty    Float // system expected (hidden from counter — blind count)
+  actualQty    Float // physical count entered by staff
+  difference   Float // actualQty − systemQty
+  resolved     Boolean     @default(false) // admin reconciled?
+  resolution   String? // "shrinkage" / "recount" / "flagged"
   notes        String?
 
   @@unique([opnameId, ingredientId])
   @@map("stock_opname_items")
 }
 
-// ─── Discounts ───────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  DISCOUNTS
+// ═══════════════════════════════════════════════════════
 
 model Discount {
   id          String       @id @default(cuid())
-  name        String       // "Member 10%", "Promo Ramadan"
+  name        String
   type        DiscountType
-  value       Float        // 10 for 10%, or 5000 for Rp5.000
+  value       Float
   active      Boolean      @default(true)
-  minOrder    Float?       // Minimum order to apply
-  maxDiscount Float?       // Cap for percent discounts
+  minOrder    Float?
+  maxDiscount Float?
   validFrom   DateTime?
   validTo     DateTime?
   orders      Order[]
@@ -331,63 +458,95 @@ model Discount {
   @@map("discounts")
 }
 
-// ─── Orders ──────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  ORDERS  (calc stack: tax/service/takeaway all optional)
+// ═══════════════════════════════════════════════════════
 
 model Order {
-  id            String      @id @default(cuid())
-  orderNumber   String      @unique
-  outletId      String
-  outlet        Outlet      @relation(fields: [outletId], references: [id])
-  userId        String
-  user          User        @relation(fields: [userId], references: [id])
-  shiftId       String?
-  shift         Shift?      @relation(fields: [shiftId], references: [id])
-  customerId    String?
-  customer      Customer?   @relation(fields: [customerId], references: [id])
-  discountId    String?
-  discountRef   Discount?   @relation(fields: [discountId], references: [id])
-  status        OrderStatus @default(PENDING)
-  subtotal      Float       @default(0)
-  tax           Float       @default(0)
-  taxRate       Float       @default(0.11)
-  discount      Float       @default(0)
-  discountLabel String?
-  total         Float       @default(0)
-  costTotal     Float       @default(0)
-  profit        Float       @default(0)
-  notes         String?
-  splitGroup    String?     // Group ID for split bills
-  splitIndex    Int?        // Which split (1, 2, 3...)
-  refundedAt    DateTime?
-  refundReason  String?
-  refundBy      String?
-  items         OrderItem[]
-  payment       Payment?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id          String      @id @default(cuid())
+  orderNumber String      @unique
+  orderType   OrderType   @default(DINE_IN)
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  shiftId     String?
+  shift       Shift?      @relation(fields: [shiftId], references: [id])
+  customerId  String?
+  customer    Customer?   @relation(fields: [customerId], references: [id])
+  discountId  String?
+  discountRef Discount?   @relation(fields: [discountId], references: [id])
+  status      OrderStatus @default(OPEN)
+  billName    String? // table number / customer name for open bills
 
-  @@index([outletId, createdAt])
+  // ── Calc stack (each charge stored explicitly) ──
+  subtotal       Float   @default(0) // sum of product prices + add-ons
+  taxEnabled     Boolean @default(false)
+  taxRate        Float   @default(0.10)
+  tax            Float   @default(0) // taxRate × subtotal (PRODUCT subtotal only)
+  serviceEnabled Boolean @default(false)
+  serviceRate    Float   @default(0.05)
+  serviceCharge  Float   @default(0) // serviceRate × subtotal
+  takeawayCharge Float   @default(0) // Σ per-item takeaway charge (outside tax)
+  discount       Float   @default(0)
+  discountLabel  String?
+  pointsEarned   Int     @default(0) // loyalty points granted by this order
+  pointsRedeemed Int     @default(0) // loyalty points spent on this order
+  total          Float   @default(0)
+  costTotal      Float   @default(0) // COGS
+  profit         Float   @default(0)
+
+  notes        String?
+  splitGroup   String?
+  splitIndex   Int?
+  refundedAt   DateTime?
+  refundReason String?
+  refundBy     String?
+  items        OrderItem[]
+  payment      Payment?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([createdAt])
   @@index([status])
   @@index([shiftId])
   @@map("orders")
 }
 
 model OrderItem {
-  id        String  @id @default(cuid())
+  id        String              @id @default(cuid())
   orderId   String
-  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order     Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String
-  product   Product @relation(fields: [productId], references: [id])
+  product   Product             @relation(fields: [productId], references: [id])
   quantity  Int
-  price     Float
-  cost      Float   @default(0)
+  price     Float // unit price incl. add-on priceDelta
+  cost      Float               @default(0) // unit COGS incl. modifiers
   subtotal  Float
   notes     String?
+  modifiers OrderItemModifier[] // snapshot of chosen modifiers
 
   @@map("order_items")
 }
 
-// ─── Payments ────────────────────────────────────────
+// Snapshot of modifiers chosen for an order item (history stays correct
+// even if the ModifierOption is later edited or deleted).
+model OrderItemModifier {
+  id                 String         @id @default(cuid())
+  orderItemId        String
+  orderItem          OrderItem      @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  groupName          String
+  optionName         String
+  effect             ModifierEffect
+  targetIngredientId String?
+  multiplier         Float?
+  addQty             Float?
+  priceDelta         Float          @default(0)
+
+  @@map("order_item_modifiers")
+}
+
+// ═══════════════════════════════════════════════════════
+//  PAYMENTS
+// ═══════════════════════════════════════════════════════
 
 model Payment {
   id        String        @id @default(cuid())
@@ -398,28 +557,29 @@ model Payment {
   amount    Float
   received  Float         @default(0)
   change    Float         @default(0)
-  reference String?
+  reference String? // QRIS ref / EDC approval code (for reconciliation)
   createdAt DateTime      @default(now())
 
   @@map("payments")
 }
 
-// ─── Shifts / Cash Management ────────────────────────
+// ═══════════════════════════════════════════════════════
+//  SHIFTS / CASH MANAGEMENT
+// ═══════════════════════════════════════════════════════
 
 model Shift {
   id            String    @id @default(cuid())
-  outletId      String
-  outlet        Outlet    @relation(fields: [outletId], references: [id])
   userId        String
   user          User      @relation(fields: [userId], references: [id])
   openedAt      DateTime  @default(now())
   closedAt      DateTime?
-  openingCash   Float     @default(0) // Modal kembalian
-  closingCash   Float?    // Actual cash counted at close
-  expectedCash  Float?    // System calculated
-  difference    Float?    // closingCash - expectedCash
+  openingCash   Float     @default(0)
+  closingCash   Float?
+  expectedCash  Float?
+  difference    Float?
   cashSales     Float     @default(0)
   qrisSales     Float     @default(0)
+  cardSales     Float     @default(0)
   totalSales    Float     @default(0)
   totalExpenses Float     @default(0)
   notes         String?
@@ -428,16 +588,16 @@ model Shift {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  @@index([outletId, openedAt])
+  @@index([openedAt])
   @@map("shifts")
 }
 
-// ─── Expenses ────────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  EXPENSES
+// ═══════════════════════════════════════════════════════
 
 model Expense {
   id          String          @id @default(cuid())
-  outletId    String
-  outlet      Outlet          @relation(fields: [outletId], references: [id])
   shiftId     String?
   shift       Shift?          @relation(fields: [shiftId], references: [id])
   category    ExpenseCategory
@@ -448,35 +608,36 @@ model Expense {
   createdBy   String?
   createdAt   DateTime        @default(now())
 
-  @@index([outletId, createdAt])
+  @@index([createdAt])
   @@map("expenses")
 }
 
-// ─── Assets / Inventaris Barang ──────────────────────
+// ═══════════════════════════════════════════════════════
+//  ASSETS / INVENTARIS
+// ═══════════════════════════════════════════════════════
 
 model Asset {
   id            String         @id @default(cuid())
   name          String
-  code          String?        @unique // Asset code
-  outletId      String
-  outlet        Outlet         @relation(fields: [outletId], references: [id])
-  category      String         // Peralatan, Elektronik, Furnitur, etc.
+  code          String?        @unique
+  category      String
   condition     AssetCondition @default(GOOD)
   purchaseDate  DateTime?
   purchasePrice Float?
   currentValue  Float?
   supplier      String?
-  location      String?        // "Dapur", "Bar", "Kasir"
+  location      String? // free-text ("Dapur", "Bar", "Kasir")
   notes         String?
   active        Boolean        @default(true)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 
-  @@index([outletId])
   @@map("assets")
 }
 
-// ─── Suppliers ───────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  SUPPLIERS & PURCHASE ORDERS  (PO always receives into GUDANG)
+// ═══════════════════════════════════════════════════════
 
 model Supplier {
   id             String          @id @default(cuid())
@@ -493,20 +654,15 @@ model Supplier {
   @@map("suppliers")
 }
 
-// ─── Purchase Orders ─────────────────────────────────
-
 model PurchaseOrder {
   id          String              @id @default(cuid())
   poNumber    String              @unique
-  outletId    String
-  outlet      Outlet              @relation(fields: [outletId], references: [id])
   supplierId  String
   supplier    Supplier            @relation(fields: [supplierId], references: [id])
   status      PurchaseOrderStatus @default(DRAFT)
   totalAmount Float               @default(0)
   notes       String?
   items       PurchaseOrderItem[]
-  approvedAt  DateTime?
   completedAt DateTime?
   createdBy   String?
   createdAt   DateTime            @default(now())
@@ -522,24 +678,50 @@ model PurchaseOrderItem {
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
   ingredientId    String
   ingredient      Ingredient    @relation(fields: [ingredientId], references: [id])
-  quantity        Float
-  unitPrice       Float
+  quantity        Float // in purchaseUnit (carton)
+  unitPrice       Float // per purchaseUnit
   totalPrice      Float
   receivedQty     Float         @default(0)
 
   @@map("purchase_order_items")
 }
 
-// ─── Customers ───────────────────────────────────────
+// ═══════════════════════════════════════════════════════
+//  CUSTOMERS / CRM  (phone is the dedup key)
+// ═══════════════════════════════════════════════════════
 
 model Customer {
-  id        String   @id @default(cuid())
-  name      String
-  phone     String?
-  email     String?
-  orders    Order[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String    @id @default(cuid())
+  name        String
+  phone       String?   @unique // fixes the duplicate-customer bug
+  email       String?
+  notes       String?
+  // ── Loyalty / CRM (cached aggregates; source of truth = LoyaltyLedger + orders) ──
+  points      Int       @default(0)
+  totalSpent  Float     @default(0)
+  visitCount  Int       @default(0)
+  lastVisitAt DateTime?
+  memberSince DateTime?
+  orders        Order[]
+  loyaltyLedger LoyaltyLedger[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@map("customers")
+}
+
+// Point movements — append-only ledger (audit trail; saldo = sum of points).
+model LoyaltyLedger {
+  id         String        @id @default(cuid())
+  customerId String
+  customer   Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderId    String? // earn/redeem tied to an order
+  type       LoyaltyTxType
+  points     Int // +earn / −redeem / ±adjust
+  note       String?
+  createdBy  String?
+  createdAt  DateTime      @default(now())
+
+  @@index([customerId])
+  @@map("loyalty_ledger")
 }

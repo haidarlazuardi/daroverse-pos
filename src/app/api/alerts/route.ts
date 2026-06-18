@@ -4,14 +4,9 @@ import { success, error, withAuth } from '@/lib/api-helpers';
 import { getLowStockAlerts, getPredictedStockouts } from '@/lib/stock-engine';
 
 export const GET = withAuth(async (req, user) => {
-  const { searchParams } = new URL(req.url);
-  const outletId = searchParams.get('outletId') || user.outletId;
-
-  if (!outletId) return error('No outlet specified');
-
   const [stockAlerts, predictions] = await Promise.all([
-    getLowStockAlerts(outletId),
-    getPredictedStockouts(outletId),
+    getLowStockAlerts(),
+    getPredictedStockouts(),
   ]);
 
   // Negative margin products
@@ -33,4 +28,4 @@ export const GET = withAuth(async (req, user) => {
     }));
 
   return success({ stockAlerts, predictions, marginAlerts });
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);

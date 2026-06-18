@@ -25,7 +25,6 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       email: user.email,
       role: user.role,
-      outletId: user.outletId,
       name: user.name,
     };
 
@@ -34,7 +33,7 @@ export async function POST(req: NextRequest) {
     return success({
       token,
       user: payload,
-      redirect: user.role === 'ADMIN' ? '/dashboard' : '/pos',
+      redirect: user.role === 'SUPER_ADMIN' ? '/dashboard' : '/pos',
     });
   } catch (e) {
     console.error('Login error:', e);

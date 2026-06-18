@@ -8,7 +8,7 @@ export const GET = withAuth(async () => {
     orderBy: { name: 'asc' },
   });
   return success(suppliers);
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);
 
 export const POST = withAuth(async (req) => {
   const { name, contactPerson, phone, email, address } = await req.json();
@@ -18,7 +18,7 @@ export const POST = withAuth(async (req) => {
     data: { name, contactPerson, phone, email, address },
   });
   return success(supplier, 201);
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);
 
 export const PUT = withAuth(async (req) => {
   const { id, ...data } = await req.json();
@@ -35,4 +35,4 @@ export const PUT = withAuth(async (req) => {
     },
   });
   return success(supplier);
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);

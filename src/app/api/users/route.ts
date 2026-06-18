@@ -5,14 +5,14 @@ import { hashPassword } from '@/lib/auth';
 
 export const GET = withAuth(async () => {
   const users = await prisma.user.findMany({
-    select: { id: true, name: true, email: true, role: true, active: true, outletId: true, outlet: true, createdAt: true },
+    select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
     orderBy: { createdAt: 'desc' },
   });
   return success(users);
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);
 
 export const POST = withAuth(async (req) => {
-  const { name, email, password, role, outletId, pin } = await req.json();
+  const { name, email, password, role, pin } = await req.json();
 
   if (!name || !email || !password) return error('Name, email, and password are required');
 
@@ -25,11 +25,10 @@ export const POST = withAuth(async (req) => {
       email,
       password: await hashPassword(password),
       role: role || 'CASHIER',
-      outletId,
       pin,
     },
-    select: { id: true, name: true, email: true, role: true, outletId: true },
+    select: { id: true, name: true, email: true, role: true },
   });
 
   return success(user, 201);
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);

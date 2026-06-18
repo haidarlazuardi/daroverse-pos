@@ -9,7 +9,7 @@ import clsx from 'clsx';
 interface Ingredient {
   id: string; name: string; type: string; unit: string; purchaseUnit: string | null;
   conversionRate: number | null; minStock: number; latestPrice: number;
-  stockLevels: Array<{ quantity: number }>;
+  stockLevels: Array<{ location: string; quantity: number }>;
   prepRecipe?: { yieldQty: number | null; yieldUnit: string | null; items: Array<{ ingredient: { id: string; name: string; unit: string }; quantity: number }> };
 }
 
@@ -115,7 +115,9 @@ export default function InventoryPage() {
             </tr></thead>
             <tbody>
               {ingredients.map(ing => {
-                const stock = ing.stockLevels?.[0]?.quantity ?? 0;
+                const LOCS: Record<string,string> = { GUDANG: 'Gudang', BAR: 'Bar', KITCHEN: 'Dapur' };
+                const stock = (ing.stockLevels || []).reduce((sum, sl) => sum + sl.quantity, 0);
+                const perLoc = (ing.stockLevels || []).map(sl => `${LOCS[sl.location] || sl.location} ${formatNumber(sl.quantity)}`).join(' · ');
                 const isLow = stock <= ing.minStock;
                 const isCritical = stock <= 0;
                 return (
@@ -129,6 +131,7 @@ export default function InventoryPage() {
                           {ing.prepRecipe.yieldQty && ` → yields ${ing.prepRecipe.yieldQty}${ing.prepRecipe.yieldUnit || ing.unit}`}
                         </p>
                       )}
+                      {perLoc && <p className="text-xs text-gray-400 mt-0.5">{perLoc}</p>}
                     </td>
                     <td><Badge variant={ing.type === 'PREPPED' ? 'info' : 'default'}>{ing.type === 'PREPPED' ? '🔸 Prepped' : 'Raw'}</Badge></td>
                     <td className="muted">{ing.unit}</td>
@@ -148,12 +151,13 @@ export default function InventoryPage() {
           </Card>
         ) : (
           <Card padding={false}><div className="table-wrapper"><table className="table">
-            <thead><tr><th>Date</th><th>Ingredient</th><th>Type</th><th className="right">Qty</th><th>Notes</th></tr></thead>
+            <thead><tr><th>Date</th><th>Ingredient</th><th>Lokasi</th><th>Type</th><th className="right">Qty</th><th>Notes</th></tr></thead>
             <tbody>
               {movements.map(mov => (
                 <tr key={mov.id}>
                   <td className="muted">{new Date(mov.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
                   <td className="font-medium">{mov.ingredient.name}</td>
+                  <td className="muted">{(mov as any).location || '—'}</td>
                   <td><Badge variant={mov.quantity > 0 ? 'success' : 'danger'}>{mov.type}</Badge></td>
                   <td className={clsx('right font-bold', mov.quantity > 0 ? 'text-emerald-600' : 'text-red-600')}>
                     {mov.quantity > 0 ? '+' : ''}{formatNumber(mov.quantity)} {mov.ingredient.unit}

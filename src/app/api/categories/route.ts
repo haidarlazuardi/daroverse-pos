@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const user = authenticate(req);
-  if (!user || user.role !== 'ADMIN') return error('Forbidden', 403);
+  if (!user || user.role !== 'SUPER_ADMIN') return error('Forbidden', 403);
 
   const { name, color, icon, sortOrder } = await req.json();
   if (!name) return error('Name is required');

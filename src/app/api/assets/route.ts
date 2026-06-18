@@ -4,20 +4,17 @@ import { success, error, withAuth } from '@/lib/api-helpers';
 
 export const GET = withAuth(async (req, user) => {
   const { searchParams } = new URL(req.url);
-  const outletId = searchParams.get('outletId') || user.outletId;
   const category = searchParams.get('category');
   const condition = searchParams.get('condition');
   const search = searchParams.get('search');
 
   const where: Record<string, unknown> = { active: true };
-  if (outletId) where.outletId = outletId;
   if (category) where.category = category;
   if (condition) where.condition = condition;
   if (search) where.name = { contains: search, mode: 'insensitive' };
 
   const assets = await prisma.asset.findMany({
     where,
-    include: { outlet: { select: { name: true } } },
     orderBy: { name: 'asc' },
   });
 
@@ -30,18 +27,15 @@ export const GET = withAuth(async (req, user) => {
   });
 
   return success({ assets, totalValue, byCategory });
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);
 
 export const POST = withAuth(async (req, user) => {
   const body = await req.json();
-  const outletId = body.outletId || user.outletId;
-  if (!outletId) return error('Outlet is required');
 
   const asset = await prisma.asset.create({
     data: {
       name: body.name,
       code: body.code || null,
-      outletId,
       category: body.category || 'Lainnya',
       condition: body.condition || 'GOOD',
       purchaseDate: body.purchaseDate ? new Date(body.purchaseDate) : null,
@@ -53,7 +47,7 @@ export const POST = withAuth(async (req, user) => {
     },
   });
   return success(asset, 201);
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);
 
 export const PUT = withAuth(async (req) => {
   const { id, ...data } = await req.json();
@@ -71,4 +65,4 @@ export const PUT = withAuth(async (req) => {
     },
   });
   return success(asset);
-}, ['ADMIN']);
+}, ['SUPER_ADMIN']);

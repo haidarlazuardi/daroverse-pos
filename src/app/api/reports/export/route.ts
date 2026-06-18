@@ -18,12 +18,11 @@ function toCsv(headers: string[], rows: string[][]): string {
 
 export async function GET(req: NextRequest) {
   try {
-    const user = requireAuth(req, ['ADMIN']);
+    const user = requireAuth(req, ['SUPER_ADMIN']);
     const { searchParams } = new URL(req.url);
     const type = searchParams.get('type') || 'daily';
     const from = searchParams.get('from');
     const to = searchParams.get('to');
-    const outletId = searchParams.get('outletId') || user.outletId;
 
     const now = new Date();
     const dateFrom = from ? new Date(from) : new Date(now.getFullYear(), now.getMonth(), 1);
@@ -33,7 +32,6 @@ export async function GET(req: NextRequest) {
       status: 'COMPLETED',
       createdAt: { gte: dateFrom, lte: dateTo },
     };
-    if (outletId) baseWhere.outletId = outletId;
 
     const orders = await prisma.order.findMany({
       where: baseWhere,

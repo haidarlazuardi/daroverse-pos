@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth, AuthError, TokenPayload } from './auth';
-
-type Role = 'ADMIN' | 'CASHIER';
+import { requireAuth, AuthError, TokenPayload, Role } from './auth';
 
 export function success(data: unknown, status = 200) {
   return NextResponse.json({ success: true, data }, { status });

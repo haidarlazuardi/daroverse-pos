@@ -4,11 +4,12 @@ import { NextRequest } from 'next/server';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'daroverse-fallback-secret';
 
+export type Role = 'SUPER_ADMIN' | 'CASHIER';
+
 export interface TokenPayload {
   userId: string;
   email: string;
-  role: 'ADMIN' | 'CASHIER';
-  outletId: string | null;
+  role: Role;
   name: string;
 }
 
@@ -47,7 +48,7 @@ export function authenticate(req: NextRequest): TokenPayload | null {
   return verifyToken(token);
 }
 
-export function requireAuth(req: NextRequest, allowedRoles?: ('ADMIN' | 'CASHIER')[]): TokenPayload {
+export function requireAuth(req: NextRequest, allowedRoles?: Role[]): TokenPayload {
   const user = authenticate(req);
   if (!user) throw new AuthError('Unauthorized', 401);
   if (allowedRoles && !allowedRoles.includes(user.role)) throw new AuthError('Forbidden', 403);
