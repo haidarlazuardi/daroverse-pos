@@ -6,9 +6,9 @@
 :root {
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono: 'SF Mono', SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace;
-  --brand: #16a34a;
-  --brand-light: #dcfce7;
-  --brand-dark: #15803d;
+  --brand: #48654D;
+  --brand-light: #DDE6DE;
+  --brand-dark: #3C5440;
   --danger: #dc2626;
   --danger-light: #fef2f2;
   --warning: #f59e0b;
@@ -22,8 +22,8 @@
 
 body {
   font-family: var(--font-sans);
-  background: #f8fafc;
-  color: #0f172a;
+  background: #F7F2E7;
+  color: #1f2421;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -43,8 +43,8 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 @keyframes pulse-green {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
-  50% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(72, 101, 77, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(72, 101, 77, 0); }
 }
 .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
 .animate-slide-up { animation: slideUp 0.3s ease-out forwards; }

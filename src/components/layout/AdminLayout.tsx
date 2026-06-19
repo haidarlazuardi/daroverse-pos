@@ -61,14 +61,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         {/* Logo */}
         <div className={clsx('flex items-center h-16 px-4 border-b border-surface-100', collapsed && 'justify-center')}>
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-brand-500 flex items-center justify-center flex-shrink-0">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
-                <line x1="3" y1="6" x2="21" y2="6"/>
-                <path d="M16 10a4 4 0 01-8 0"/>
-              </svg>
+            <div className="w-9 h-9 rounded-xl bg-cream flex items-center justify-center flex-shrink-0 overflow-hidden border border-cream-dark">
+              <img src="/soeka-logo.png" alt="Soeka House" className="w-full h-full object-contain" />
             </div>
-            {!collapsed && <span className="font-bold text-surface-900 text-lg tracking-tight">Daroverse</span>}
+            {!collapsed && <span className="font-bold text-surface-900 text-lg tracking-tight">Soeka House</span>}
           </div>
         </div>
 
@@ -120,7 +116,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
           <aside className="absolute left-0 top-0 bottom-0 w-[260px] bg-white shadow-2xl flex flex-col animate-fade-in">
             <div className="flex items-center justify-between h-16 px-4 border-b border-surface-100">
-              <span className="font-bold text-surface-900 text-lg">Daroverse</span>
+              <span className="font-bold text-surface-900 text-lg">Soeka House</span>
               <button onClick={() => setMobileOpen(false)} className="p-2 hover:bg-surface-100 rounded-lg">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>

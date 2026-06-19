@@ -60,15 +60,8 @@ export default function LoginPage() {
       <div className="relative w-full max-w-md mx-4">
         {/* Logo */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand-500 mb-5">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
-              <line x1="3" y1="6" x2="21" y2="6"/>
-              <path d="M16 10a4 4 0 01-8 0"/>
-            </svg>
-          </div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Daroverse POS</h1>
-          <p className="text-surface-400 mt-2 text-sm">Sign in to your account</p>
+          <img src="/soeka-logo.png" alt="Soeka House" className="w-44 mx-auto mb-4 rounded-2xl shadow-lg" />
+          <p className="text-surface-400 mt-2 text-sm">Masuk ke akun kamu</p>
         </div>
 
         {/* Login card */}
