@@ -4,7 +4,33 @@ import { NextRequest } from 'next/server';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'daroverse-fallback-secret';
 
-export type Role = 'SUPER_ADMIN' | 'CASHIER';
+export type Role = 'SUPER_ADMIN' | 'OWNER' | 'MANAGER' | 'CASHIER' | 'KITCHEN' | 'INVENTORY';
+
+// Role hierarchy helpers — use these in API guards instead of hardcoding strings
+export const ADMIN_ROLES: Role[]     = ['SUPER_ADMIN', 'OWNER', 'MANAGER'];
+export const SENIOR_ROLES: Role[]    = ['SUPER_ADMIN', 'OWNER'];
+export const ALL_ROLES: Role[]       = ['SUPER_ADMIN', 'OWNER', 'MANAGER', 'CASHIER', 'KITCHEN', 'INVENTORY'];
+export const STOCK_ROLES: Role[]     = ['SUPER_ADMIN', 'OWNER', 'MANAGER', 'INVENTORY'];
+export const KITCHEN_ROLES: Role[]   = ['SUPER_ADMIN', 'OWNER', 'MANAGER', 'KITCHEN'];
+
+export const ROLE_LABELS: Record<Role, string> = {
+  SUPER_ADMIN: 'Super Admin',
+  OWNER:       'Owner',
+  MANAGER:     'Manager',
+  CASHIER:     'Kasir',
+  KITCHEN:     'Dapur',
+  INVENTORY:   'Inventory',
+};
+
+// Default redirect after login per role
+export const ROLE_HOME: Record<Role, string> = {
+  SUPER_ADMIN: '/dashboard',
+  OWNER:       '/dashboard',
+  MANAGER:     '/dashboard',
+  CASHIER:     '/pos',
+  KITCHEN:     '/production',
+  INVENTORY:   '/inventory',
+};
 
 export interface TokenPayload {
   userId: string;

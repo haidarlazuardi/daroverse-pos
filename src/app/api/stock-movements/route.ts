@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, withAuth } from '@/lib/api-helpers';
+import { ADMIN_ROLES, SENIOR_ROLES } from '@/lib/auth';
 import { StockLocation } from '@prisma/client';
 import { ensureCan } from '@/lib/permissions';
 
@@ -23,7 +24,7 @@ export const GET = withAuth(async (req) => {
     take: limit,
   });
   return success(movements);
-}, ['SUPER_ADMIN']);
+}, ADMIN_ROLES);
 
 // Manual movement: WASTE (the staff "Buang" action) or ADJUSTMENT.
 // PURCHASE/TRANSFER/PRODUCTION/SALE flow through their own engine paths.

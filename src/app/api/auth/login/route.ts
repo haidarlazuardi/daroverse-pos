@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { verifyPassword, signToken } from '@/lib/auth';
+import { verifyPassword, signToken, ROLE_HOME } from '@/lib/auth';
 import { success, error } from '@/lib/api-helpers';
 
 export async function POST(req: NextRequest) {
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     return success({
       token,
       user: payload,
-      redirect: user.role === 'SUPER_ADMIN' ? '/dashboard' : '/pos',
+      redirect: (ROLE_HOME as Record<string, string>)[user.role] ?? '/pos',
     });
   } catch (e) {
     console.error('Login error:', e);

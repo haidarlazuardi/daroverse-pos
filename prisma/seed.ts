@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { PrismaClient } from '@prisma/client';
 import { seedUsers } from './seeds/users';
 import { seedSettings } from './seeds/settings';

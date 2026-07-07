@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, withAuth } from '@/lib/api-helpers';
 import { authenticate } from '@/lib/auth';
+import { ADMIN_ROLES, SENIOR_ROLES } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
@@ -107,7 +108,7 @@ export const POST = withAuth(async (req) => {
     console.error('Product create error:', e);
     return error(e.message || 'Failed to create product', 500);
   }
-}, ['SUPER_ADMIN']);
+}, ADMIN_ROLES);
 
 export const PUT = withAuth(async (req) => {
   try {
@@ -160,13 +161,13 @@ export const PUT = withAuth(async (req) => {
   } catch (e: any) {
     return error(e.message || 'Failed to update product', 500);
   }
-}, ['SUPER_ADMIN']);
+}, ADMIN_ROLES);
 
 // DELETE: Soft delete - deactivate instead of hard delete
 export async function DELETE(req: NextRequest) {
   try {
     const user = authenticate(req);
-    if (!user || user.role !== 'SUPER_ADMIN') return error('Forbidden', 403);
+    if (!user || !ADMIN_ROLES.includes(user.role)) return error('Forbidden', 403);
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');

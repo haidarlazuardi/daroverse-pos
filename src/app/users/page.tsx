@@ -69,7 +69,9 @@ export default function UsersPage() {
                       </td>
                       <td className="px-6 py-4 text-sm text-surface-600">{u.email}</td>
                       <td className="px-6 py-4 text-center">
-                        <Badge variant={u.role === 'SUPER_ADMIN' ? 'info' : 'default'}>{u.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Kasir'}</Badge>
+                        <Badge variant={['SUPER_ADMIN','OWNER'].includes(u.role) ? 'info' : ['MANAGER'].includes(u.role) ? 'success' : 'default'}>
+                          {{ SUPER_ADMIN:'Super Admin', OWNER:'Owner', MANAGER:'Manager', CASHIER:'Kasir', KITCHEN:'Dapur', INVENTORY:'Inventory' }[u.role] ?? u.role}
+                        </Badge>
                       </td>
                       <td className="px-6 py-4 text-center">
                         <Badge variant={u.active ? 'success' : 'danger'}>{u.active ? 'Aktif' : 'Nonaktif'}</Badge>
@@ -91,7 +93,14 @@ export default function UsersPage() {
           <Input label="Email" type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
           <Input label="Password" type="password" value={form.password} onChange={e => setForm({...form, password: e.target.value})} />
           <Select label="Role" value={form.role} onChange={e => setForm({...form, role: e.target.value})}
-            options={[{ value: 'CASHIER', label: 'Kasir' }, { value: 'SUPER_ADMIN', label: 'Super Admin' }]} />
+            options={[
+              { value: 'CASHIER',     label: 'Kasir' },
+              { value: 'KITCHEN',     label: 'Dapur' },
+              { value: 'INVENTORY',   label: 'Inventory' },
+              { value: 'MANAGER',     label: 'Manager' },
+              { value: 'OWNER',       label: 'Owner' },
+              { value: 'SUPER_ADMIN', label: 'Super Admin' },
+            ]} />
           <Button onClick={handleAdd} className="w-full">Buat user</Button>
         </div>
       </Modal>
