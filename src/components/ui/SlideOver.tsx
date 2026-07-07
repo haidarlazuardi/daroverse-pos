@@ -3,7 +3,7 @@
 import { ReactNode, useEffect } from 'react';
 import clsx from 'clsx';
 
-interface SlideOverProps {
+export interface SlideOverProps {
   open: boolean;
   onClose: () => void;
   title: string;
