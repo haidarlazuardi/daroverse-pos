@@ -121,3 +121,11 @@ export function formatCurrency(amount: number): string {
 export function formatNumber(n: number): string {
   return new Intl.NumberFormat('id-ID').format(n);
 }
+
+// ─── Composite components (separate files) ───────────────────────────────────
+export { SlideOver } from './SlideOver';
+export type { SlideOverProps } from './SlideOver';
+export { DataTable } from './DataTable';
+export type { Column, DataTableProps } from './DataTable';
+export { Toolbar } from './Toolbar';
+export type { ToolbarProps, FilterOption } from './Toolbar';
