@@ -95,12 +95,26 @@ export async function GET(req: NextRequest) {
   if (!user) return error('Unauthorized', 401);
 
   const { searchParams } = new URL(req.url);
+  const id     = searchParams.get('id');
   const status = searchParams.get('status');
   const shiftId = searchParams.get('shiftId');
   const from = searchParams.get('from');
   const to = searchParams.get('to');
   const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 200);
   const offset = parseInt(searchParams.get('offset') || '0');
+
+  // Single order fetch
+  if (id) {
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        items: { include: { product: true, modifiers: true } },
+        payment: true, discount: true, customer: true,
+      },
+    });
+    if (!order) return error('Order tidak ditemukan', 404);
+    return success(order);
+  }
 
   const where: Prisma.OrderWhereInput = {};
   if (status) where.status = status as any;
