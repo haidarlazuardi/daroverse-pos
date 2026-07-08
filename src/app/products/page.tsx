@@ -186,6 +186,19 @@ export default function ProductsPage() {
           ]}
           onAdd={() => { closeModal(); setShowAdd(true); }} addLabel="Produk Baru"
           onExport={handleExport}
+
+          extra={
+  <button onClick={async () => {
+    if (!confirm('Recalculate HPP semua produk dari resep?')) return;
+    try {
+      await api.patch('/api/products', {});
+      alert('✅ HPP berhasil diupdate!');
+      load();
+    } catch (e: any) { alert(e?.message || 'Gagal'); }
+  }} className="flex items-center gap-1.5 px-3 py-2 text-sm text-purple-600 border border-purple-200 rounded-xl hover:bg-purple-50 transition-colors">
+    💡 Recalculate HPP
+  </button>
+}
           selected={selected}
           bulkActions={
             <Button variant="danger" size="sm" onClick={() => { if(confirm(`Nonaktifkan ${selected.length} produk?`)) Promise.all(selected.map(id => api.delete(`/api/products?id=${id}`))).then(() => { setSelected([]); load(); }); }}>
