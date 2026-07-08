@@ -25,9 +25,9 @@ const SESSIONS = [
     id: 'daily',
     label: 'Hitung Harian',
     sublabel: 'Sebelum buka — ±10 menit',
-    description: 'Bahan yang cepat habis: kopi, susu, sirup. Hitung di Bar.',
+    description: 'Bahan yang cepat habis: kopi, susu, sirup.',
     location: 'BAR',
-    tier: 'A',
+    tier: '',
     icon: '☀️',
     color: 'amber',
   },
@@ -35,7 +35,7 @@ const SESSIONS = [
     id: 'weekly',
     label: 'Hitung Mingguan',
     sublabel: 'Senin pagi — ±30 menit',
-    description: 'Semua bahan di Bar dan Kitchen. Cek juga sisa stok Gudang.',
+    description: 'Semua bahan di satu lokasi. Pilih lokasi yang mau dihitung.',
     location: 'GUDANG',
     tier: '',
     icon: '📋',
@@ -51,7 +51,7 @@ const SESSIONS = [
     icon: '🚀',
     color: 'green',
   },
-] as const;
+];
 
 type SessionId = typeof SESSIONS[number]['id'];
 
@@ -91,6 +91,10 @@ export default function StockOpnamePage() {
   const [activeLoc, setActiveLoc]       = useState<'GUDANG' | 'BAR' | 'KITCHEN'>('GUDANG');
   const [isOpeningStock, setIsOpeningStock] = useState(false);
   const [search, setSearch]             = useState('');
+  // Per-session location override
+  const [sessionLocations, setSessionLocations] = useState<Record<string, string>>({
+    daily: 'BAR', weekly: 'GUDANG', opening: 'GUDANG',
+  });
 
   const loadHistory = useCallback(async () => {
     setLoadingHistory(true);
@@ -104,7 +108,8 @@ export default function StockOpnamePage() {
   // ── Start a session ──────────────────────────────────────────────────────
 
   async function startSession(session: typeof SESSIONS[number]) {
-    setCreating(session.id);
+    const selectedLoc = sessionLocations[session.id] || session.location;
+    setCreating(session.id as SessionId);
     try {
       if (session.id === 'opening') {
         // Opening stock: create opname for all 3 locations, merge items
@@ -123,13 +128,13 @@ export default function StockOpnamePage() {
       } else {
         const opname = await api.post<Opname>('/api/stock-opname', {
           action: 'create',
-          location: session.location,
+          location: selectedLoc,
           tier: session.tier || undefined,
         });
         setActiveOpname(opname);
         setEditItems((opname as any).items || []);
         setIsOpeningStock(false);
-        setActiveLoc(session.location as any);
+        setActiveLoc(selectedLoc as any);
       }
       setViewMode(false);
       setSearch('');
@@ -226,16 +231,34 @@ export default function StockOpnamePage() {
                     <div className={clsx('w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0', styles.icon)}>
                       {session.icon}
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className="font-semibold text-gray-900">{session.label}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{session.sublabel}</p>
                       <p className="text-sm text-gray-600 mt-2">{session.description}</p>
+                      {session.id !== 'opening' && (
+                        <div className="flex items-center gap-2 mt-3">
+                          <span className="text-xs text-gray-400">Lokasi:</span>
+                          <div className="flex gap-1">
+                            {ALL_LOCS.map(loc => (
+                              <button key={loc} type="button"
+                                onClick={e => { e.stopPropagation(); setSessionLocations(prev => ({ ...prev, [session.id]: loc })); }}
+                                className={clsx('px-2.5 py-1 rounded-lg text-xs font-medium transition-all border',
+                                  sessionLocations[session.id] === loc
+                                    ? 'bg-gray-800 text-white border-gray-800'
+                                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400'
+                                )}>
+                                {LOC_LABEL[loc]}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <button
                     onClick={() => startSession(session)}
                     disabled={!!creating}
-                    className={clsx('flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50', styles.btn)}
+                    className={clsx('flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 mt-auto', styles.btn)}
                   >
                     {isLoading ? 'Memuat...' : 'Mulai'}
                   </button>
