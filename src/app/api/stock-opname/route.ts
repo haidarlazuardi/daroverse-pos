@@ -34,12 +34,33 @@ export const POST = withAuth(async (req, user) => {
     // CREATE — snapshot current stock at a location (optionally only a count tier).
     if (action === 'create') {
       if (!location) return error('Lokasi wajib diisi');
+
+      // Query ingredients langsung — lebih reliable daripada lewat stockLevels
+      // karena stockLevels mungkin belum ada untuk ingredient baru
+      const ingredients = await prisma.ingredient.findMany({
+        where: {
+          active: true,
+          ...(tier ? { countTier: tier as any } : {}),
+        },
+        select: { id: true },
+      });
+
+      // Ensure stockLevels exist for all ingredients at this location
+      await prisma.stockLevel.createMany({
+        data: ingredients.map(i => ({
+          ingredientId: i.id,
+          location: location as StockLocation,
+          quantity: 0,
+        })),
+        skipDuplicates: true,
+      });
+
+      // Fetch updated stockLevels
       const stockLevels = await prisma.stockLevel.findMany({
         where: {
           location: location as StockLocation,
-          ingredient: { active: true, ...(tier ? { countTier: tier } : {}) },
+          ingredientId: { in: ingredients.map(i => i.id) },
         },
-        include: { ingredient: { select: { id: true } } },
       });
 
       const opname = await prisma.stockOpname.create({
