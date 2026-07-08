@@ -66,18 +66,27 @@ export const POST = withAuth(async (req, user) => {
           status: 'DRAFT',
           notes,
           createdBy: user.userId,
-          items: {
-            create: ingredients.map((ing) => ({
-              ingredientId: ing.id,
-              systemQty: qtyMap.get(ing.id) ?? 0,
-              actualQty: qtyMap.get(ing.id) ?? 0,
-              difference: 0,
-            })),
-          },
         },
+      });
+
+      // Create items separately dengan skipDuplicates untuk handle constraint issues
+      await prisma.stockOpnameItem.createMany({
+        data: ingredients.map((ing) => ({
+          opnameId: opname.id,
+          ingredientId: ing.id,
+          systemQty: qtyMap.get(ing.id) ?? 0,
+          actualQty: qtyMap.get(ing.id) ?? 0,
+          difference: 0,
+        })),
+        skipDuplicates: true,
+      });
+
+      // Fetch complete opname dengan items
+      const fullOpname = await prisma.stockOpname.findUnique({
+        where: { id: opname.id },
         include: { items: { include: { ingredient: { select: { name: true, unit: true } } } } },
       });
-      return success(opname, 201);
+      return success(fullOpname, 201);
     }
 
     // UPDATE counts (staff enter physical counts — blind to systemQty in the UI).
