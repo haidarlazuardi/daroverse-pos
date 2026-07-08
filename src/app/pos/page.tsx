@@ -204,7 +204,7 @@ export default function POSPage() {
       cart.clear();
       // Rebuild cart dari order items
       for (const item of order.items || []) {
-        cart.addLine({
+        const lineData = {
           productId: item.productId,
           name: item.product?.name || item.name || '',
           basePrice: item.unitPrice,
@@ -216,8 +216,10 @@ export default function POSPage() {
             targetIngredientId: m.targetIngredientId,
             multiplier: m.multiplier, addQty: m.addQty,
           })),
-          quantity: item.quantity,
-        });
+        };
+        for (let q = 0; q < (item.quantity || 1); q++) {
+          cart.addLine(lineData);
+        }
       }
       setActiveBill({ id: bill.id, name: bill.billName || bill.orderNumber });
       setShowBills(false);
