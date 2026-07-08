@@ -161,8 +161,18 @@ export default function POSPage() {
     setSubmitting(true);
     try {
       const received = payMethod === 'CASH' ? parseFloat(cashReceived) || cart.total() : cart.total();
-      const order = await api.post('/api/orders', { ...commonBody(), open: false, paymentMethod: payMethod, paymentReference: payRef || undefined, received });
-      setLastOrder(order); setStep('receipt'); cart.clear(); setSelectedDiscount(''); loadData();
+      let order;
+      if (activeBill) {
+        // Tutup open bill yang sudah ada
+        order = await api.patch<any>('/api/orders', {
+          orderId: activeBill.id, action: 'complete',
+          paymentMethod: payMethod, paymentReference: payRef || undefined,
+          received, taxEnabled: cart.taxEnabled, serviceEnabled: cart.serviceEnabled,
+        });
+      } else {
+        order = await api.post('/api/orders', { ...commonBody(), open: false, paymentMethod: payMethod, paymentReference: payRef || undefined, received });
+      }
+      setLastOrder(order); setStep('receipt'); cart.clear(); setActiveBill(null); setSelectedDiscount(''); loadData();
     } catch (e: any) { alert(e.message || 'Checkout gagal'); }
     finally { setSubmitting(false); }
   };
@@ -188,8 +198,32 @@ export default function POSPage() {
   };
   const startAddingToBill = (bill: any) => { cart.clear(); setActiveBill({ id: bill.id, name: bill.billName || bill.orderNumber }); setShowBills(false); };
   const closeBill = async (bill: any) => {
-    try { await api.patch('/api/orders', { orderId: bill.id, action: 'complete', paymentMethod: 'CASH', taxEnabled: cart.taxEnabled, serviceEnabled: cart.serviceEnabled }); loadBills(); }
-    catch (e: any) { alert(e.message || 'Gagal'); }
+    // Load item dari open bill ke cart, lalu buka payment screen
+    try {
+      const order = await api.get<any>(`/api/orders?id=${bill.id}`);
+      cart.clear();
+      // Rebuild cart dari order items
+      for (const item of order.items || []) {
+        cart.addLine({
+          productId: item.productId,
+          name: item.product?.name || item.name || '',
+          basePrice: item.unitPrice,
+          station: item.product?.station || 'DRINK',
+          takeawayCharge: item.product?.takeawayCharge || 0,
+          modifiers: (item.modifiers || []).map((m: any) => ({
+            groupName: m.groupName, optionName: m.optionName,
+            effect: m.effect, priceDelta: m.priceDelta,
+            targetIngredientId: m.targetIngredientId,
+            multiplier: m.multiplier, addQty: m.addQty,
+          })),
+          quantity: item.quantity,
+        });
+      }
+      setActiveBill({ id: bill.id, name: bill.billName || bill.orderNumber });
+      setShowBills(false);
+      setStep('payment');
+      setShowCart(true);
+    } catch (e: any) { alert(e?.message || 'Gagal load bill'); }
   };
 
   const lookupCustomer = async () => {

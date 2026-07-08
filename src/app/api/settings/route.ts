@@ -1,4 +1,5 @@
 import { success, error, withAuth } from '@/lib/api-helpers';
+import { ADMIN_ROLES, SENIOR_ROLES } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
 // GET — all settings as a { key: value } map (any authenticated user)
@@ -25,4 +26,4 @@ export const PUT = withAuth(async (req) => {
     )
   );
   return success({ saved: entries.length });
-}, ['SUPER_ADMIN']);
+}, ADMIN_ROLES);

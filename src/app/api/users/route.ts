@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, withAuth } from '@/lib/api-helpers';
 import { hashPassword } from '@/lib/auth';
+import { ADMIN_ROLES, SENIOR_ROLES } from '@/lib/auth';
 
 export const GET = withAuth(async () => {
   const users = await prisma.user.findMany({
@@ -9,7 +10,7 @@ export const GET = withAuth(async () => {
     orderBy: { createdAt: 'desc' },
   });
   return success(users);
-}, ['SUPER_ADMIN']);
+}, SENIOR_ROLES);
 
 export const POST = withAuth(async (req) => {
   const { name, email, password, role, pin } = await req.json();
@@ -31,4 +32,4 @@ export const POST = withAuth(async (req) => {
   });
 
   return success(user, 201);
-}, ['SUPER_ADMIN']);
+}, SENIOR_ROLES);

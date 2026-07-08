@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, withAuth } from '@/lib/api-helpers';
+import { ADMIN_ROLES, SENIOR_ROLES } from '@/lib/auth';
 
 export const GET = withAuth(async (req, user) => {
   const { searchParams } = new URL(req.url);
@@ -27,7 +28,7 @@ export const GET = withAuth(async (req, user) => {
   });
 
   return success({ assets, totalValue, byCategory });
-}, ['SUPER_ADMIN']);
+}, ADMIN_ROLES);
 
 export const POST = withAuth(async (req, user) => {
   const body = await req.json();
@@ -47,7 +48,7 @@ export const POST = withAuth(async (req, user) => {
     },
   });
   return success(asset, 201);
-}, ['SUPER_ADMIN']);
+}, ADMIN_ROLES);
 
 export const PUT = withAuth(async (req) => {
   const { id, ...data } = await req.json();
@@ -65,4 +66,4 @@ export const PUT = withAuth(async (req) => {
     },
   });
   return success(asset);
-}, ['SUPER_ADMIN']);
+}, ADMIN_ROLES);

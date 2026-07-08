@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, withAuth } from '@/lib/api-helpers';
 import { authenticate } from '@/lib/auth';
+import { ADMIN_ROLES, SENIOR_ROLES } from '@/lib/auth';
 
 // GET: both admin and cashier can fetch active discounts
 export async function GET(req: NextRequest) {
@@ -45,7 +46,7 @@ export const POST = withAuth(async (req) => {
     },
   });
   return success(discount, 201);
-}, ['SUPER_ADMIN']);
+}, ADMIN_ROLES);
 
 export const PUT = withAuth(async (req) => {
   const { id, ...data } = await req.json();
@@ -65,7 +66,7 @@ export const PUT = withAuth(async (req) => {
     },
   });
   return success(discount);
-}, ['SUPER_ADMIN']);
+}, ADMIN_ROLES);
 
 export const DELETE = withAuth(async (req) => {
   const { searchParams } = new URL(req.url);
@@ -74,4 +75,4 @@ export const DELETE = withAuth(async (req) => {
 
   await prisma.discount.update({ where: { id }, data: { active: false } });
   return success({ deleted: true });
-}, ['SUPER_ADMIN']);
+}, ADMIN_ROLES);
