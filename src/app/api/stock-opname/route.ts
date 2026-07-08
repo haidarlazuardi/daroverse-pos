@@ -35,8 +35,6 @@ export const POST = withAuth(async (req, user) => {
     if (action === 'create') {
       if (!location) return error('Lokasi wajib diisi');
 
-      // Query ingredients langsung — lebih reliable daripada lewat stockLevels
-      // karena stockLevels mungkin belum ada untuk ingredient baru
       const ingredients = await prisma.ingredient.findMany({
         where: {
           active: true,
@@ -45,23 +43,22 @@ export const POST = withAuth(async (req, user) => {
         select: { id: true },
       });
 
-      // Ensure stockLevels exist for all ingredients at this location
-      await prisma.stockLevel.createMany({
-        data: ingredients.map(i => ({
-          ingredientId: i.id,
-          location: location as StockLocation,
-          quantity: 0,
-        })),
-        skipDuplicates: true,
-      });
+      if (!ingredients.length) return error('Tidak ada bahan aktif ditemukan');
 
-      // Fetch updated stockLevels
+      // Upsert stockLevels untuk semua ingredient di lokasi ini
+      for (const ing of ingredients) {
+        await prisma.stockLevel.upsert({
+          where: { ingredientId_location: { ingredientId: ing.id, location: location as StockLocation } },
+          update: {},
+          create: { ingredientId: ing.id, location: location as StockLocation, quantity: 0 },
+        });
+      }
+
+      // Fetch current quantities
       const stockLevels = await prisma.stockLevel.findMany({
-        where: {
-          location: location as StockLocation,
-          ingredientId: { in: ingredients.map(i => i.id) },
-        },
+        where: { location: location as StockLocation, ingredientId: { in: ingredients.map(i => i.id) } },
       });
+      const qtyMap = new Map(stockLevels.map(sl => [sl.ingredientId, sl.quantity]));
 
       const opname = await prisma.stockOpname.create({
         data: {
@@ -70,10 +67,10 @@ export const POST = withAuth(async (req, user) => {
           notes,
           createdBy: user.userId,
           items: {
-            create: stockLevels.map((sl) => ({
-              ingredientId: sl.ingredientId,
-              systemQty: sl.quantity,
-              actualQty: sl.quantity,
+            create: ingredients.map((ing) => ({
+              ingredientId: ing.id,
+              systemQty: qtyMap.get(ing.id) ?? 0,
+              actualQty: qtyMap.get(ing.id) ?? 0,
               difference: 0,
             })),
           },
