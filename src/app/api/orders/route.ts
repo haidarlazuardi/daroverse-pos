@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
       where: { id },
       include: {
         items: { include: { product: true, modifiers: true } },
-        payment: true, discount: true, customer: true,
+        payment: true, customer: true,
       },
     });
     if (!order) return error('Order tidak ditemukan', 404);
