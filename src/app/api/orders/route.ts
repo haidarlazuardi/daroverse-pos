@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, generateOrderNumber } from '@/lib/api-helpers';
-import { authenticate } from '@/lib/auth';
+import { authenticate, ADMIN_ROLES, SENIOR_ROLES } from '@/lib/auth';
 import {
   computeOrderRequirements,
   applyDeductionsInTx,
@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
   const where: Prisma.OrderWhereInput = {};
   if (status) where.status = status as any;
   if (shiftId) where.shiftId = shiftId;
-  if (user.role === 'CASHIER') where.userId = user.userId;
+  if (!ADMIN_ROLES.includes(user.role)) where.userId = user.userId;
   if (from || to) {
     where.createdAt = {};
     if (from) where.createdAt.gte = new Date(from);
@@ -129,7 +129,7 @@ export async function GET(req: NextRequest) {
     prisma.order.count({ where }),
   ]);
 
-  const data = user.role === 'CASHIER' ? orders.map(stripForCashier) : orders;
+  const data = !ADMIN_ROLES.includes(user.role) ? orders.map(stripForCashier) : orders;
   return success({ orders: data, total, limit, offset });
 }
 
@@ -327,7 +327,7 @@ export async function POST(req: NextRequest) {
       return ord;
     });
 
-    return success(user.role === 'CASHIER' ? stripForCashier(order) : order, 201);
+    return success(!ADMIN_ROLES.includes(user.role) ? stripForCashier(order) : order, 201);
   } catch (e: any) {
     console.error('Order creation error:', e);
     return error(e.message || 'Gagal membuat order', 500);
@@ -469,7 +469,7 @@ export async function PATCH(req: NextRequest) {
 
     // ── Refund a completed order (admin only) ──
     if (action === 'refund' && order.status === 'COMPLETED') {
-      if (user.role !== 'SUPER_ADMIN') return error('Hanya admin yang bisa refund', 403);
+      if (!SENIOR_ROLES.includes(user.role)) return error('Hanya admin yang bisa refund', 403);
 
       await prisma.$transaction(async (tx) => {
         await tx.order.update({

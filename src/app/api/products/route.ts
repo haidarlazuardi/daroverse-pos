@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, withAuth } from '@/lib/api-helpers';
 import { authenticate } from '@/lib/auth';
+import { ADMIN_ROLES, SENIOR_ROLES } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
@@ -55,9 +56,15 @@ export const POST = withAuth(async (req) => {
         const ing = ingredients.find((i: any) => i.id === ri.ingredientId);
         if (!ing) continue;
         if ((ing as any).type === 'PREPPED' && (ing as any).prepRecipe) {
-          const prepCost = (ing as any).prepRecipe.items.reduce((s: number, pi: any) => s + pi.quantity * pi.ingredient.latestPrice, 0);
-          const costPerUnit = (ing as any).prepRecipe.yieldQty ? prepCost / (ing as any).prepRecipe.yieldQty : prepCost;
-          calculatedCost += parseFloat(ri.quantity) * costPerUnit;
+          const prep = (ing as any).prepRecipe;
+          // Fallback ke latestPrice kalau yieldQty null/0 (hindari pembagian salah)
+          if (!prep.yieldQty || prep.yieldQty <= 0) {
+            calculatedCost += parseFloat(ri.quantity) * ((ing as any).latestPrice || 0);
+          } else {
+            const prepCost = prep.items.reduce((s: number, pi: any) => s + pi.quantity * pi.ingredient.latestPrice, 0);
+            const costPerUnit = prepCost / prep.yieldQty;
+            calculatedCost += parseFloat(ri.quantity) * costPerUnit;
+          }
         } else {
           calculatedCost += parseFloat(ri.quantity) * ing.latestPrice;
         }
@@ -107,7 +114,7 @@ export const POST = withAuth(async (req) => {
     console.error('Product create error:', e);
     return error(e.message || 'Failed to create product', 500);
   }
-}, ['SUPER_ADMIN']);
+}, ADMIN_ROLES);
 
 export const PUT = withAuth(async (req) => {
   try {
@@ -136,11 +143,23 @@ export const PUT = withAuth(async (req) => {
         });
         const ingredients = await prisma.ingredient.findMany({
           where: { id: { in: newRecipe.items.map((i: any) => i.ingredientId) } },
+          include: { prepRecipe: { include: { items: { include: { ingredient: true } } } } },
         });
         let cost = 0;
         for (const ri of newRecipe.items) {
-          const ing = ingredients.find((i: any) => i.id === ri.ingredientId);
-          if (ing) cost += parseFloat(ri.quantity) * ing.latestPrice;
+          const ing = ingredients.find((i: any) => i.id === ri.ingredientId) as any;
+          if (!ing) continue;
+          if (ing.type === 'PREPPED' && ing.prepRecipe) {
+            const prep = ing.prepRecipe;
+            if (!prep.yieldQty || prep.yieldQty <= 0) {
+              cost += parseFloat(ri.quantity) * (ing.latestPrice || 0);
+            } else {
+              const prepCost = prep.items.reduce((s: number, pi: any) => s + pi.quantity * pi.ingredient.latestPrice, 0);
+              cost += parseFloat(ri.quantity) * (prepCost / prep.yieldQty);
+            }
+          } else {
+            cost += parseFloat(ri.quantity) * ing.latestPrice;
+          }
         }
         updateData.cost = cost;
       }
@@ -160,13 +179,13 @@ export const PUT = withAuth(async (req) => {
   } catch (e: any) {
     return error(e.message || 'Failed to update product', 500);
   }
-}, ['SUPER_ADMIN']);
+}, ADMIN_ROLES);
 
 // DELETE: Soft delete - deactivate instead of hard delete
 export async function DELETE(req: NextRequest) {
   try {
     const user = authenticate(req);
-    if (!user || user.role !== 'SUPER_ADMIN') return error('Forbidden', 403);
+    if (!user || !ADMIN_ROLES.includes(user.role)) return error('Forbidden', 403);
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
@@ -207,3 +226,14 @@ async function createModifierGroups(productId: string, groups: any[]) {
     });
   }
 }
+
+// PATCH /api/products — recalculate semua product cost dari resep
+export const PATCH = withAuth(async () => {
+  try {
+    const { recalculateProductCosts } = await import('@/lib/stock-engine');
+    const result = await recalculateProductCosts();
+    return success({ recalculated: true, warnings: result.warnings });
+  } catch (e: any) {
+    return error(e?.message || 'Gagal recalculate', 500);
+  }
+}, ADMIN_ROLES);

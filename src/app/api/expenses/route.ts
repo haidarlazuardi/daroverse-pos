@@ -2,12 +2,13 @@ import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error } from '@/lib/api-helpers';
 import { authenticate } from '@/lib/auth';
+import { ADMIN_ROLES, SENIOR_ROLES } from '@/lib/auth';
 import { ensureCan } from '@/lib/permissions';
 
 export async function GET(req: NextRequest) {
   const user = authenticate(req);
   if (!user) return error('Unauthorized', 401);
-  if (user.role !== 'SUPER_ADMIN') return error('Forbidden', 403);
+  if (!ADMIN_ROLES.includes(user.role)) return error('Forbidden', 403);
 
   const { searchParams } = new URL(req.url);
   const from = searchParams.get('from');
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const user = authenticate(req);
-  if (!user || user.role !== 'SUPER_ADMIN') return error('Forbidden', 403);
+  if (!user || !ADMIN_ROLES.includes(user.role)) return error('Forbidden', 403);
 
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');

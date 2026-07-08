@@ -1,4 +1,5 @@
 import { success, withAuth } from '@/lib/api-helpers';
+import { ADMIN_ROLES, SENIOR_ROLES } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import { CASHIER_FEATURES, LOCKED_FEATURES, getCashierPermissions } from '@/lib/permissions';
 
@@ -21,4 +22,4 @@ export const PUT = withAuth(async (req) => {
     create: { key: 'cashier_permissions', value: JSON.stringify(clean) },
   });
   return success({ saved: true, permissions: clean });
-}, ['SUPER_ADMIN']);
+}, ADMIN_ROLES);

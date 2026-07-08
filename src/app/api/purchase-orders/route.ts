@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, withAuth, generatePONumber } from '@/lib/api-helpers';
+import { ADMIN_ROLES, SENIOR_ROLES, STOCK_ROLES } from '@/lib/auth';
 import { receivePurchaseOrder } from '@/lib/stock-engine';
 import { ensureCan } from '@/lib/permissions';
 
@@ -59,14 +60,14 @@ export const POST = withAuth(async (req, user) => {
     console.error('PO create error:', e);
     return error(e.message || 'Failed', 500);
   }
-}, ['SUPER_ADMIN']);
+}, STOCK_ROLES);
 
 export const PATCH = withAuth(async (req, user) => {
   try {
     const { id, action } = await req.json();
     if (!id || !action) return error('ID and action required');
     if (action === 'complete') { const d = await ensureCan(user, 'receive_po'); if (d) return error(d, 403); }
-    else if (user.role !== 'SUPER_ADMIN') return error('Hanya admin.', 403);
+    else if (!ADMIN_ROLES.includes(user.role)) return error('Hanya admin.', 403);
 
     if (action === 'complete') {
       await receivePurchaseOrder(id, user.userId);
