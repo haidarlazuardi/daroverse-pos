@@ -284,6 +284,238 @@ export default function AnalyticsPage() {
               </section>
             )}
 
+            {/* ── INSIGHT 1: Jam Sibuk per Hari ──────────────────── */}
+            {data.busyByDay && (
+              <section>
+                <SectionTitle>⏰ Jam & Hari Tersibuk</SectionTitle>
+                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-gray-50 border-b border-gray-100">
+                          <th className="px-3 py-2 text-left text-gray-400 font-semibold w-12">Jam</th>
+                          {data.busyByDay.map((d: any) => (
+                            <th key={d.day} className="px-2 py-2 text-center text-gray-500 font-semibold">{d.day}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Array.from({ length: 17 }, (_, i) => i + 6).map(hour => {
+                          const maxOrders = Math.max(...data.busyByDay.flatMap((d: any) => d.hours.map((h: any) => h.orders)));
+                          return (
+                            <tr key={hour} className="border-b border-gray-100 last:border-0">
+                              <td className="px-3 py-1.5 text-gray-400 font-mono">{String(hour).padStart(2,'0')}:00</td>
+                              {data.busyByDay.map((d: any) => {
+                                const h = d.hours.find((h: any) => h.hour === hour);
+                                const intensity = maxOrders > 0 ? (h?.orders || 0) / maxOrders : 0;
+                                const bg = intensity === 0 ? 'transparent'
+                                  : intensity < 0.3 ? 'rgba(72,101,77,0.1)'
+                                  : intensity < 0.6 ? 'rgba(72,101,77,0.3)'
+                                  : intensity < 0.85 ? 'rgba(72,101,77,0.6)'
+                                  : 'rgba(72,101,77,0.9)';
+                                const textColor = intensity >= 0.6 ? '#fff' : '#48654D';
+                                return (
+                                  <td key={d.day} className="px-2 py-1.5 text-center" style={{ background: bg }}>
+                                    {h?.orders > 0 && (
+                                      <span className="font-bold text-[10px]" style={{ color: textColor }}>{h.orders}</span>
+                                    )}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 flex items-center gap-4">
+                    <span className="text-xs text-gray-400">Intensitas:</span>
+                    {[['Sepi','rgba(72,101,77,0.1)','#48654D'],['Ramai','rgba(72,101,77,0.6)','#fff'],['Peak','rgba(72,101,77,0.9)','#fff']].map(([label, bg, color]) => (
+                      <div key={label} className="flex items-center gap-1.5">
+                        <div className="w-4 h-4 rounded" style={{ background: bg }} />
+                        <span className="text-xs text-gray-500">{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* ── INSIGHT 2: Menu Engineering Matrix ─────────────── */}
+            {data.menuMatrix?.length > 0 && (
+              <section>
+                <SectionTitle>🎯 Menu Engineering</SectionTitle>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  {[
+                    { q: 'star',      label: '⭐ Star',      desc: 'Laku + margin tinggi → Push!',      color: 'bg-emerald-50 border-emerald-200', badge: 'bg-emerald-100 text-emerald-700' },
+                    { q: 'plowhorse', label: '🐴 Plowhorse', desc: 'Laku + margin rendah → Naikkan harga', color: 'bg-blue-50 border-blue-200',    badge: 'bg-blue-100 text-blue-700' },
+                    { q: 'puzzle',    label: '🧩 Puzzle',    desc: 'Jarang + margin tinggi → Promosiin', color: 'bg-amber-50 border-amber-200',   badge: 'bg-amber-100 text-amber-700' },
+                    { q: 'dog',       label: '🐕 Dog',       desc: 'Jarang + margin rendah → Evaluasi',  color: 'bg-red-50 border-red-200',       badge: 'bg-red-100 text-red-700' },
+                  ].map(({ q, label, desc, color, badge }) => {
+                    const items = data.menuMatrix.filter((p: any) => p.quadrant === q);
+                    return (
+                      <div key={q} className={clsx('rounded-xl border p-4', color)}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-bold text-gray-900 text-sm">{label}</span>
+                          <span className={clsx('text-xs font-bold px-2 py-0.5 rounded-full', badge)}>{items.length} menu</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mb-2">{desc}</p>
+                        <div className="space-y-1">
+                          {items.slice(0, 4).map((p: any) => (
+                            <div key={p.name} className="flex items-center justify-between">
+                              <span className="text-xs text-gray-700 truncate max-w-[60%]">{p.name}</span>
+                              <span className="text-xs font-semibold text-gray-600">{p.margin.toFixed(0)}%</span>
+                            </div>
+                          ))}
+                          {items.length > 4 && <p className="text-xs text-gray-400">+{items.length - 4} lainnya</p>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+
+            {/* ── INSIGHT 3: Food Cost % per Kategori ────────────── */}
+            {data.foodCostByCategory?.length > 0 && (
+              <section>
+                <SectionTitle>🍳 Food Cost % per Kategori</SectionTitle>
+                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                  <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex gap-4 text-xs text-gray-400">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"/> &lt;28% Excellent</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block"/> 28-35% Good</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 inline-block"/> 35-45% Warning</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block"/> &gt;45% Danger</span>
+                  </div>
+                  <div className="divide-y divide-gray-100">
+                    {data.foodCostByCategory.map((c: any) => {
+                      const statusColor = c.status === 'excellent' ? 'text-emerald-600 bg-emerald-50'
+                        : c.status === 'good' ? 'text-blue-600 bg-blue-50'
+                        : c.status === 'warning' ? 'text-amber-600 bg-amber-50'
+                        : c.status === 'danger' ? 'text-red-600 bg-red-50'
+                        : 'text-gray-500 bg-gray-50';
+                      const barColor = c.status === 'excellent' ? 'bg-emerald-500'
+                        : c.status === 'good' ? 'bg-blue-500'
+                        : c.status === 'warning' ? 'bg-amber-500'
+                        : 'bg-red-500';
+                      return (
+                        <div key={c.category} className="px-4 py-3">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="font-semibold text-sm text-gray-900">{c.category}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-400">{formatCurrency(c.revenue)} omzet</span>
+                              <span className={clsx('text-xs font-bold px-2 py-0.5 rounded-full', statusColor)}>
+                                {c.foodCostPct.toFixed(1)}%
+                              </span>
+                            </div>
+                          </div>
+                          <div className="w-full bg-gray-100 rounded-full h-1.5">
+                            <div className={clsx('h-1.5 rounded-full', barColor)}
+                              style={{ width: `${Math.min(100, c.foodCostPct)}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* ── INSIGHT 4: Repeat Rate Trend ───────────────────── */}
+            {data.repeatRateTrend && (
+              <section>
+                <SectionTitle>🔄 Repeat Rate 4 Minggu Terakhir</SectionTitle>
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <div className="grid grid-cols-4 gap-3">
+                    {data.repeatRateTrend.map((w: any, i: number) => {
+                      const isLatest = i === data.repeatRateTrend.length - 1;
+                      const prev = i > 0 ? data.repeatRateTrend[i-1].repeatRate : null;
+                      const trend = prev !== null ? w.repeatRate - prev : 0;
+                      return (
+                        <div key={w.week} className={clsx('rounded-xl p-3 text-center', isLatest ? 'bg-brand-50 border border-brand-200' : 'bg-gray-50')}>
+                          <p className="text-xs text-gray-400 mb-1">{w.week}</p>
+                          <p className={clsx('text-2xl font-black', isLatest ? 'text-brand-700' : 'text-gray-700')}>
+                            {w.repeatRate.toFixed(0)}%
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">{w.uniqueCustomers} pelanggan</p>
+                          {trend !== 0 && (
+                            <p className={clsx('text-xs font-semibold mt-1', trend > 0 ? 'text-emerald-600' : 'text-red-500')}>
+                              {trend > 0 ? '▲' : '▼'} {Math.abs(trend).toFixed(1)}%
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-3 text-center">
+                    Repeat rate = % order dari pelanggan yang pernah order sebelumnya. Target &gt;30%.
+                  </p>
+                </div>
+              </section>
+            )}
+
+            {/* ── INSIGHT 5: Waste-to-Revenue ────────────────────── */}
+            {data.wasteRatio && (
+              <section>
+                <SectionTitle>🗑️ Waste-to-Revenue Ratio</SectionTitle>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                  {[
+                    { label: 'Total Waste', value: formatCurrency(data.wasteRatio.totalWasteValue) },
+                    { label: 'Omzet Periode', value: formatCurrency(data.wasteRatio.revenueInPeriod) },
+                    {
+                      label: 'Waste Ratio',
+                      value: `${data.wasteRatio.ratio.toFixed(2)}%`,
+                      variant: data.wasteRatio.status === 'excellent' ? 'positive'
+                        : data.wasteRatio.status === 'good' ? 'default'
+                        : data.wasteRatio.status === 'warning' ? 'warning' : 'negative',
+                    },
+                  ].map(s => (
+                    <div key={s.label} className={clsx(
+                      'rounded-xl border p-4',
+                      s.variant === 'positive' ? 'bg-emerald-50 border-emerald-200'
+                      : s.variant === 'warning' ? 'bg-amber-50 border-amber-200'
+                      : s.variant === 'negative' ? 'bg-red-50 border-red-200'
+                      : 'bg-white border-gray-200'
+                    )}>
+                      <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">{s.label}</p>
+                      <p className={clsx('text-2xl font-black mt-1',
+                        s.variant === 'positive' ? 'text-emerald-700'
+                        : s.variant === 'warning' ? 'text-amber-700'
+                        : s.variant === 'negative' ? 'text-red-700'
+                        : 'text-gray-900'
+                      )}>{s.value}</p>
+                      {s.variant && (
+                        <p className="text-xs mt-1 font-medium" style={{ color: 'inherit' }}>
+                          {data.wasteRatio.status === 'excellent' ? '✅ Sangat baik (<2%)'
+                          : data.wasteRatio.status === 'good' ? '👍 Wajar (2-5%)'
+                          : data.wasteRatio.status === 'warning' ? '⚠️ Perlu perhatian (5-10%)'
+                          : '🚨 Kritis (>10%)'}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {data.wasteRatio.topWastedItems?.length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                      <p className="text-sm font-semibold text-gray-700">Bahan paling banyak terbuang</p>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {data.wasteRatio.topWastedItems.map((item: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between px-4 py-3">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                            <p className="text-xs text-gray-400">{formatNumber(item.qty)} {item.unit} terbuang</p>
+                          </div>
+                          <p className="font-bold text-red-600 text-sm">{formatCurrency(item.value)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
+
           </div>
         )}
       </div>
