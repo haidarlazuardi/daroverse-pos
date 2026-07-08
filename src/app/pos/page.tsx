@@ -164,11 +164,13 @@ export default function POSPage() {
       let order;
       if (activeBill) {
         // Tutup open bill yang sudah ada
-        order = await api.patch<any>('/api/orders', {
+        await api.patch<any>('/api/orders', {
           orderId: activeBill.id, action: 'complete',
           paymentMethod: payMethod, paymentReference: payRef || undefined,
           received, taxEnabled: cart.taxEnabled, serviceEnabled: cart.serviceEnabled,
         });
+        // Fetch order lengkap untuk struk
+        order = await api.get<any>(`/api/orders?id=${activeBill.id}`);
       } else {
         order = await api.post('/api/orders', { ...commonBody(), open: false, paymentMethod: payMethod, paymentReference: payRef || undefined, received });
       }

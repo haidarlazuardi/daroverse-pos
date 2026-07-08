@@ -7,6 +7,7 @@ import { seedModifierTemplates } from './seeds/modifierTemplates';
 import { seedPaymentMethods } from './seeds/paymentMethods';
 import { seedStockLocations } from './seeds/stockLocations';
 import { seedUnits } from './seeds/units';
+import { seedSoekaHouse } from './seeds/soekahouse';
 
 const prisma = new PrismaClient();
 
@@ -27,6 +28,10 @@ async function main() {
   await seedPaymentMethods(prisma);
   await seedStockLocations(prisma);
   await seedUnits(prisma);
+
+  console.log('\n🏠 Seeding Soeka House data...');
+  await seedSoekaHouse(prisma);
+  console.log('✅ Soeka House data seeded');
 
   console.log('\n🎉 Production seed completed successfully.');
 }
