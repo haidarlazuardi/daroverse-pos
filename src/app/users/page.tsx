@@ -39,7 +39,7 @@ export default function UsersPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-surface-900">Users</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-surface-900">Users</h2>
             <p className="text-surface-500 text-sm mt-1">Kelola akun staff dan role</p>
           </div>
           <Button onClick={() => setShowAdd(true)}>+ Tambah user</Button>
@@ -51,11 +51,11 @@ export default function UsersPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-surface-200">
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Nama</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Email</th>
-                    <th className="text-center px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Role</th>
-                    <th className="text-center px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Status</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Bergabung</th>
+                    <th className="text-left px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Nama</th>
+                    <th className="text-left px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Email</th>
+                    <th className="text-center px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Role</th>
+                    <th className="text-center px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Status</th>
+                    <th className="text-left px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Bergabung</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-100">

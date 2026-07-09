@@ -178,9 +178,9 @@ export default function CustomersPage() {
 
       {/* Detail slide-in */}
       {selected && (
-        <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="fixed inset-0 z-50 flex justify-end items-end sm:items-stretch">
           <div className="absolute inset-0 bg-black/40" onClick={() => setSelected(null)} />
-          <div className="relative bg-white w-full max-w-md flex flex-col shadow-2xl animate-slide-in-right">
+          <div className="relative bg-white w-full sm:max-w-md max-h-[90vh] sm:max-h-full flex flex-col shadow-2xl animate-slide-in-right">
             {/* Header */}
             <div className="flex items-start justify-between px-6 py-5 border-b border-gray-100">
               <div className="flex items-center gap-3">

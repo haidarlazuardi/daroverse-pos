@@ -233,7 +233,7 @@ export default function ProductsPage() {
             <Input label="Nama produk" value={form.name} onChange={e => setForm({...form,name:e.target.value})} placeholder="cth. Kopi Susu" />
             <Input label="SKU" value={form.sku} onChange={e => setForm({...form,sku:e.target.value})} placeholder="Opsional" />
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Select label="Kategori" value={form.categoryId} onChange={e => setForm({...form,categoryId:e.target.value})}
               options={[{value:'',label:'Pilih kategori'},...categories.map(c=>({value:c.id,label:c.name}))]} />
             <Select label="Station" value={form.station} onChange={e => setForm({...form,station:e.target.value as 'FOOD'|'DRINK'})}
@@ -273,7 +273,7 @@ export default function ProductsPage() {
           {priceRec && (
             <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
               <p className="text-sm font-semibold text-purple-800 mb-2">💡 HPP: {formatCurrency(priceRec.cost)} — pilih target margin:</p>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                 {Object.entries(priceRec.recommendations).map(([key,val])=>(
                   <button key={key} onClick={()=>setForm({...form,price:String(val)})}
                     className={clsx('py-2 rounded-xl text-sm font-bold border-2 transition-all', form.price===String(val)?'border-purple-500 bg-purple-100 text-purple-700':'border-purple-200 text-purple-600 hover:border-purple-300')}>

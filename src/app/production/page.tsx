@@ -50,7 +50,7 @@ export default function ProductionPage() {
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div><h2 className="text-2xl font-bold text-surface-900">Produksi</h2><p className="text-surface-500 text-sm mt-1">Racik stok olahan dari bahan mentah</p></div>
+          <div><h2 className="text-xl sm:text-2xl font-bold text-surface-900">Produksi</h2><p className="text-surface-500 text-sm mt-1">Racik stok olahan dari bahan mentah</p></div>
           <Button onClick={() => setShow(true)}>+ Bikin batch</Button>
         </div>
 
@@ -59,18 +59,18 @@ export default function ProductionPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead><tr className="border-b border-surface-200">
-                  {['No', 'Olahan', 'Lokasi', 'Rencana', 'Hasil', 'Status', 'Tanggal'].map((h) => <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-surface-500 uppercase">{h}</th>)}
+                  {['No', 'Olahan', 'Lokasi', 'Rencana', 'Hasil', 'Status', 'Tanggal'].map((h) => <th key={h} className="text-left px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">{h}</th>)}
                 </tr></thead>
                 <tbody className="divide-y divide-surface-100">
                   {orders.map((o) => (
                     <tr key={o.id} className="hover:bg-surface-50 text-sm">
-                      <td className="px-6 py-3 font-mono text-xs">{o.number}</td>
-                      <td className="px-6 py-3 font-medium">{o.ingredient?.name}</td>
-                      <td className="px-6 py-3">{o.location}</td>
-                      <td className="px-6 py-3">{o.plannedYield} {o.ingredient?.unit}</td>
-                      <td className="px-6 py-3">{o.actualYield ?? '—'} {o.actualYield ? o.ingredient?.unit : ''}</td>
-                      <td className="px-6 py-3"><Badge variant={o.status === 'COMPLETED' ? 'success' : o.status === 'CANCELLED' ? 'danger' : 'default'}>{o.status}</Badge></td>
-                      <td className="px-6 py-3 text-surface-400">{new Date(o.createdAt).toLocaleString('id-ID')}</td>
+                      <td className="px-3 sm:px-6 py-3 font-mono text-xs">{o.number}</td>
+                      <td className="px-3 sm:px-6 py-3 font-medium">{o.ingredient?.name}</td>
+                      <td className="px-3 sm:px-6 py-3">{o.location}</td>
+                      <td className="px-3 sm:px-6 py-3">{o.plannedYield} {o.ingredient?.unit}</td>
+                      <td className="px-3 sm:px-6 py-3">{o.actualYield ?? '—'} {o.actualYield ? o.ingredient?.unit : ''}</td>
+                      <td className="px-3 sm:px-6 py-3"><Badge variant={o.status === 'COMPLETED' ? 'success' : o.status === 'CANCELLED' ? 'danger' : 'default'}>{o.status}</Badge></td>
+                      <td className="px-3 sm:px-6 py-3 text-surface-400">{new Date(o.createdAt).toLocaleString('id-ID')}</td>
                     </tr>
                   ))}
                 </tbody>

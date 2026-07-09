@@ -35,7 +35,11 @@ export function StatCard({ label, value, sub, icon }: {
           <p className="stat-value">{value}</p>
           {sub && <p className="stat-sub">{sub}</p>}
         </div>
-        {icon && <div className="p-2.5 rounded-xl bg-gray-50 text-gray-400">{icon}</div>}
+        {icon && (
+          <div className="p-2.5 rounded-xl" style={{ background: 'rgba(92,138,98,0.15)', color: 'var(--brand-light)' }}>
+            {icon}
+          </div>
+        )}
       </div>
     </Card>
   );
@@ -64,8 +68,14 @@ export function Modal({ open, onClose, title, children, maxWidth = 'max-w-lg' }:
       <div className={clsx('modal-content', maxWidth)}>
         <div className="modal-header">
           <h2 className="modal-title">{title}</h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-lg">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <button onClick={onClose}
+            className="p-1.5 rounded-lg transition-colors"
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-4)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
           </button>
         </div>
         <div className="modal-body">{children}</div>
@@ -105,14 +115,11 @@ export function Select({ label, options, className, ...props }: {
 export function Loader({ className }: { className?: string }) {
   return (
     <div className={clsx('flex items-center justify-center py-12', className)}>
-      <svg className="animate-spin w-8 h-8 text-green-600" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" fill="none" opacity="0.2"/>
-        <path d="M12 2a10 10 0 0110 10" stroke="currentColor" strokeWidth="3" fill="none" strokeLinecap="round"/>
-      </svg>
+      <div className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+        style={{ borderColor: 'rgba(74,222,128,0.2)', borderTopColor: 'var(--green)' }} />
     </div>
   );
 }
-
 // ─── Format helpers ──────────────────────────────────
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);

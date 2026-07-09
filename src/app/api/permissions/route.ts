@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { success, withAuth } from '@/lib/api-helpers';
 import { ADMIN_ROLES, SENIOR_ROLES } from '@/lib/auth';
 import prisma from '@/lib/prisma';

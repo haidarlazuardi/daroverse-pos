@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, withAuth } from '@/lib/api-helpers';
@@ -36,45 +38,85 @@ export const GET = withAuth(async (req, user) => {
     createdAt: { gte: dateFrom, lte: dateTo },
   };
 
-  // ─── Fetch orders once ─────────────────────────────
-  const orders = await prisma.order.findMany({
-    where: baseWhere,
-    include: {
-      items: { include: { product: { include: { category: true } } } },
-      payment: true,
-      user: { select: { name: true } },
-    },
-    orderBy: { createdAt: 'asc' },
-  });
+  // ─── Fetch orders + expenses + POs in parallel ──────
+  const [orders, expenses, purchaseOrders] = await Promise.all([
+    prisma.order.findMany({
+      where: baseWhere,
+      include: {
+        items: { include: { product: { include: { category: true } } } },
+        payment: true,
+        user: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.expense.findMany({
+      where: { createdAt: { gte: dateFrom, lte: dateTo } },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.purchaseOrder.findMany({
+      where: {
+        status: 'COMPLETED',
+        completedAt: { gte: dateFrom, lte: dateTo },
+      },
+      include: { supplier: { select: { name: true } } },
+      orderBy: { completedAt: 'asc' },
+    }),
+  ]);
 
-  const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
-  const totalCOGS = orders.reduce((s, o) => s + o.costTotal, 0);
-  const totalProfit = orders.reduce((s, o) => s + o.profit, 0);
-  const totalDiscount = orders.reduce((s, o) => s + o.discount, 0);
-  const totalTax = orders.reduce((s, o) => s + o.tax, 0);
+  // ─── Shared totals ──────────────────────────────────
+  const totalRevenue      = orders.reduce((s, o) => s + o.total, 0);
+  const totalCOGS         = orders.reduce((s, o) => s + o.costTotal, 0);
+  const totalProfit       = orders.reduce((s, o) => s + o.profit, 0);
+  const totalDiscount     = orders.reduce((s, o) => s + o.discount, 0);
+  const totalTax          = orders.reduce((s, o) => s + o.tax, 0);
   const totalTransactions = orders.length;
-  const avgOrderValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+  const avgOrderValue     = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+
+  // Expense totals
+  const totalExpenses     = expenses.reduce((s, e) => s + e.amount, 0);
+  const totalPurchases    = purchaseOrders.reduce((s, po) => s + po.totalAmount, 0);
+  const totalCosts        = totalCOGS + totalExpenses + totalPurchases;
+  const grossProfit       = totalRevenue - totalCOGS;
+  const operatingProfit   = totalRevenue - totalCosts;
+
+  // Expense by category
+  const expenseByCategory = expenses.reduce((acc: Record<string, number>, e) => {
+    acc[e.category] = (acc[e.category] || 0) + e.amount;
+    return acc;
+  }, {});
 
   // ─── TYPE: summary ─────────────────────────────────
   if (type === 'summary') {
+    // Hourly breakdown for "jam tersibuk"
+    const hourlyMap = new Map<number, { hour: number; orders: number; revenue: number }>();
+    for (let h = 0; h < 24; h++) hourlyMap.set(h, { hour: h, orders: 0, revenue: 0 });
+    for (const o of orders) {
+      const h = new Date(o.createdAt).getHours();
+      const existing = hourlyMap.get(h)!;
+      existing.orders++; existing.revenue += o.total;
+    }
+    const hourly = Array.from(hourlyMap.values());
+
     return success({
       period: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
       summary: {
-        totalRevenue,
-        totalCOGS,
-        totalProfit,
-        totalDiscount,
-        totalTax,
-        totalTransactions,
-        avgOrderValue,
+        totalRevenue, totalCOGS, totalProfit, totalDiscount, totalTax,
+        totalTransactions, avgOrderValue,
         profitMargin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
         avgDailyRevenue: totalTransactions > 0
-          ? totalRevenue / Math.max(1, Math.ceil((dateTo.getTime() - dateFrom.getTime()) / (1000 * 60 * 60 * 24)))
+          ? totalRevenue / Math.max(1, Math.ceil((dateTo.getTime() - dateFrom.getTime()) / 864e5))
           : 0,
         avgDailyTransactions: totalTransactions > 0
-          ? totalTransactions / Math.max(1, Math.ceil((dateTo.getTime() - dateFrom.getTime()) / (1000 * 60 * 60 * 24)))
+          ? totalTransactions / Math.max(1, Math.ceil((dateTo.getTime() - dateFrom.getTime()) / 864e5))
           : 0,
+        // Cost breakdown
+        totalExpenses, totalPurchases, totalCosts,
+        grossProfit, operatingProfit,
+        grossMargin: totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0,
+        operatingMargin: totalRevenue > 0 ? (operatingProfit / totalRevenue) * 100 : 0,
+        expenseByCategory,
       },
+      hourly,
     });
   }
 
@@ -83,11 +125,12 @@ export const GET = withAuth(async (req, user) => {
     const dailyMap = new Map<string, {
       date: string; revenue: number; cogs: number; profit: number;
       transactions: number; discount: number; tax: number; avgOrder: number;
+      expenses: number; purchases: number;
     }>();
 
     for (const order of orders) {
       const day = new Date(order.createdAt).toISOString().slice(0, 10);
-      const existing = dailyMap.get(day) || { date: day, revenue: 0, cogs: 0, profit: 0, transactions: 0, discount: 0, tax: 0, avgOrder: 0 };
+      const existing = dailyMap.get(day) || { date: day, revenue: 0, cogs: 0, profit: 0, transactions: 0, discount: 0, tax: 0, avgOrder: 0, expenses: 0, purchases: 0 };
       existing.revenue += order.total;
       existing.cogs += order.costTotal;
       existing.profit += order.profit;
@@ -96,17 +139,28 @@ export const GET = withAuth(async (req, user) => {
       existing.tax += order.tax;
       dailyMap.set(day, existing);
     }
-
+    for (const e of expenses) {
+      const day = new Date(e.createdAt).toISOString().slice(0, 10);
+      const ex = dailyMap.get(day) || { date: day, revenue: 0, cogs: 0, profit: 0, transactions: 0, discount: 0, tax: 0, avgOrder: 0, expenses: 0, purchases: 0 };
+      ex.expenses += e.amount;
+      dailyMap.set(day, ex);
+    }
+    for (const po of purchaseOrders) {
+      const day = new Date(po.completedAt!).toISOString().slice(0, 10);
+      const ex = dailyMap.get(day) || { date: day, revenue: 0, cogs: 0, profit: 0, transactions: 0, discount: 0, tax: 0, avgOrder: 0, expenses: 0, purchases: 0 };
+      ex.purchases += po.totalAmount;
+      dailyMap.set(day, ex);
+    }
     const daily = Array.from(dailyMap.values())
-      .map(d => ({ ...d, avgOrder: d.transactions > 0 ? d.revenue / d.transactions : 0 }))
+      .map(d => ({ ...d, avgOrder: d.transactions > 0 ? d.revenue / d.transactions : 0, netProfit: d.profit - d.expenses - d.purchases }))
       .sort((a, b) => a.date.localeCompare(b.date));
-
     return success({
       period: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
-      summary: { totalRevenue, totalCOGS, totalProfit, totalTransactions, avgOrderValue },
+      summary: { totalRevenue, totalCOGS, totalProfit, totalTransactions, avgOrderValue, totalExpenses, totalPurchases, operatingProfit },
       daily,
     });
   }
+
 
   // ─── TYPE: monthly ─────────────────────────────────
   if (type === 'monthly') {
@@ -392,5 +446,43 @@ export const GET = withAuth(async (req, user) => {
     });
   }
 
-  return error('Invalid report type. Use: summary, daily, monthly, ytd, category, payment, comparison, product');
+  // ─── TYPE: expenses ────────────────────────────────
+  if (type === 'expenses') {
+    // Expenses by day
+    const dailyExpenseMap = new Map<string, { date: string; expenses: number; purchases: number; total: number }>();
+    for (const e of expenses) {
+      const day = new Date(e.createdAt).toISOString().slice(0, 10);
+      const ex = dailyExpenseMap.get(day) || { date: day, expenses: 0, purchases: 0, total: 0 };
+      ex.expenses += e.amount; ex.total += e.amount;
+      dailyExpenseMap.set(day, ex);
+    }
+    for (const po of purchaseOrders) {
+      const day = new Date(po.completedAt!).toISOString().slice(0, 10);
+      const ex = dailyExpenseMap.get(day) || { date: day, expenses: 0, purchases: 0, total: 0 };
+      ex.purchases += po.totalAmount; ex.total += po.totalAmount;
+      dailyExpenseMap.set(day, ex);
+    }
+    const dailyExpenses = Array.from(dailyExpenseMap.values()).sort((a, b) => a.date.localeCompare(b.date));
+
+    return success({
+      period: { from: dateFrom.toISOString(), to: dateTo.toISOString() },
+      summary: {
+        totalExpenses, totalPurchases, totalCosts,
+        expenseByCategory,
+        totalRevenue, grossProfit, operatingProfit,
+        operatingMargin: totalRevenue > 0 ? (operatingProfit / totalRevenue) * 100 : 0,
+      },
+      dailyExpenses,
+      expenses: expenses.map(e => ({
+        id: e.id, date: e.createdAt, category: e.category,
+        description: e.description, amount: e.amount, type: 'EXPENSE',
+      })),
+      purchases: purchaseOrders.map(po => ({
+        id: po.id, date: po.completedAt, poNumber: po.poNumber,
+        supplier: po.supplier.name, amount: po.totalAmount, type: 'PURCHASE',
+      })),
+    });
+  }
+
+  return error('Invalid report type. Use: summary, daily, monthly, ytd, category, payment, comparison, product, expenses');
 }, ['SUPER_ADMIN']);

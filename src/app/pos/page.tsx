@@ -404,7 +404,7 @@ export default function POSPage() {
 
         {step === 'payment' && (
           <div className="flex-1 flex flex-col px-4 py-4 overflow-y-auto">
-            <div className="text-center mb-6"><p className="text-gray-500 text-sm">Total</p><p className="text-3xl font-bold text-gray-900 mt-1">{formatCurrency(cart.total())}</p></div>
+            <div className="text-center mb-6"><p className="text-gray-500 text-sm">Total</p><p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">{formatCurrency(cart.total())}</p></div>
 
             {/* Loyalty */}
             <div className="mb-4 border border-gray-200 rounded-xl p-3">
@@ -436,7 +436,7 @@ export default function POSPage() {
                 <label className="label">Uang diterima</label>
                 <input type="number" value={cashReceived} onChange={(e) => setCashReceived(e.target.value)} className="input text-xl text-center font-bold" autoFocus />
                 {parseFloat(cashReceived) >= cart.total() && <p className="text-center text-green-600 font-bold mt-2">Kembali: {formatCurrency(parseFloat(cashReceived) - cart.total())}</p>}
-                <div className="grid grid-cols-3 gap-2 mt-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-3">
                   {[cart.total(), 50000, 100000, 150000, 200000, 500000].map((a, idx) => (<button key={idx} onClick={() => setCashReceived(String(a))} className="btn btn-sm btn-secondary">{formatCurrency(a)}</button>))}
                 </div>
               </div>
@@ -508,7 +508,7 @@ export default function POSPage() {
       <Modal open={billModal} onClose={() => setBillModal(false)} title="Simpan sebagai bill">
         <div className="space-y-3">
           <Input label="Nama / nomor meja" value={billName} onChange={(e) => setBillName(e.target.value)} placeholder="cth. Meja 4 / Budi" />
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {['Meja 1', 'Meja 2', 'Meja 3', 'Meja 4', 'Meja 5', 'Meja 6', 'Take away', 'Bar'].map((t) => (
               <button key={t} onClick={() => setBillName(t)} className={clsx('py-2 rounded-lg text-sm border', billName === t ? 'bg-green-50 border-green-500 text-green-700' : 'border-gray-200 text-gray-600')}>{t}</button>
             ))}

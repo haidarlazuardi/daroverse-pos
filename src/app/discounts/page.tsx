@@ -33,7 +33,7 @@ export default function DiscountsPage() {
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div><h2 className="text-2xl font-bold text-surface-900">Discounts</h2><p className="text-surface-500 text-sm mt-1">Setup discount presets for POS cashier</p></div>
+          <div><h2 className="text-xl sm:text-2xl font-bold text-surface-900">Discounts</h2><p className="text-surface-500 text-sm mt-1">Setup discount presets for POS cashier</p></div>
           <Button onClick={() => setShowAdd(true)}>+ Add Discount</Button>
         </div>
 

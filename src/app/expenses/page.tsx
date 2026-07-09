@@ -50,7 +50,7 @@ export default function ExpensesPage() {
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div><h2 className="text-2xl font-bold text-surface-900">Expenses</h2><p className="text-surface-500 text-sm mt-1">Track daily operational expenses</p></div>
+          <div><h2 className="text-xl sm:text-2xl font-bold text-surface-900">Expenses</h2><p className="text-surface-500 text-sm mt-1">Track daily operational expenses</p></div>
           <Button onClick={() => setShowAdd(true)}>+ Add Expense</Button>
         </div>
 
@@ -74,22 +74,22 @@ export default function ExpensesPage() {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead><tr className="border-b border-surface-200">
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Date</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Category</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Description</th>
-                    <th className="text-right px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Amount</th>
-                    <th className="text-left px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Paid By</th>
-                    <th className="px-6 py-3"></th>
+                    <th className="text-left px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Date</th>
+                    <th className="text-left px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Category</th>
+                    <th className="text-left px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Description</th>
+                    <th className="text-right px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Amount</th>
+                    <th className="text-left px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Paid By</th>
+                    <th className="px-3 sm:px-6 py-3"></th>
                   </tr></thead>
                   <tbody className="divide-y divide-surface-100">
                     {(data.expenses || []).map((e: any) => (
                       <tr key={e.id} className="hover:bg-surface-50">
-                        <td className="px-6 py-3 text-sm text-surface-500">{new Date(e.createdAt).toLocaleDateString('id-ID')}</td>
-                        <td className="px-6 py-3"><Badge>{e.category}</Badge></td>
-                        <td className="px-6 py-3 text-sm text-surface-900">{e.description}</td>
-                        <td className="px-6 py-3 text-sm font-bold text-red-600 text-right">{formatCurrency(e.amount)}</td>
-                        <td className="px-6 py-3 text-sm text-surface-500">{e.paidBy || '—'}</td>
-                        <td className="px-6 py-3"><button onClick={() => handleDelete(e.id)} className="text-red-400 hover:text-red-600 text-sm">Delete</button></td>
+                        <td className="px-3 sm:px-6 py-3 text-sm text-surface-500">{new Date(e.createdAt).toLocaleDateString('id-ID')}</td>
+                        <td className="px-3 sm:px-6 py-3"><Badge>{e.category}</Badge></td>
+                        <td className="px-3 sm:px-6 py-3 text-sm text-surface-900">{e.description}</td>
+                        <td className="px-3 sm:px-6 py-3 text-sm font-bold text-red-600 text-right">{formatCurrency(e.amount)}</td>
+                        <td className="px-3 sm:px-6 py-3 text-sm text-surface-500">{e.paidBy || '—'}</td>
+                        <td className="px-3 sm:px-6 py-3"><button onClick={() => handleDelete(e.id)} className="text-red-400 hover:text-red-600 text-sm">Delete</button></td>
                       </tr>
                     ))}
                   </tbody>

@@ -228,7 +228,7 @@ export default function StockOpnamePage() {
               <div key={session.id} className={clsx('bg-white border-2 rounded-2xl p-5 transition-all', styles.card)}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex items-start gap-4">
-                    <div className={clsx('w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0', styles.icon)}>
+                    <div className={clsx('w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-xl sm:text-2xl flex-shrink-0', styles.icon)}>
                       {session.icon}
                     </div>
                     <div className="flex-1">
