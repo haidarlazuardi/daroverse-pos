@@ -37,7 +37,7 @@ export const GET = withAuth(async (req: NextRequest) => {
         createdAt: true,
         items: {
           select: {
-            quantity: true, unitPrice: true, costPrice: true,
+            quantity: true, price: true, cost: true,
             product: { select: { id: true, name: true, category: { select: { id: true, name: true, color: true } } } },
           },
         },
@@ -133,7 +133,7 @@ export const GET = withAuth(async (req: NextRequest) => {
     const d = new Date(o.createdAt).getDay();
     const h = new Date(o.createdAt).getHours();
     if (hourlyGrid[d]?.[h]) {
-      const rev = o.items.reduce((s: number, i: any) => s + i.unitPrice * i.quantity, 0);
+      const rev = o.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
       hourlyGrid[d][h].orders++;
       hourlyGrid[d][h].revenue += rev;
     }
@@ -153,8 +153,8 @@ export const GET = withAuth(async (req: NextRequest) => {
       const pid = item.product.id;
       const existing = productStats.get(pid) || { name: item.product.name, category: item.product.category?.name || 'Lainnya', categoryColor: item.product.category?.color || '#888', qty: 0, revenue: 0, cost: 0 };
       existing.qty     += item.quantity;
-      existing.revenue += item.unitPrice * item.quantity;
-      existing.cost    += (item.costPrice || 0) * item.quantity;
+      existing.revenue += item.price * item.quantity;
+      existing.cost    += (item.cost || 0) * item.quantity;
       productStats.set(pid, existing);
     }
   }
