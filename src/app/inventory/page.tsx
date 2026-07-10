@@ -215,10 +215,6 @@ export default function InventoryPage() {
       render: ing => <span className="text-gray-500 text-sm">{formatNumber(ing.minStock)} {ing.unit}</span>,
     },
     {
-      key: 'latestPrice', label: 'Harga/Unit', sortable: true, width: 'w-32',
-      render: ing => <span className="text-gray-700">{formatCurrency(ing.latestPrice)}</span>,
-    },
-    {
       key: 'status', label: 'Status', width: 'w-20',
       render: ing => isCritical(ing)
         ? <Badge variant="danger">Habis</Badge>
