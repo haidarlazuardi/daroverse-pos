@@ -15,7 +15,7 @@ const PERIODS = [
 
 const LOC_LABEL: Record<string, string> = { GUDANG: 'Gudang', BAR: 'Bar', KITCHEN: 'Dapur' };
 
-function KpiCard({ label, value, sub, variant = 'default' }: { label: string; value: string; sub?: string; variant?: 'default'|'success'|'warning'|'danger' }) {
+function KpiCard({ label, value, sub, variant = 'default' }: { label: string; value: string | number; sub?: string; variant?: 'default'|'success'|'warning'|'danger' }) {
   const colors = {
     default: 'bg-white border-gray-200 text-gray-900',
     success: 'bg-emerald-50 border-emerald-200 text-emerald-700',
@@ -77,48 +77,50 @@ export default function AnalyticsPage() {
           <div className="space-y-6">
 
             {/* ── 1. COGS & Revenue ─────────────────────────────────── */}
-            <section>
-              <SectionTitle>💰 Pendapatan & Biaya</SectionTitle>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                <KpiCard label="Pendapatan" value={formatCurrency(data.cogs.revenue)} />
-                <KpiCard label="COGS Teoritis"
-                  value={formatCurrency(data.cogs.theoreticalCOGS)}
-                  sub={`${data.cogs.theoreticalPct.toFixed(1)}% dari omzet`}
-                  variant={data.cogs.theoreticalPct > 40 ? 'warning' : 'success'}
-                />
-                <KpiCard label="Buang (Waste)"
-                  value={formatCurrency(data.cogs.wasteValue)}
-                  variant={data.cogs.wasteValue > 100000 ? 'warning' : 'default'}
-                />
-                <KpiCard label="Selisih Opname"
-                  value={formatCurrency(data.cogs.shrinkValue)}
-                  variant={data.cogs.shrinkValue > 50000 ? 'warning' : 'default'}
-                />
-              </div>
-              {/* Kebocoran highlight */}
-              <div className={clsx('rounded-xl p-4 flex items-center justify-between',
-                data.cogs.leakPct > 5 ? 'bg-red-50 border border-red-200' : 'bg-emerald-50 border border-emerald-200')}>
-                <div>
-                  <p className="text-xs font-medium text-gray-500">Total Kebocoran</p>
-                  <p className={clsx('text-2xl font-bold', data.cogs.leakPct > 5 ? 'text-red-600' : 'text-emerald-600')}>
-                    {formatCurrency(data.cogs.leakTotal)}
-                  </p>
-                  <p className="text-xs" style={{color:"var(--text-2)"}} mt-0.5">waste + selisih opname</p>
+            {data?.cogs && (
+              <section>
+                <SectionTitle>💰 Pendapatan & Biaya</SectionTitle>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                  <KpiCard label="Pendapatan" value={formatCurrency(data.cogs.revenue || 0)} />
+                  <KpiCard label="COGS Teoritis"
+                    value={formatCurrency(data.cogs.theoreticalCOGS || 0)}
+                    sub={`${(data.cogs.theoreticalPct || 0).toFixed(1)}% dari omzet`}
+                    variant={(data.cogs.theoreticalPct || 0) > 40 ? 'warning' : 'success'}
+                  />
+                  <KpiCard label="Buang (Waste)"
+                    value={formatCurrency(data.cogs.wasteValue || 0)}
+                    variant={(data.cogs.wasteValue || 0) > 100000 ? 'warning' : 'default'}
+                  />
+                  <KpiCard label="Selisih Opname"
+                    value={formatCurrency(data.cogs.shrinkValue || 0)}
+                    variant={(data.cogs.shrinkValue || 0) > 50000 ? 'warning' : 'default'}
+                  />
                 </div>
-                <div className="text-right">
-                  <p className={clsx('text-3xl sm:text-4xl font-black', data.cogs.leakPct > 5 ? 'text-red-500' : 'text-emerald-500')}>
-                    {data.cogs.leakPct.toFixed(1)}%
-                  </p>
-                  <p className="text-xs" style={{color:"var(--text-2)"}}">dari COGS</p>
-                  <p className={clsx('text-xs font-semibold mt-1', data.cogs.leakPct > 5 ? 'text-red-600' : 'text-emerald-600')}>
-                    {data.cogs.leakPct > 5 ? '⚠️ Perlu perhatian' : '✅ Masih wajar'}
-                  </p>
+                {/* Kebocoran highlight */}
+                <div className={clsx('rounded-xl p-4 flex items-center justify-between',
+                  (data.cogs.leakPct || 0) > 5 ? 'bg-red-50 border border-red-200' : 'bg-emerald-50 border border-emerald-200')}>
+                  <div>
+                    <p className="text-xs font-medium text-gray-500">Total Kebocoran</p>
+                    <p className={clsx('text-2xl font-bold', (data.cogs.leakPct || 0) > 5 ? 'text-red-600' : 'text-emerald-600')}>
+                      {formatCurrency(data.cogs.leakTotal || 0)}
+                    </p>
+                    <p className="text-xs mt-0.5" style={{color:"var(--text-2)"}}>waste + selisih opname</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={clsx('text-3xl sm:text-4xl font-black', (data.cogs.leakPct || 0) > 5 ? 'text-red-500' : 'text-emerald-500')}>
+                      {(data.cogs.leakPct || 0).toFixed(1)}%
+                    </p>
+                    <p className="text-xs" style={{color:"var(--text-2)"}}>dari COGS</p>
+                    <p className={clsx('text-xs font-semibold mt-1', (data.cogs.leakPct || 0) > 5 ? 'text-red-600' : 'text-emerald-600')}>
+                      {(data.cogs.leakPct || 0) > 5 ? '⚠️ Perlu perhatian' : '✅ Masih wajar'}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </section>
+              </section>
+            )}
 
             {/* ── 2. Reorder Suggestions ─────────────────────────────── */}
-            {data.reorderSuggestions?.length > 0 && (
+            {data?.reorderSuggestions?.length > 0 && (
               <section>
                 <SectionTitle>🛒 Perlu Dibeli Segera</SectionTitle>
                 <div className="space-y-2">
@@ -145,63 +147,65 @@ export default function AnalyticsPage() {
                         <p className="text-sm font-bold text-gray-900">
                           {item.suggestPurchaseUnit || `${formatNumber(item.suggestQty)} ${item.unit}`}
                         </p>
-                        <p className="text-xs" style={{color:"var(--text-2)"}}">≈ {formatCurrency(item.estimatedCost)}</p>
+                        <p className="text-xs" style={{color:"var(--text-2)"}}>≈ {formatCurrency(item.estimatedCost)}</p>
                       </div>
                     </div>
                   ))}
                   {data.reorderSuggestions.length > 8 && (
-                    <p className="text-sm text-center" style={{color:"var(--text-2)"}} py-2">+{data.reorderSuggestions.length - 8} bahan lainnya</p>
+                    <p className="text-sm text-center py-2" style={{color:"var(--text-2)"}}>+{data.reorderSuggestions.length - 8} bahan lainnya</p>
                   )}
                 </div>
               </section>
             )}
 
             {/* ── 3. Stok per Lokasi ─────────────────────────────────── */}
-            <section>
-              <SectionTitle>📦 Stok per Lokasi</SectionTitle>
-              <div className="space-y-2">
-                {(['GUDANG', 'BAR', 'KITCHEN'] as const).map(loc => {
-                  const items = (data.stockByLocation[loc] || []).filter((i: any) => i.quantity > 0);
-                  const isExpanded = expandedLoc === loc;
-                  const shown = isExpanded ? items : items.slice(0, 5);
-                  return (
-                    <div key={loc} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                      <button onClick={() => setExpandedLoc(isExpanded ? null : loc)}
-                        className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold text-gray-900">{LOC_LABEL[loc]}</span>
-                          <Badge variant="default">{items.length} bahan</Badge>
-                        </div>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                          className={clsx("transition-transform" style={{color:"var(--text-2)"}}', isExpanded && 'rotate-90')}>
-                          <polyline points="9 18 15 12 9 6"/>
-                        </svg>
-                      </button>
-                      {items.length > 0 && (
-                        <div className="border-t border-gray-100 divide-y divide-gray-100">
-                          {shown.map((i: any, idx: number) => (
-                            <div key={idx} className="flex justify-between items-center px-4 py-2.5">
-                              <span className="text-sm text-gray-700">{i.name}{i.type === 'PREPPED' && <span className="text-purple-400 ml-1">●</span>}</span>
-                              <span className="text-sm font-semibold text-gray-900">{formatNumber(i.quantity)} {i.unit}</span>
-                            </div>
-                          ))}
-                          {!isExpanded && items.length > 5 && (
-                            <button onClick={() => setExpandedLoc(loc)}
-                              className="w-full py-2 text-sm text-brand-600 hover:bg-brand-50 transition-colors">
-                              Lihat {items.length - 5} bahan lainnya →
-                            </button>
-                          )}
-                        </div>
-                      )}
-                      {items.length === 0 && <p className="px-4 py-3 text-sm" style={{color:"var(--text-2)"}}">Tidak ada stok</p>}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
+            {data?.stockByLocation && (
+              <section>
+                <SectionTitle>📦 Stok per Lokasi</SectionTitle>
+                <div className="space-y-2">
+                  {(['GUDANG', 'BAR', 'KITCHEN'] as const).map(loc => {
+                    const items = (data.stockByLocation[loc] || []).filter((i: any) => i.quantity > 0);
+                    const isExpanded = expandedLoc === loc;
+                    const shown = isExpanded ? items : items.slice(0, 5);
+                    return (
+                      <div key={loc} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                        <button onClick={() => setExpandedLoc(isExpanded ? null : loc)}
+                          className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <span className="font-semibold text-gray-900">{LOC_LABEL[loc]}</span>
+                            <Badge variant="default">{items.length} bahan</Badge>
+                          </div>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                            className={clsx("transition-transform", isExpanded && "rotate-90")} style={{color:"var(--text-2)"}}>
+                            <polyline points="9 18 15 12 9 6"/>
+                          </svg>
+                        </button>
+                        {items.length > 0 && (
+                          <div className="border-t border-gray-100 divide-y divide-gray-100">
+                            {shown.map((i: any, idx: number) => (
+                              <div key={idx} className="flex justify-between items-center px-4 py-2.5">
+                                <span className="text-sm text-gray-700">{i.name}{i.type === 'PREPPED' && <span className="text-purple-400 ml-1">●</span>}</span>
+                                <span className="text-sm font-semibold text-gray-900">{formatNumber(i.quantity)} {i.unit}</span>
+                              </div>
+                            ))}
+                            {!isExpanded && items.length > 5 && (
+                              <button onClick={() => setExpandedLoc(loc)}
+                                className="w-full py-2 text-sm text-brand-600 hover:bg-brand-50 transition-colors">
+                                Lihat {items.length - 5} bahan lainnya →
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {items.length === 0 && <p className="px-4 py-3 text-sm" style={{color:"var(--text-2)"}}>Tidak ada stok</p>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
             {/* ── 4. Modifier Insights ───────────────────────────────── */}
-            {data.modifierInsights?.length > 0 && (
+            {data?.modifierInsights?.length > 0 && (
               <section>
                 <SectionTitle>🎛️ Pilihan Paling Populer</SectionTitle>
                 <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden">
@@ -209,13 +213,13 @@ export default function AnalyticsPage() {
                     <div key={i} className="flex items-center justify-between px-4 py-3">
                       <div>
                         <p className="text-sm font-medium text-gray-900">{m.option}</p>
-                        <p className="text-xs" style={{color:"var(--text-2)"}}">{m.group}</p>
+                        <p className="text-xs" style={{color:"var(--text-2)"}}>{m.group}</p>
                       </div>
                       <div className="flex items-center gap-3">
                         {/* Mini bar */}
                         <div className="w-20 bg-gray-100 rounded-full h-1.5 hidden sm:block">
                           <div className="bg-brand-500 h-1.5 rounded-full"
-                            style={{ width: `${Math.min(100, m.count / data.modifierInsights[0].count * 100)}%` }} />
+                            style={{ width: `${Math.min(100, (m.count / (data.modifierInsights[0]?.count || 1)) * 100)}%` }} />
                         </div>
                         <span className="text-sm font-bold text-gray-900 w-12 text-right">{m.count}×</span>
                       </div>
@@ -226,43 +230,45 @@ export default function AnalyticsPage() {
             )}
 
             {/* ── 5. CRM ─────────────────────────────────────────────── */}
-            <section>
-              <SectionTitle>👥 Pelanggan</SectionTitle>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                <KpiCard label="Total Pelanggan" value={formatNumber(data.crm.totalCustomers)} />
-                <KpiCard label="Member (punya HP)" value={formatNumber(data.crm.members)} />
-                <KpiCard label="Repeat Customer"
-                  value={`${data.crm.repeatRate.toFixed(0)}%`}
-                  variant={data.crm.repeatRate > 30 ? 'success' : 'default'}
-                  sub={`${data.crm.repeatCustomers} orang`}
-                />
-                <KpiCard label="Poin Beredar" value={formatNumber(data.crm.pointsOutstanding)} sub="belum ditukar" variant="warning" />
-              </div>
-              {data.crm.topCustomers?.length > 0 && (
-                <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                  <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-                    <p className="text-sm font-semibold text-gray-700">🏆 Top Spender</p>
-                  </div>
-                  <div className="divide-y divide-gray-100">
-                    {data.crm.topCustomers.map((c: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <span className="text-lg">{['🥇','🥈','🥉','4️⃣','5️⃣'][i]}</span>
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">{c.name}</p>
-                            <p className="text-xs" style={{color:"var(--text-2)"}}">{c.visitCount}× kunjungan · {c.points} poin</p>
-                          </div>
-                        </div>
-                        <p className="font-bold text-gray-900">{formatCurrency(c.totalSpent)}</p>
-                      </div>
-                    ))}
-                  </div>
+            {data?.crm && (
+              <section>
+                <SectionTitle>👥 Pelanggan</SectionTitle>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                  <KpiCard label="Total Pelanggan" value={formatNumber(data.crm.totalCustomers || 0)} />
+                  <KpiCard label="Member (punya HP)" value={formatNumber(data.crm.members || 0)} />
+                  <KpiCard label="Repeat Customer"
+                    value={`${(data.crm.repeatRate || 0).toFixed(0)}%`}
+                    variant={(data.crm.repeatRate || 0) > 30 ? 'success' : 'default'}
+                    sub={`${data.crm.repeatCustomers || 0} orang`}
+                  />
+                  <KpiCard label="Poin Beredar" value={formatNumber(data.crm.pointsOutstanding || 0)} sub="belum ditukar" variant="warning" />
                 </div>
-              )}
-            </section>
+                {data.crm.topCustomers?.length > 0 && (
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                      <p className="text-sm font-semibold text-gray-700">🏆 Top Spender</p>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {data.crm.topCustomers.map((c: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">{['🥇','🥈','🥉','4️⃣','5️⃣'][i]}</span>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{c.name}</p>
+                              <p className="text-xs" style={{color:"var(--text-2)"}}>{c.visitCount}× kunjungan · {c.points} poin</p>
+                            </div>
+                          </div>
+                          <p className="font-bold text-gray-900">{formatCurrency(c.totalSpent)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
 
             {/* ── 6. Production Variance ─────────────────────────────── */}
-            {data.productionVariance?.length > 0 && (
+            {data?.productionVariance?.length > 0 && (
               <section>
                 <SectionTitle>🍳 Selisih Produksi Batch</SectionTitle>
                 <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -271,11 +277,11 @@ export default function AnalyticsPage() {
                       <div key={i} className="flex items-center justify-between px-4 py-3">
                         <div>
                           <p className="text-sm font-medium text-gray-900">{p.name}</p>
-                          <p className="text-xs" style={{color:"var(--text-2)"}}">Plan {formatNumber(p.planned)} → Aktual {formatNumber(p.actual)} {p.unit}</p>
+                          <p className="text-xs" style={{color:"var(--text-2)"}}>Plan {formatNumber(p.planned)} → Aktual {formatNumber(p.actual)} {p.unit}</p>
                         </div>
                         <div className={clsx('text-sm font-bold', p.variance > 0 ? 'text-emerald-600' : 'text-red-600')}>
                           {p.variance > 0 ? '+' : ''}{formatNumber(p.variance)} {p.unit}
-                          <span className="text-xs ml-1 opacity-70">({p.variancePct.toFixed(1)}%)</span>
+                          <span className="text-xs ml-1 opacity-70">({(p.variancePct || 0).toFixed(1)}%)</span>
                         </div>
                       </div>
                     ))}
@@ -285,7 +291,7 @@ export default function AnalyticsPage() {
             )}
 
             {/* ── INSIGHT 1: Jam Sibuk per Hari ──────────────────── */}
-            {data.busyByDay && (
+            {data?.busyByDay && (
               <section>
                 <SectionTitle>⏰ Jam & Hari Tersibuk</SectionTitle>
                 <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -316,7 +322,7 @@ export default function AnalyticsPage() {
                                 const textColor = intensity >= 0.6 ? '#fff' : '#48654D';
                                 return (
                                   <td key={d.day} className="px-2 py-1.5 text-center" style={{ background: bg }}>
-                                    {h?.orders > 0 && (
+                                    {(h?.orders || 0) > 0 && (
                                       <span className="font-bold text-[10px]" style={{ color: textColor }}>{h.orders}</span>
                                     )}
                                   </td>
@@ -329,7 +335,7 @@ export default function AnalyticsPage() {
                     </table>
                   </div>
                   <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 flex items-center gap-4">
-                    <span className="text-xs" style={{color:"var(--text-2)"}}">Intensitas:</span>
+                    <span className="text-xs" style={{color:"var(--text-2)"}}>Intensitas:</span>
                     {[['Sepi','rgba(72,101,77,0.1)','#48654D'],['Ramai','rgba(72,101,77,0.6)','#fff'],['Peak','rgba(72,101,77,0.9)','#fff']].map(([label, bg, color]) => (
                       <div key={label} className="flex items-center gap-1.5">
                         <div className="w-4 h-4 rounded" style={{ background: bg }} />
@@ -342,7 +348,7 @@ export default function AnalyticsPage() {
             )}
 
             {/* ── INSIGHT 2: Menu Engineering Matrix ─────────────── */}
-            {data.menuMatrix?.length > 0 && (
+            {data?.menuMatrix?.length > 0 && (
               <section>
                 <SectionTitle>🎯 Menu Engineering</SectionTitle>
                 <div className="grid grid-cols-2 gap-3 mb-3">
@@ -364,10 +370,10 @@ export default function AnalyticsPage() {
                           {items.slice(0, 4).map((p: any) => (
                             <div key={p.name} className="flex items-center justify-between">
                               <span className="text-xs text-gray-700 truncate max-w-[60%]">{p.name}</span>
-                              <span className="text-xs font-semibold text-gray-600">{p.margin.toFixed(0)}%</span>
+                              <span className="text-xs font-semibold text-gray-600">{(p.margin || 0).toFixed(0)}%</span>
                             </div>
                           ))}
-                          {items.length > 4 && <p className="text-xs" style={{color:"var(--text-2)"}}">+{items.length - 4} lainnya</p>}
+                          {items.length > 4 && <p className="text-xs" style={{color:"var(--text-2)"}}>+{items.length - 4} lainnya</p>}
                         </div>
                       </div>
                     );
@@ -377,7 +383,7 @@ export default function AnalyticsPage() {
             )}
 
             {/* ── INSIGHT 3: Food Cost % per Kategori ────────────── */}
-            {data.foodCostByCategory?.length > 0 && (
+            {data?.foodCostByCategory?.length > 0 && (
               <section>
                 <SectionTitle>🍳 Food Cost % per Kategori</SectionTitle>
                 <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -403,15 +409,15 @@ export default function AnalyticsPage() {
                           <div className="flex items-center justify-between mb-1.5">
                             <span className="font-semibold text-sm text-gray-900">{c.category}</span>
                             <div className="flex items-center gap-2">
-                              <span className="text-xs" style={{color:"var(--text-2)"}}">{formatCurrency(c.revenue)} omzet</span>
+                              <span className="text-xs" style={{color:"var(--text-2)"}}>{formatCurrency(c.revenue)} omzet</span>
                               <span className={clsx('text-xs font-bold px-2 py-0.5 rounded-full', statusColor)}>
-                                {c.foodCostPct.toFixed(1)}%
+                                {(c.foodCostPct || 0).toFixed(1)}%
                               </span>
                             </div>
                           </div>
                           <div className="w-full bg-gray-100 rounded-full h-1.5">
                             <div className={clsx('h-1.5 rounded-full', barColor)}
-                              style={{ width: `${Math.min(100, c.foodCostPct)}%` }} />
+                              style={{ width: `${Math.min(100, c.foodCostPct || 0)}%` }} />
                           </div>
                         </div>
                       );
@@ -422,7 +428,7 @@ export default function AnalyticsPage() {
             )}
 
             {/* ── INSIGHT 4: Repeat Rate Trend ───────────────────── */}
-            {data.repeatRateTrend && (
+            {data?.repeatRateTrend && (
               <section>
                 <SectionTitle>🔄 Repeat Rate 4 Minggu Terakhir</SectionTitle>
                 <div className="bg-white border border-gray-200 rounded-xl p-4">
@@ -433,11 +439,11 @@ export default function AnalyticsPage() {
                       const trend = prev !== null ? w.repeatRate - prev : 0;
                       return (
                         <div key={w.week} className={clsx('rounded-xl p-3 text-center', isLatest ? 'bg-brand-50 border border-brand-200' : 'bg-gray-50')}>
-                          <p className="text-xs" style={{color:"var(--text-2)"}} mb-1">{w.week}</p>
+                          <p className="text-xs mb-1" style={{color:"var(--text-2)"}}>{w.week}</p>
                           <p className={clsx('text-2xl font-black', isLatest ? 'text-brand-700' : 'text-gray-700')}>
-                            {w.repeatRate.toFixed(0)}%
+                            {(w.repeatRate || 0).toFixed(0)}%
                           </p>
-                          <p className="text-xs" style={{color:"var(--text-2)"}} mt-0.5">{w.uniqueCustomers} pelanggan</p>
+                          <p className="text-xs mt-0.5" style={{color:"var(--text-2)"}}>{w.uniqueCustomers} pelanggan</p>
                           {trend !== 0 && (
                             <p className={clsx('text-xs font-semibold mt-1', trend > 0 ? 'text-emerald-600' : 'text-red-500')}>
                               {trend > 0 ? '▲' : '▼'} {Math.abs(trend).toFixed(1)}%
@@ -447,7 +453,7 @@ export default function AnalyticsPage() {
                       );
                     })}
                   </div>
-                  <p className="text-xs" style={{color:"var(--text-2)"}} mt-3 text-center">
+                  <p className="text-xs mt-3 text-center" style={{color:"var(--text-2)"}}>
                     Repeat rate = % order dari pelanggan yang pernah order sebelumnya. Target &gt;30%.
                   </p>
                 </div>
@@ -455,16 +461,16 @@ export default function AnalyticsPage() {
             )}
 
             {/* ── INSIGHT 5: Waste-to-Revenue ────────────────────── */}
-            {data.wasteRatio && (
+            {data?.wasteRatio && (
               <section>
                 <SectionTitle>🗑️ Waste-to-Revenue Ratio</SectionTitle>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                   {[
-                    { label: 'Total Waste', value: formatCurrency(data.wasteRatio.totalWasteValue) },
-                    { label: 'Omzet Periode', value: formatCurrency(data.wasteRatio.revenueInPeriod) },
+                    { label: 'Total Waste', value: formatCurrency(data.wasteRatio.totalWasteValue || 0) },
+                    { label: 'Omzet Periode', value: formatCurrency(data.wasteRatio.revenueInPeriod || 0) },
                     {
                       label: 'Waste Ratio',
-                      value: `${data.wasteRatio.ratio.toFixed(2)}%`,
+                      value: `${(data.wasteRatio.ratio || 0).toFixed(2)}%`,
                       variant: data.wasteRatio.status === 'excellent' ? 'positive'
                         : data.wasteRatio.status === 'good' ? 'default'
                         : data.wasteRatio.status === 'warning' ? 'warning' : 'negative',
@@ -477,7 +483,7 @@ export default function AnalyticsPage() {
                       : s.variant === 'negative' ? 'bg-red-50 border-red-200'
                       : 'bg-white border-gray-200'
                     )}>
-                      <p className="text-xs" style={{color:"var(--text-2)"}} uppercase tracking-wide font-semibold">{s.label}</p>
+                      <p className="text-xs uppercase tracking-wide font-semibold" style={{color:"var(--text-2)"}}>{s.label}</p>
                       <p className={clsx('text-2xl font-black mt-1',
                         s.variant === 'positive' ? 'text-emerald-700'
                         : s.variant === 'warning' ? 'text-amber-700'
@@ -505,7 +511,7 @@ export default function AnalyticsPage() {
                         <div key={i} className="flex items-center justify-between px-4 py-3">
                           <div>
                             <p className="text-sm font-medium text-gray-900">{item.name}</p>
-                            <p className="text-xs" style={{color:"var(--text-2)"}}">{formatNumber(item.qty)} {item.unit} terbuang</p>
+                            <p className="text-xs" style={{color:"var(--text-2)"}}>{formatNumber(item.qty)} {item.unit} terbuang</p>
                           </div>
                           <p className="font-bold text-red-600 text-sm">{formatCurrency(item.value)}</p>
                         </div>
