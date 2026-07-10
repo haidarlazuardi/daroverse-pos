@@ -7,6 +7,7 @@ import { DataTable, Column } from '@/components/ui/DataTable';
 import { Toolbar } from '@/components/ui/Toolbar';
 import { api } from '@/lib/fetch';
 import clsx from 'clsx';
+import * as XLSX from 'xlsx';
 
 interface Ingredient {
   id: string; name: string; unit: string; type: string;
@@ -161,7 +162,16 @@ export default function TransfersPage() {
 
         {mode === 'history' ? (
           <>
-            <Toolbar onAdd={() => setMode('bulk')} addLabel="Transfer Baru" />
+            <Toolbar
+              onAdd={() => setMode('bulk')} addLabel="Transfer Baru"
+              search={search} onSearch={setSearch} searchPlaceholder="Cari bahan..."
+              onExport={() => {
+                const rows = moves.map(m => ({ Waktu: new Date(m.createdAt).toLocaleString('id-ID'), Bahan: m.ingredient.name, Satuan: m.ingredient.unit, Tujuan: m.location, Jumlah: m.quantity, Catatan: m.notes || '' }));
+                const ws = XLSX.utils.json_to_sheet(rows);
+                const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Transfers');
+                XLSX.writeFile(wb, 'transfers-soeka.xlsx');
+              }}
+            />
             <DataTable
               data={moves} columns={columns} keyField="id" loading={loading}
               emptyMessage="Belum ada riwayat transfer."

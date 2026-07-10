@@ -106,3 +106,11 @@ export async function PATCH(req: NextRequest) {
     return error(e.message || 'Gagal', 500);
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get('id');
+  if (!id) return Response.json({ error: 'ID wajib diisi' }, { status: 400 });
+  await prisma.productionOrder.delete({ where: { id } });
+  return Response.json({ success: true, deleted: true });
+}

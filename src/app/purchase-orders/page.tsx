@@ -23,6 +23,7 @@ export default function PurchaseOrdersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [search, setSearch]       = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [slideOpen, setSlideOpen] = useState(false);
   const [detailPO, setDetailPO]   = useState<PO | null>(null);
@@ -142,14 +143,15 @@ export default function PurchaseOrdersPage() {
         </div>
 
         <Toolbar
+          search={search} onSearch={setSearch} searchPlaceholder="Cari no PO atau supplier..."
           filters={[{ key: 'status', label: 'Status', value: statusFilter, onChange: setStatusFilter,
-            options: Object.entries(STATUS_LABEL).map(([v,l]) => ({ value: v, label: l })) }]}
+            options: Object.entries(STATUS_LABEL).map(([v,l]) => ({ value: v, label: l as string })) }]}
           onAdd={openCreate} addLabel="Buat PO"
           onExport={handleExport}
         />
 
         <DataTable
-          data={data} columns={columns} keyField="id" loading={loading}
+          data={data.filter(po => !search || po.poNumber?.toLowerCase().includes(search.toLowerCase()) || po.supplier?.name?.toLowerCase().includes(search.toLowerCase()))} columns={columns} keyField="id" loading={loading}
           emptyMessage="Belum ada purchase order."
           onRowClick={openDetail}
           rowActions={po => po.status === 'DRAFT' ? (

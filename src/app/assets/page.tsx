@@ -2,29 +2,38 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
-import { Card, Button, Badge, Modal, Input, Select, Loader, StatCard, formatCurrency } from '@/components/ui';
+import { Badge, Button, Modal, StatCard, formatCurrency } from '@/components/ui';
+import { SlideOver } from '@/components/ui/SlideOver';
+import { DataTable, Column } from '@/components/ui/DataTable';
+import { Toolbar } from '@/components/ui/Toolbar';
 import { api } from '@/lib/fetch';
+import * as XLSX from 'xlsx';
 
-const ASSET_CATEGORIES = ['Peralatan Dapur', 'Elektronik', 'Furnitur', 'Peralatan Bar', 'Kebersihan', 'Lainnya'];
-const CONDITIONS = [
-  { value: 'GOOD', label: 'Good' }, { value: 'FAIR', label: 'Fair' },
-  { value: 'POOR', label: 'Poor' }, { value: 'BROKEN', label: 'Broken' },
-];
+const CATS = ['Peralatan Dapur','Elektronik','Furnitur','Peralatan Bar','Kebersihan','Lainnya'];
+const CONDS = [{ value:'GOOD',label:'Baik' },{ value:'FAIR',label:'Cukup' },{ value:'POOR',label:'Buruk' },{ value:'BROKEN',label:'Rusak' }];
+const EMPTY = { name:'', code:'', category:'Peralatan Dapur', condition:'GOOD', purchaseDate:'', purchasePrice:'', location:'', supplier:'', notes:'' };
+const condVariant: Record<string, any> = { GOOD:'success', FAIR:'warning', POOR:'danger', BROKEN:'danger', DISPOSED:'default' };
+const condLabel:   Record<string, string> = { GOOD:'Baik', FAIR:'Cukup', POOR:'Buruk', BROKEN:'Rusak', DISPOSED:'Disposed' };
 
 export default function AssetsPage() {
-  const [data, setData] = useState<any>(null);
+  const [data, setData]       = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [showAdd, setShowAdd] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch]   = useState('');
   const [filterCat, setFilterCat] = useState('');
-  const [form, setForm] = useState({ name: '', code: '', category: 'Peralatan Dapur', condition: 'GOOD', purchaseDate: '', purchasePrice: '', location: '', supplier: '', notes: '' });
+  const [filterCond, setFilterCond] = useState('');
+  const [slideOpen, setSlideOpen] = useState(false);
+  const [editing, setEditing] = useState<any>(null);
+  const [form, setForm]       = useState({ ...EMPTY });
+  const [saving, setSaving]   = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       let url = '/api/assets?';
-      if (search) url += `search=${search}&`;
-      if (filterCat) url += `category=${filterCat}&`;
+      if (search) url += `search=${encodeURIComponent(search)}&`;
+      if (filterCat) url += `category=${encodeURIComponent(filterCat)}&`;
       setData(await api.get(url));
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
@@ -32,94 +41,122 @@ export default function AssetsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const handleAdd = async () => {
-    try {
-      await api.post('/api/assets', { ...form, purchasePrice: form.purchasePrice || undefined, currentValue: form.purchasePrice || undefined });
-      setShowAdd(false); setForm({ name: '', code: '', category: 'Peralatan Dapur', condition: 'GOOD', purchaseDate: '', purchasePrice: '', location: '', supplier: '', notes: '' }); load();
-    } catch (e) { console.error(e); }
-  };
+  function openAdd() { setEditing(null); setForm({ ...EMPTY }); setSlideOpen(true); }
+  function openEdit(a: any) {
+    setEditing(a);
+    setForm({ name: a.name, code: a.code||'', category: a.category, condition: a.condition, purchaseDate: a.purchaseDate?.slice(0,10)||'', purchasePrice: a.purchasePrice ? String(a.purchasePrice) : '', location: a.location||'', supplier: a.supplier||'', notes: a.notes||'' });
+    setSlideOpen(true);
+  }
 
-  const condColor: Record<string, 'success' | 'warning' | 'danger' | 'default'> = { GOOD: 'success', FAIR: 'warning', POOR: 'danger', BROKEN: 'danger', DISPOSED: 'default' };
+  async function handleSave() {
+    if (!form.name) return;
+    setSaving(true);
+    try {
+      const payload = { ...form, purchasePrice: form.purchasePrice ? parseFloat(form.purchasePrice) : undefined, currentValue: form.purchasePrice ? parseFloat(form.purchasePrice) : undefined };
+      if (editing) await api.patch('/api/assets', { id: editing.id, ...payload });
+      else await api.post('/api/assets', payload);
+      setSlideOpen(false); load();
+    } catch (e: any) { alert(e.message || 'Gagal'); }
+    finally { setSaving(false); }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try { await api.delete(`/api/assets?id=${deleteTarget.id}`); setDeleteTarget(null); load(); }
+    catch (e: any) { alert(e.message || 'Gagal'); }
+    finally { setDeleting(false); }
+  }
+
+  function handleExport() {
+    const rows = (data?.assets || []).map((a: any) => ({ Nama: a.name, Kode: a.code||'', Kategori: a.category, Kondisi: condLabel[a.condition]||a.condition, Lokasi: a.location||'', 'Harga Beli': a.purchasePrice||'', 'Nilai Sekarang': a.currentValue||'', 'Tgl Beli': a.purchaseDate?.slice(0,10)||'', Supplier: a.supplier||'', Catatan: a.notes||'' }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Assets');
+    XLSX.writeFile(wb, 'assets-soeka.xlsx');
+  }
+
+  const assets = (data?.assets || []).filter((a: any) => !filterCond || a.condition === filterCond);
+  const f = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
+
+  const columns: Column<any>[] = [
+    { key:'name', label:'Aset', sortable:true, render: a => <div><p className="font-semibold text-gray-900">{a.name}</p>{a.code && <p className="text-xs text-gray-400">{a.code}</p>}</div> },
+    { key:'category', label:'Kategori', render: a => <span className="text-gray-600 text-sm">{a.category}</span> },
+    { key:'location', label:'Lokasi', render: a => <span className="text-gray-500 text-sm">{a.location||'—'}</span> },
+    { key:'condition', label:'Kondisi', render: a => <Badge variant={condVariant[a.condition]}>{condLabel[a.condition]||a.condition}</Badge> },
+    { key:'currentValue', label:'Nilai', sortable:true, render: a => <span className="font-semibold text-gray-900">{a.currentValue ? formatCurrency(a.currentValue) : '—'}</span> },
+    { key:'purchaseDate', label:'Tgl Beli', render: a => <span className="text-gray-400 text-sm">{a.purchaseDate ? new Date(a.purchaseDate).toLocaleDateString('id-ID') : '—'}</span> },
+  ];
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div><h2 className="text-xl sm:text-2xl font-bold text-surface-900">Assets</h2><p className="text-surface-500 text-sm mt-1">Track equipment and inventory items</p></div>
-          <Button onClick={() => setShowAdd(true)}>+ Add Asset</Button>
+      <div className="max-w-5xl mx-auto">
+        <div className="page-header">
+          <div><h1 className="page-title">Aset</h1><p className="page-subtitle">Kelola peralatan dan inventaris kafe</p></div>
         </div>
 
-        <Card>
-          <div className="flex gap-3 flex-wrap">
-            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search assets..." className="px-3 py-2 border border-surface-300 rounded-xl text-sm flex-1 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-brand-500/30" />
-            <select value={filterCat} onChange={e => setFilterCat(e.target.value)} className="px-3 py-2 border border-surface-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/30">
-              <option value="">All Categories</option>
-              {ASSET_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+        {data && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <StatCard label="Total Aset" value={String(data.assets?.length || 0)} />
+            <StatCard label="Total Nilai" value={formatCurrency(data.totalValue || 0)} />
+            {Object.entries(data.byCategory as Record<string,any>||{}).slice(0,2).map(([cat, info]: any) => (
+              <StatCard key={cat} label={cat} value={`${info.count} item`} sub={formatCurrency(info.value)} />
+            ))}
           </div>
-        </Card>
-
-        {loading || !data ? <Loader /> : (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard label="Total Assets" value={String((data.assets || []).length)} />
-              <StatCard label="Total Value" value={formatCurrency(data.totalValue || 0)} />
-              {Object.entries(data.byCategory as Record<string, { count: number; value: number }>).slice(0, 2).map(([cat, info]) => (
-                <StatCard key={cat} label={cat} value={`${info.count} items`} sub={formatCurrency(info.value)} />
-              ))}
-            </div>
-
-            <Card padding={false}>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead><tr className="border-b border-surface-200">
-                    <th className="text-left px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Asset</th>
-                    <th className="text-left px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Category</th>
-                    <th className="text-left px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Location</th>
-                    <th className="text-center px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Condition</th>
-                    <th className="text-right px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Value</th>
-                    <th className="text-left px-3 sm:px-6 py-3 text-xs font-semibold text-surface-500 uppercase">Purchase Date</th>
-                  </tr></thead>
-                  <tbody className="divide-y divide-surface-100">
-                    {(data.assets || []).map((a: any) => (
-                      <tr key={a.id} className="hover:bg-surface-50">
-                        <td className="px-6 py-4"><p className="text-sm font-medium text-surface-900">{a.name}</p>{a.code && <p className="text-xs text-surface-400">{a.code}</p>}</td>
-                        <td className="px-6 py-4 text-sm text-surface-600">{a.category}</td>
-                        <td className="px-6 py-4 text-sm text-surface-500">{a.location || '—'}</td>
-                        <td className="px-6 py-4 text-center"><Badge variant={condColor[a.condition] || 'default'}>{a.condition}</Badge></td>
-                        <td className="px-6 py-4 text-sm font-bold text-right">{a.currentValue ? formatCurrency(a.currentValue) : '—'}</td>
-                        <td className="px-6 py-4 text-sm text-surface-500">{a.purchaseDate ? new Date(a.purchaseDate).toLocaleDateString('id-ID') : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {(data.assets || []).length === 0 && <div className="py-12 text-center text-surface-400">No assets found</div>}
-              </div>
-            </Card>
-          </>
         )}
+
+        <Toolbar
+          search={search} onSearch={setSearch} searchPlaceholder="Cari nama aset..."
+          filters={[
+            { key:'cat', label:'Kategori', value:filterCat, onChange:setFilterCat, options: CATS.map(c=>({value:c,label:c})) },
+            { key:'cond', label:'Kondisi', value:filterCond, onChange:setFilterCond, options: CONDS },
+          ]}
+          onExport={handleExport} onAdd={openAdd} addLabel="Tambah Aset"
+        />
+
+        <DataTable data={assets} columns={columns} keyField="id" loading={loading} emptyMessage="Belum ada aset tercatat"
+          rowActions={a => (
+            <div className="flex gap-1">
+              <button onClick={() => openEdit(a)} className="p-1.5 hover:bg-brand-50 rounded-lg text-gray-400 hover:text-brand-600">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+              <button onClick={() => setDeleteTarget(a)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+              </button>
+            </div>
+          )}
+        />
       </div>
 
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add Asset" maxWidth="max-w-2xl">
+      <SlideOver open={slideOpen} onClose={() => setSlideOpen(false)} title={editing ? 'Edit Aset' : 'Tambah Aset'} width="lg"
+        footer={<div className="flex justify-end gap-3"><button onClick={() => setSlideOpen(false)} className="btn btn-secondary btn-md">Batal</button><Button onClick={handleSave} disabled={saving||!form.name}>{saving ? 'Menyimpan...' : 'Simpan'}</Button></div>}>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Asset Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="e.g. Blender Philips" />
-            <Input label="Asset Code" value={form.code} onChange={e => setForm({...form, code: e.target.value})} placeholder="Optional (e.g. EQ-001)" />
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label">Nama Aset *</label><input className="input" value={form.name} onChange={e => f('name',e.target.value)} placeholder="cth. Blender Philips" /></div>
+            <div><label className="label">Kode Aset</label><input className="input" value={form.code} onChange={e => f('code',e.target.value)} placeholder="cth. EQ-001" /></div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Select label="Category" value={form.category} onChange={e => setForm({...form, category: e.target.value})} options={ASSET_CATEGORIES.map(c => ({ value: c, label: c }))} />
-            <Select label="Condition" value={form.condition} onChange={e => setForm({...form, condition: e.target.value})} options={CONDITIONS} />
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label">Kategori</label><select className="select" value={form.category} onChange={e => f('category',e.target.value)}>{CATS.map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+            <div><label className="label">Kondisi</label><select className="select" value={form.condition} onChange={e => f('condition',e.target.value)}>{CONDS.map(c=><option key={c.value} value={c.value}>{c.label}</option>)}</select></div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Purchase Date" type="date" value={form.purchaseDate} onChange={e => setForm({...form, purchaseDate: e.target.value})} />
-            <Input label="Purchase Price (IDR)" type="number" value={form.purchasePrice} onChange={e => setForm({...form, purchasePrice: e.target.value})} />
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label">Tanggal Beli</label><input className="input" type="date" value={form.purchaseDate} onChange={e => f('purchaseDate',e.target.value)} /></div>
+            <div><label className="label">Harga Beli (Rp)</label><input className="input" type="number" value={form.purchasePrice} onChange={e => f('purchasePrice',e.target.value)} /></div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label="Location" value={form.location} onChange={e => setForm({...form, location: e.target.value})} placeholder="e.g. Dapur, Bar" />
-            <Input label="Supplier" value={form.supplier} onChange={e => setForm({...form, supplier: e.target.value})} />
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label">Lokasi</label><input className="input" value={form.location} onChange={e => f('location',e.target.value)} placeholder="cth. Dapur, Bar" /></div>
+            <div><label className="label">Supplier</label><input className="input" value={form.supplier} onChange={e => f('supplier',e.target.value)} /></div>
           </div>
-          <Input label="Notes" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
-          <Button onClick={handleAdd} className="w-full">Add Asset</Button>
+          <div><label className="label">Catatan</label><textarea className="input" rows={2} value={form.notes} onChange={e => f('notes',e.target.value)} /></div>
+        </div>
+      </SlideOver>
+
+      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Hapus Aset">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">Yakin hapus aset <span className="font-bold">{deleteTarget?.name}</span>?</p>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setDeleteTarget(null)} className="btn btn-secondary btn-md">Batal</button>
+            <button onClick={handleDelete} disabled={deleting} className="btn btn-danger btn-md">{deleting ? 'Menghapus...' : 'Hapus'}</button>
+          </div>
         </div>
       </Modal>
     </AdminLayout>

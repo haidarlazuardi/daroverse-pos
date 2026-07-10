@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
-import { Badge, Button, formatCurrency, formatNumber } from '@/components/ui';
+import { Badge, Button, Modal, formatCurrency, formatNumber } from '@/components/ui';
+import { SlideOver } from '@/components/ui/SlideOver';
+import { SlideOver } from '@/components/ui/SlideOver';
 import { Toolbar } from '@/components/ui/Toolbar';
 import { api } from '@/lib/fetch';
 import clsx from 'clsx';
@@ -15,7 +17,7 @@ interface Customer {
 }
 
 function tierLabel(spent: number): { label: string; color: string } {
-  if (spent >= 1000000) return { label: '⭐ VIP', color: 'text-yellow-600 bg-yellow-50' };
+  if (spent >= 1000000) return { label: '⭐ VIP',    color: 'text-yellow-600 bg-yellow-50' };
   if (spent >= 500000)  return { label: '🥈 Regular', color: 'text-blue-600 bg-blue-50' };
   return { label: '🆕 Baru', color: 'text-gray-600 bg-gray-100' };
 }
@@ -31,12 +33,18 @@ function daysSince(date: string | null): string {
 }
 
 export default function CustomersPage() {
-  const [data, setData]       = useState<Customer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch]   = useState('');
+  const [data, setData]         = useState<Customer[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [search, setSearch]     = useState('');
   const [selected, setSelected] = useState<Customer | null>(null);
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory]   = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing]   = useState<Customer | null>(null);
+  const [editForm, setEditForm] = useState({ name: '', phone: '' });
+  const [saving, setSaving]     = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,6 +72,31 @@ export default function CustomersPage() {
       setHistory(res.orders || []);
     } catch { setHistory([]); }
     finally { setLoadingHistory(false); }
+  }
+
+  function openEdit(c: Customer) {
+    setEditing(c);
+    setEditForm({ name: c.name, phone: c.phone || '' });
+    setEditOpen(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!editing || !editForm.name) return;
+    setSaving(true);
+    try {
+      await api.patch('/api/customers', { id: editing.id, name: editForm.name, phone: editForm.phone || null });
+      setEditOpen(false); load();
+      if (selected?.id === editing.id) setSelected(prev => prev ? { ...prev, ...editForm } : null);
+    } catch (e: any) { alert(e.message || 'Gagal'); }
+    finally { setSaving(false); }
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try { await api.delete(`/api/customers?id=${deleteTarget.id}`); setDeleteTarget(null); if (selected?.id === deleteTarget.id) setSelected(null); load(); }
+    catch (e: any) { alert(e.message || 'Gagal'); }
+    finally { setDeleting(false); }
   }
 
   function handleExport() {
@@ -163,11 +196,17 @@ export default function CustomersPage() {
                     </div>
                   </div>
 
-                  {/* Bottom row - last visit */}
+                  {/* Bottom row - last visit + actions */}
                   <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
                     <span className="text-xs text-gray-400">Terakhir: {daysSince(c.lastVisitAt)}</span>
-                    <span className={clsx('text-xs font-semibold px-2 py-0.5 rounded-full md:hidden', tier.color)}>{tier.label}</span>
-                    <span className="text-xs text-gray-400 sm:hidden">{formatCurrency(c.totalSpent)} · {c.visitCount}× kunjungan</span>
+                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => openEdit(c)} className="p-1.5 rounded-lg hover:bg-brand-50 text-gray-300 hover:text-brand-600 transition-colors">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      </button>
+                      <button onClick={() => setDeleteTarget(c)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+                      </button>
+                    </div>
                   </div>
                 </button>
               );
@@ -248,6 +287,28 @@ export default function CustomersPage() {
           </div>
         </div>
       )}
+
+      {/* Edit SlideOver */}
+      {editOpen && (
+        <SlideOver open={editOpen} onClose={() => setEditOpen(false)} title="Edit Pelanggan"
+          footer={<div className="flex justify-end gap-3"><button onClick={() => setEditOpen(false)} className="btn btn-secondary btn-md">Batal</button><Button onClick={handleSaveEdit} disabled={saving||!editForm.name}>{saving ? 'Menyimpan...' : 'Simpan'}</Button></div>}>
+          <div className="space-y-4">
+            <div><label className="label">Nama *</label><input className="input" value={editForm.name} onChange={e => setEditForm(p => ({...p, name: e.target.value}))} /></div>
+            <div><label className="label">Nomor HP</label><input className="input" value={editForm.phone} onChange={e => setEditForm(p => ({...p, phone: e.target.value}))} placeholder="08xx..." /></div>
+          </div>
+        </SlideOver>
+      )}
+
+      {/* Delete Modal */}
+      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Hapus Pelanggan">
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">Yakin hapus pelanggan <span className="font-bold">{deleteTarget?.name}</span>? Data transaksi tetap tersimpan.</p>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setDeleteTarget(null)} className="btn btn-secondary btn-md">Batal</button>
+            <button onClick={handleDelete} disabled={deleting} className="btn btn-danger btn-md">{deleting ? 'Menghapus...' : 'Hapus'}</button>
+          </div>
+        </div>
+      </Modal>
     </AdminLayout>
   );
 }

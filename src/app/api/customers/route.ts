@@ -47,3 +47,11 @@ export const PATCH = withAuth(async (req: NextRequest) => {
   });
   return success(customer);
 }, ADMIN_ROLES);
+
+export const DELETE = withAuth(async (req: NextRequest) => {
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get('id');
+  if (!id) return error('ID wajib diisi');
+  await prisma.customer.delete({ where: { id } });
+  return success({ deleted: true });
+}, ADMIN_ROLES);

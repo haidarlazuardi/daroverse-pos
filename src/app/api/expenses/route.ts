@@ -80,3 +80,22 @@ export async function DELETE(req: NextRequest) {
   await prisma.expense.delete({ where: { id } });
   return success({ deleted: true });
 }
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const { id, category, description, amount, paidBy } = await req.json();
+    if (!id) return Response.json({ error: 'ID wajib diisi' }, { status: 400 });
+    const expense = await prisma.expense.update({
+      where: { id },
+      data: {
+        ...(category    && { category }),
+        ...(description && { description }),
+        ...(amount      && { amount: parseFloat(amount) }),
+        ...(paidBy !== undefined && { paidBy: paidBy || null }),
+      },
+    });
+    return Response.json({ success: true, expense });
+  } catch (e: any) {
+    return Response.json({ error: e.message }, { status: 500 });
+  }
+}

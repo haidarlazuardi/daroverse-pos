@@ -35,3 +35,27 @@ export const POST = withAuth(async (req) => {
 
   return success(user, 201);
 }, SENIOR_ROLES);
+
+export const PATCH = withAuth(async (req) => {
+  const { id, name, email, role, password, active } = await req.json();
+  if (!id) return error('ID wajib diisi');
+  const updateData: any = {};
+  if (name !== undefined)   updateData.name   = name;
+  if (email !== undefined)  updateData.email  = email;
+  if (role !== undefined)   updateData.role   = role;
+  if (active !== undefined) updateData.active = active;
+  if (password) {
+    updateData.password = await hashPassword(password);
+  }
+  const user = await prisma.user.update({ where: { id }, data: updateData });
+  const { password: _, ...safe } = user as any;
+  return success(safe);
+}, SENIOR_ROLES);
+
+export const DELETE = withAuth(async (req) => {
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get('id');
+  if (!id) return error('ID wajib diisi');
+  await prisma.user.update({ where: { id }, data: { active: false } });
+  return success({ deleted: true });
+}, SENIOR_ROLES);

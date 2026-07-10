@@ -69,3 +69,18 @@ export const PUT = withAuth(async (req) => {
   });
   return success(asset);
 }, ADMIN_ROLES);
+
+export const PATCH = withAuth(async (req) => {
+  const { id, ...data } = await req.json();
+  if (!id) return error('ID wajib diisi');
+  const asset = await prisma.asset.update({ where: { id }, data });
+  return success(asset);
+}, ADMIN_ROLES);
+
+export const DELETE = withAuth(async (req) => {
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get('id');
+  if (!id) return error('ID wajib diisi');
+  await prisma.asset.delete({ where: { id } });
+  return success({ deleted: true });
+}, ADMIN_ROLES);
