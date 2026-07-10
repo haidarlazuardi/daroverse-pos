@@ -52,7 +52,7 @@ function getPreset(days: number): { from: string; to: string } {
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-gray-900 text-white rounded-xl px-4 py-3 mb-3">
+    <div className="rounded-xl" style={{background:"var(--brand)",color:"#fff"}} px-4 py-3 mb-3">
       <h2 className="text-sm font-semibold tracking-wide">{children}</h2>
     </div>
   );
@@ -205,7 +205,7 @@ export default function ReportsPage() {
             <p className="text-sm text-gray-400 mt-0.5">Performa penjualan & keuangan Soeka House</p>
           </div>
           <button onClick={exportToExcel}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-xl hover:bg-gray-800 transition-colors">
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl" style={{background:"var(--brand)",color:"#fff"}} transition-colors">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
             Export Excel
           </button>
@@ -229,7 +229,7 @@ export default function ReportsPage() {
             ) : (
               <>
                 <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); cacheRef.current.clear(); }} className="input text-sm" />
-                <span className="text-gray-300">—</span>
+                <span className="opacity-80">—</span>
                 <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); cacheRef.current.clear(); }} className="input text-sm" />
               </>
             )}
@@ -242,7 +242,7 @@ export default function ReportsPage() {
             <button key={t.key} onClick={() => setTab(t.key)}
               className={clsx(
                 'px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0',
-                tab === t.key ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700'
+                tab === t.key ? "tab-active" : 'tab-inactive bg-white border border-gray-200'
               )}>
               {t.label}
             </button>
@@ -303,7 +303,7 @@ export default function ReportsPage() {
                           <div key={h.hour} className="flex items-center gap-3">
                             <span className="text-xs text-gray-400 w-14 font-mono">{String(h.hour).padStart(2,'0')}:00</span>
                             <div className="flex-1 bg-gray-100 rounded-full h-2">
-                              <div className="bg-gray-900 h-2 rounded-full transition-all"
+                              <div className="h-2 rounded-full" style={{background:"var(--brand)"}} transition-all"
                                 style={{ width: `${(h.orders / maxOrders) * 100}%` }} />
                             </div>
                             <span className="text-xs font-bold text-gray-700 w-16 text-right">{h.orders} order</span>
@@ -357,11 +357,11 @@ export default function ReportsPage() {
                     })}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-gray-900 text-white">
+                    <tr style={{background:"var(--brand)",color:"#fff"}}>
                       <td className="px-4 py-3 font-bold text-sm">Total</td>
                       <td className="px-4 py-3 text-right font-bold text-sm">{formatCurrency(data.daily.reduce((s: number, d: any) => s+d.revenue, 0))}</td>
-                      <td className="px-4 py-3 text-right text-gray-300 text-sm">{data.daily.reduce((s: number, d: any) => s+d.transactions, 0)}</td>
-                      <td className="px-4 py-3 text-right text-gray-300 text-sm">{formatCurrency(data.daily.reduce((s: number, d: any) => s+d.cogs, 0))}</td>
+                      <td className="px-4 py-3 text-right opacity-80 text-sm">{data.daily.reduce((s: number, d: any) => s+d.transactions, 0)}</td>
+                      <td className="px-4 py-3 text-right opacity-80 text-sm">{formatCurrency(data.daily.reduce((s: number, d: any) => s+d.cogs, 0))}</td>
                       <td className="px-4 py-3 text-right text-amber-300 text-sm">{formatCurrency(data.daily.reduce((s: number, d: any) => s+(d.expenses||0), 0))}</td>
                       <td className="px-4 py-3 text-right text-orange-300 text-sm">{formatCurrency(data.daily.reduce((s: number, d: any) => s+(d.purchases||0), 0))}</td>
                       <td className="px-4 py-3 text-right font-bold text-sm text-emerald-300">{formatCurrency(data.daily.reduce((s: number, d: any) => s+(d.netProfit??d.profit), 0))}</td>
@@ -459,7 +459,7 @@ export default function ReportsPage() {
                           <Td right muted>{c.orders}</Td>
                           <Td right>
                             <div className="flex items-center justify-end gap-2">
-                              <MiniBar value={c.revenue} max={s?.totalRevenue||1} color="bg-gray-900" />
+                              <MiniBar value={c.revenue} max={s?.totalRevenue||1} color="bg-brand-700" />
                               <span className="text-sm font-bold text-gray-700 w-10 text-right">{pct.toFixed(1)}%</span>
                             </div>
                           </Td>
@@ -522,7 +522,7 @@ export default function ReportsPage() {
                         </div>
                       </div>
                       <div className="bg-gray-100 rounded-full h-2">
-                        <div className="bg-gray-900 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                        <div className="h-2 rounded-full" style={{background:"var(--brand)"}} transition-all" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
                   );

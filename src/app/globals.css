@@ -7,21 +7,38 @@
   --font-mono: 'SF Mono', Consolas, monospace;
 
   --brand:       #48654D;
-  --brand-light: #6B9A72;
+  --brand-light: #5C8A62;
   --brand-dark:  #3C5440;
   --brand-glow:  rgba(72,101,77,0.15);
 
-  --bg:        #F8F6F1;
+  /* Backgrounds — putih bersih dengan hint warm */
+  --bg:        #F7F5F0;
   --surface-1: #FFFFFF;
-  --surface-2: #F4F2ED;
-  --surface-3: #EDEAE3;
+  --surface-2: #F5F4F0;
+  --surface-3: #ECEAE4;
 
-  --text-1: #1A1F1B;
-  --text-2: #5A6B5D;
-  --text-3: #9AA89D;
+  /* Text — kontras tinggi di atas putih */
+  --text-1: #111816;   /* hampir hitam — untuk heading, angka penting */
+  --text-2: #374840;   /* gelap — untuk body text, label */
+  --text-3: #6B7A6E;   /* medium — untuk hint, placeholder, secondary */
 
-  --border:    rgba(72,101,77,0.12);
-  --border-md: rgba(72,101,77,0.18);
+  /* Border */
+  --border:    rgba(0,0,0,0.08);
+  --border-md: rgba(0,0,0,0.12);
+
+  /* Status */
+  --red:      #DC2626;
+  --red-bg:   #FEF2F2;
+  --amber:    #B45309;
+  --amber-bg: #FFFBEB;
+  --green-ok: #15803D;
+  --green-bg: #F0FDF4;
+
+  --radius:    14px;
+  --radius-sm: 10px;
+  --radius-xs:  6px;
+  --radius-full: 9999px;
+}
 
   --red:      #DC2626;
   --red-bg:   #FEF2F2;
@@ -100,7 +117,7 @@ input[type="number"] { -moz-appearance: textfield; }
   .input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-glow); }
   .input-error { border-color: var(--red) !important; }
 
-  .label { @apply block text-xs font-semibold uppercase tracking-wide mb-1.5; color: var(--text-3); }
+  .label { @apply block text-xs font-semibold uppercase tracking-wide mb-1.5; color: var(--text-2); }
 
   .select {
     @apply w-full px-3.5 py-2.5 text-sm transition-all outline-none;
@@ -136,13 +153,13 @@ input[type="number"] { -moz-appearance: textfield; }
   .modal-title    { @apply text-base font-bold; color: var(--text-1); }
   .modal-body     { @apply p-6; }
 
-  .stat-label { @apply text-xs font-bold uppercase tracking-wide; color: var(--text-3); }
+  .stat-label { @apply text-xs font-bold uppercase tracking-wide; color: var(--text-2); }
   .stat-value { @apply text-2xl font-black mt-1 leading-none; color: var(--text-1); }
-  .stat-sub   { @apply text-xs mt-1; color: var(--text-3); }
+  .stat-sub   { @apply text-xs mt-1; color: var(--text-2); }
 
   .page-header   { @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6; }
   .page-title    { @apply text-xl font-black tracking-tight; color: var(--text-1); }
-  .page-subtitle { @apply text-sm mt-0.5; color: var(--text-3); }
+  .page-subtitle { @apply text-sm mt-0.5; color: var(--text-2); }
 
   .tab-group { @apply flex gap-1 p-1 overflow-x-auto w-fit; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
   .tab-item  { @apply px-3.5 py-1.5 text-sm font-semibold whitespace-nowrap transition-all; border-radius: var(--radius-xs); color: var(--text-3); }
@@ -150,9 +167,9 @@ input[type="number"] { -moz-appearance: textfield; }
   .tab-inactive:hover { background: var(--surface-3); color: var(--text-2); }
 
   .nav-item { @apply w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium transition-all; border-radius: var(--radius-sm); }
-  .nav-item-active { background: rgba(72,101,77,0.1); color: var(--brand); border: 1px solid var(--brand-glow); }
-  .nav-item-inactive { color: var(--text-3); border: 1px solid transparent; }
-  .nav-item-inactive:hover { background: var(--surface-2); color: var(--text-2); }
+  .nav-item-active { background: rgba(72,101,77,0.1); color: var(--brand-dark); border: 1px solid rgba(72,101,77,0.2); font-weight: 700; }
+  .nav-item-inactive { color: var(--text-2); border: 1px solid transparent; }
+  .nav-item-inactive:hover { background: var(--surface-3); color: var(--text-1); }
 
   .pos-product-card { @apply relative p-4 text-left transition-all active:scale-[0.97]; background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); }
   .pos-product-card:hover { border-color: var(--brand); }
@@ -169,8 +186,8 @@ input[type="number"] { -moz-appearance: textfield; }
   .error-box   { @apply text-sm p-3; background: var(--red-bg); border: 1px solid rgba(220,38,38,0.2); color: var(--red); border-radius: var(--radius-sm); }
 
   .empty-state { @apply flex flex-col items-center justify-center py-16 text-center; }
-  .empty-title { @apply text-sm font-semibold; color: var(--text-2); }
-  .empty-text  { @apply text-xs mt-1 max-w-xs; color: var(--text-3); }
+  .empty-title { @apply text-sm font-semibold; color: var(--text-1); }
+  .empty-text  { @apply text-xs mt-1 max-w-xs; color: var(--text-2); }
 
   .filter-bar    { @apply flex gap-3 flex-wrap; }
   .filter-input  { @apply px-3 py-2 text-sm flex-1 min-w-[180px] outline-none; background: var(--surface-1); border: 1px solid var(--border-md); color: var(--text-1); border-radius: var(--radius-sm); }

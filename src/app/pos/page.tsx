@@ -566,7 +566,7 @@ function CartLineRow({ line, onEdit }: { line: CartLine; onEdit: () => void }) {
     <div className="pos-cart-item">
       <button onClick={onEdit} className="flex-1 min-w-0 text-left">
         <p className="text-sm font-semibold text-gray-900 truncate">{line.name}</p>
-        {modText ? <p className="text-xs text-green-600 truncate">{modText}</p> : line.modifiers.length === 0 ? null : <p className="text-xs text-gray-300">ketuk untuk atur</p>}
+        {modText ? <p className="text-xs text-green-600 truncate">{modText}</p> : line.modifiers.length === 0 ? null : <p className="text-xs" style={{color:'var(--text-3)'}}>ketuk untuk atur</p>}
         <p className="text-sm text-gray-500">{formatCurrency(unit)}</p>
       </button>
       <div className="flex items-center gap-1.5">

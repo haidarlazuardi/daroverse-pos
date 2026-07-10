@@ -85,7 +85,7 @@ function Pagination({ page, pageSize, total, onChange }: { page: number; pageSiz
         <button onClick={() => onChange(page-1)} disabled={page===1}
           className="p-1.5 rounded-lg disabled:opacity-30 transition-colors"
           style={{ color: 'var(--text-3)' }}
-          onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+          onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--surface-2)'; }}
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
@@ -96,7 +96,7 @@ function Pagination({ page, pageSize, total, onChange }: { page: number; pageSiz
               style={p === page
                 ? { background: 'var(--green-2)', color: '#000', boxShadow: '0 0 8px var(--green-glow)' }
                 : { color: 'var(--text-2)' }}
-              onMouseEnter={e => { if (p !== page) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+              onMouseEnter={e => { if (p !== page) e.currentTarget.style.background = 'var(--surface-2)'; }}
               onMouseLeave={e => { if (p !== page) e.currentTarget.style.background = 'transparent'; }}>
               {p}
             </button>
@@ -104,7 +104,7 @@ function Pagination({ page, pageSize, total, onChange }: { page: number; pageSiz
         <button onClick={() => onChange(page+1)} disabled={page===totalPages}
           className="p-1.5 rounded-lg disabled:opacity-30 transition-colors"
           style={{ color: 'var(--text-3)' }}
-          onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+          onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--surface-2)'; }}
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
@@ -190,8 +190,8 @@ export function DataTable<T extends Record<string, any>>({
                       background: isSelected ? 'rgba(92,138,98,0.1)' : undefined,
                       transition: 'background 0.15s',
                     }}
-                    onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'; }}
-                    onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                    onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)'; }}
+                    onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = ''; }}
                     onClick={() => onRowClick?.(row)}>
                     {showSelect && (
                       <td className="px-4 py-3 w-10" onClick={e => e.stopPropagation()}>

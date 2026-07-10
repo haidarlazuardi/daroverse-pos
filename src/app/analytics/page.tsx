@@ -103,13 +103,13 @@ export default function AnalyticsPage() {
                   <p className={clsx('text-2xl font-bold', data.cogs.leakPct > 5 ? 'text-red-600' : 'text-emerald-600')}>
                     {formatCurrency(data.cogs.leakTotal)}
                   </p>
-                  <p className="text-xs text-gray-400 mt-0.5">waste + selisih opname</p>
+                  <p className="text-xs" style={{color:"var(--text-2)"}} mt-0.5">waste + selisih opname</p>
                 </div>
                 <div className="text-right">
                   <p className={clsx('text-3xl sm:text-4xl font-black', data.cogs.leakPct > 5 ? 'text-red-500' : 'text-emerald-500')}>
                     {data.cogs.leakPct.toFixed(1)}%
                   </p>
-                  <p className="text-xs text-gray-400">dari COGS</p>
+                  <p className="text-xs" style={{color:"var(--text-2)"}}">dari COGS</p>
                   <p className={clsx('text-xs font-semibold mt-1', data.cogs.leakPct > 5 ? 'text-red-600' : 'text-emerald-600')}>
                     {data.cogs.leakPct > 5 ? '⚠️ Perlu perhatian' : '✅ Masih wajar'}
                   </p>
@@ -145,12 +145,12 @@ export default function AnalyticsPage() {
                         <p className="text-sm font-bold text-gray-900">
                           {item.suggestPurchaseUnit || `${formatNumber(item.suggestQty)} ${item.unit}`}
                         </p>
-                        <p className="text-xs text-gray-400">≈ {formatCurrency(item.estimatedCost)}</p>
+                        <p className="text-xs" style={{color:"var(--text-2)"}}">≈ {formatCurrency(item.estimatedCost)}</p>
                       </div>
                     </div>
                   ))}
                   {data.reorderSuggestions.length > 8 && (
-                    <p className="text-sm text-center text-gray-400 py-2">+{data.reorderSuggestions.length - 8} bahan lainnya</p>
+                    <p className="text-sm text-center" style={{color:"var(--text-2)"}} py-2">+{data.reorderSuggestions.length - 8} bahan lainnya</p>
                   )}
                 </div>
               </section>
@@ -173,7 +173,7 @@ export default function AnalyticsPage() {
                           <Badge variant="default">{items.length} bahan</Badge>
                         </div>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                          className={clsx('text-gray-400 transition-transform', isExpanded && 'rotate-90')}>
+                          className={clsx("transition-transform" style={{color:"var(--text-2)"}}', isExpanded && 'rotate-90')}>
                           <polyline points="9 18 15 12 9 6"/>
                         </svg>
                       </button>
@@ -193,7 +193,7 @@ export default function AnalyticsPage() {
                           )}
                         </div>
                       )}
-                      {items.length === 0 && <p className="px-4 py-3 text-sm text-gray-400">Tidak ada stok</p>}
+                      {items.length === 0 && <p className="px-4 py-3 text-sm" style={{color:"var(--text-2)"}}">Tidak ada stok</p>}
                     </div>
                   );
                 })}
@@ -209,7 +209,7 @@ export default function AnalyticsPage() {
                     <div key={i} className="flex items-center justify-between px-4 py-3">
                       <div>
                         <p className="text-sm font-medium text-gray-900">{m.option}</p>
-                        <p className="text-xs text-gray-400">{m.group}</p>
+                        <p className="text-xs" style={{color:"var(--text-2)"}}">{m.group}</p>
                       </div>
                       <div className="flex items-center gap-3">
                         {/* Mini bar */}
@@ -250,7 +250,7 @@ export default function AnalyticsPage() {
                           <span className="text-lg">{['🥇','🥈','🥉','4️⃣','5️⃣'][i]}</span>
                           <div>
                             <p className="text-sm font-medium text-gray-900">{c.name}</p>
-                            <p className="text-xs text-gray-400">{c.visitCount}× kunjungan · {c.points} poin</p>
+                            <p className="text-xs" style={{color:"var(--text-2)"}}">{c.visitCount}× kunjungan · {c.points} poin</p>
                           </div>
                         </div>
                         <p className="font-bold text-gray-900">{formatCurrency(c.totalSpent)}</p>
@@ -271,7 +271,7 @@ export default function AnalyticsPage() {
                       <div key={i} className="flex items-center justify-between px-4 py-3">
                         <div>
                           <p className="text-sm font-medium text-gray-900">{p.name}</p>
-                          <p className="text-xs text-gray-400">Plan {formatNumber(p.planned)} → Aktual {formatNumber(p.actual)} {p.unit}</p>
+                          <p className="text-xs" style={{color:"var(--text-2)"}}">Plan {formatNumber(p.planned)} → Aktual {formatNumber(p.actual)} {p.unit}</p>
                         </div>
                         <div className={clsx('text-sm font-bold', p.variance > 0 ? 'text-emerald-600' : 'text-red-600')}>
                           {p.variance > 0 ? '+' : ''}{formatNumber(p.variance)} {p.unit}
@@ -329,7 +329,7 @@ export default function AnalyticsPage() {
                     </table>
                   </div>
                   <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 flex items-center gap-4">
-                    <span className="text-xs text-gray-400">Intensitas:</span>
+                    <span className="text-xs" style={{color:"var(--text-2)"}}">Intensitas:</span>
                     {[['Sepi','rgba(72,101,77,0.1)','#48654D'],['Ramai','rgba(72,101,77,0.6)','#fff'],['Peak','rgba(72,101,77,0.9)','#fff']].map(([label, bg, color]) => (
                       <div key={label} className="flex items-center gap-1.5">
                         <div className="w-4 h-4 rounded" style={{ background: bg }} />
@@ -367,7 +367,7 @@ export default function AnalyticsPage() {
                               <span className="text-xs font-semibold text-gray-600">{p.margin.toFixed(0)}%</span>
                             </div>
                           ))}
-                          {items.length > 4 && <p className="text-xs text-gray-400">+{items.length - 4} lainnya</p>}
+                          {items.length > 4 && <p className="text-xs" style={{color:"var(--text-2)"}}">+{items.length - 4} lainnya</p>}
                         </div>
                       </div>
                     );
@@ -403,7 +403,7 @@ export default function AnalyticsPage() {
                           <div className="flex items-center justify-between mb-1.5">
                             <span className="font-semibold text-sm text-gray-900">{c.category}</span>
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-400">{formatCurrency(c.revenue)} omzet</span>
+                              <span className="text-xs" style={{color:"var(--text-2)"}}">{formatCurrency(c.revenue)} omzet</span>
                               <span className={clsx('text-xs font-bold px-2 py-0.5 rounded-full', statusColor)}>
                                 {c.foodCostPct.toFixed(1)}%
                               </span>
@@ -433,11 +433,11 @@ export default function AnalyticsPage() {
                       const trend = prev !== null ? w.repeatRate - prev : 0;
                       return (
                         <div key={w.week} className={clsx('rounded-xl p-3 text-center', isLatest ? 'bg-brand-50 border border-brand-200' : 'bg-gray-50')}>
-                          <p className="text-xs text-gray-400 mb-1">{w.week}</p>
+                          <p className="text-xs" style={{color:"var(--text-2)"}} mb-1">{w.week}</p>
                           <p className={clsx('text-2xl font-black', isLatest ? 'text-brand-700' : 'text-gray-700')}>
                             {w.repeatRate.toFixed(0)}%
                           </p>
-                          <p className="text-xs text-gray-400 mt-0.5">{w.uniqueCustomers} pelanggan</p>
+                          <p className="text-xs" style={{color:"var(--text-2)"}} mt-0.5">{w.uniqueCustomers} pelanggan</p>
                           {trend !== 0 && (
                             <p className={clsx('text-xs font-semibold mt-1', trend > 0 ? 'text-emerald-600' : 'text-red-500')}>
                               {trend > 0 ? '▲' : '▼'} {Math.abs(trend).toFixed(1)}%
@@ -447,7 +447,7 @@ export default function AnalyticsPage() {
                       );
                     })}
                   </div>
-                  <p className="text-xs text-gray-400 mt-3 text-center">
+                  <p className="text-xs" style={{color:"var(--text-2)"}} mt-3 text-center">
                     Repeat rate = % order dari pelanggan yang pernah order sebelumnya. Target &gt;30%.
                   </p>
                 </div>
@@ -477,7 +477,7 @@ export default function AnalyticsPage() {
                       : s.variant === 'negative' ? 'bg-red-50 border-red-200'
                       : 'bg-white border-gray-200'
                     )}>
-                      <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold">{s.label}</p>
+                      <p className="text-xs" style={{color:"var(--text-2)"}} uppercase tracking-wide font-semibold">{s.label}</p>
                       <p className={clsx('text-2xl font-black mt-1',
                         s.variant === 'positive' ? 'text-emerald-700'
                         : s.variant === 'warning' ? 'text-amber-700'
@@ -505,7 +505,7 @@ export default function AnalyticsPage() {
                         <div key={i} className="flex items-center justify-between px-4 py-3">
                           <div>
                             <p className="text-sm font-medium text-gray-900">{item.name}</p>
-                            <p className="text-xs text-gray-400">{formatNumber(item.qty)} {item.unit} terbuang</p>
+                            <p className="text-xs" style={{color:"var(--text-2)"}}">{formatNumber(item.qty)} {item.unit} terbuang</p>
                           </div>
                           <p className="font-bold text-red-600 text-sm">{formatCurrency(item.value)}</p>
                         </div>

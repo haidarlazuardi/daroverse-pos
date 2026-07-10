@@ -27,7 +27,7 @@ function GhostBtn({ onClick, title, children }: { onClick?: () => void; title?: 
     <button onClick={onClick} title={title}
       className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg transition-all"
       style={{ color: 'var(--text-2)', border: '1px solid var(--border)' }}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-4)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-3)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
       onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; }}>
       {children}
     </button>
@@ -102,7 +102,7 @@ export function Toolbar({
           {onAdd && (
             <button onClick={onAdd}
               className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg transition-all text-white"
-              style={{ background: 'linear-gradient(135deg, var(--green-2), var(--green))', boxShadow: '0 0 14px var(--green-glow)' }}
+              style={{ background: 'var(--brand)', boxShadow: '0 2px 8px var(--brand-glow)' }}
               onMouseEnter={e => (e.currentTarget.style.filter = 'brightness(1.1)')}
               onMouseLeave={e => (e.currentTarget.style.filter = 'none')}>
               <Icon d="M12 5v14M5 12h14" />
@@ -113,8 +113,8 @@ export function Toolbar({
       </div>
       {selected.length > 0 && bulkActions && (
         <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl"
-          style={{ background: 'rgba(74,222,128,0.08)', border: '1px solid rgba(74,222,128,0.2)' }}>
-          <span className="text-sm font-semibold" style={{ color: 'var(--green)' }}>{selected.length} dipilih</span>
+          style={{ background: 'rgba(72,101,77,0.08)', border: '1px solid rgba(72,101,77,0.2)' }}>
+          <span className="text-sm font-semibold" style={{ color: 'var(--brand)' }}>{selected.length} dipilih</span>
           <div className="h-4 w-px" style={{ background: 'rgba(74,222,128,0.2)' }} />
           <div className="flex items-center gap-2">{bulkActions}</div>
         </div>

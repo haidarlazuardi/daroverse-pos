@@ -116,7 +116,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   function Sidebar({ onNav }: { onNav?: () => void }) {
     return (
-      <div className="flex flex-col h-full" style={{ background: 'var(--surface-1)', borderRight: '1px solid var(--border)' }}>
+      <div className="flex flex-col h-full" style={{ background: 'var(--surface-2)', borderRight: '1px solid var(--border)' }}>
         {/* Logo */}
         <div className="flex items-center gap-3 px-5 h-[60px] flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           {/* Logo mark — FocusFlow style: small geometric mark */}
@@ -219,7 +219,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Topbar */}
         <header className="h-[60px] flex items-center justify-between px-3 sm:px-5 flex-shrink-0"
-          style={{ background: 'var(--surface-1)', borderBottom: '1px solid var(--border)' }}>
+          style={{ background: 'var(--surface-1)', borderBottom: '1px solid var(--border-md)' }}>
           <div className="flex items-center gap-3">
             <button onClick={() => setMobileOpen(true)} className="lg:hidden p-2 rounded-lg"
               style={{ color: 'var(--text-3)' }}>
