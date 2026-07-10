@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import { Badge, Button, Modal, formatCurrency, formatNumber } from '@/components/ui';
 import { SlideOver } from '@/components/ui/SlideOver';
-import { SlideOver } from '@/components/ui/SlideOver';
 import { Toolbar } from '@/components/ui/Toolbar';
 import { api } from '@/lib/fetch';
 import clsx from 'clsx';
