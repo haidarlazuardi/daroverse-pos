@@ -39,10 +39,11 @@ enum OrderType {
 }
 
 enum OrderStatus {
-  OPEN // running bill — items can still be added (stock already deducted)
+  OPEN      // running bill — items can still be added (stock already deducted)
   COMPLETED // paid & closed
   CANCELLED
   REFUNDED
+  VOIDED    // reversed by manager/owner after completion
 }
 
 enum PaymentMethod {
@@ -59,14 +60,15 @@ enum PaymentStatus {
 }
 
 enum StockMovementType {
-  PURCHASE // PO received into GUDANG (+)
-  TRANSFER // GUDANG → BAR/KITCHEN (logged as two rows: out + in)
-  PRODUCTION // raw consumed (−) / prepped produced (+) via a ProductionOrder
-  SALE // deducted on order item (−)
-  REFUND // sale reversal (+)
-  WASTE // discarded / spoilage (−)
-  OPNAME // stock-count reconciliation (±)
-  ADJUSTMENT // manual correction (±)
+  PURCHASE    // PO received into GUDANG (+)
+  TRANSFER    // GUDANG → BAR/KITCHEN (logged as two rows: out + in)
+  PRODUCTION  // raw consumed (−) / prepped produced (+) via a ProductionOrder
+  SALE        // deducted on order item (−)
+  REFUND      // sale reversal (+)
+  WASTE       // discarded / spoilage (−)
+  OPNAME      // stock-count reconciliation (±)
+  ADJUSTMENT  // manual correction (±)
+  VOID_RETURN // stock returned when order voided (+)
 }
 
 enum PurchaseOrderStatus {
@@ -135,6 +137,17 @@ enum AssetCondition {
 enum OpnameStatus {
   DRAFT
   COMPLETED
+}
+
+enum ShiftStatus {
+  OPEN          // shift sedang berjalan
+  PENDING_CLOSE // kasir minta tutup, tunggu approval manager
+  CLOSED        // manager sudah approve
+}
+
+enum RewardType {
+  FREE_PRODUCT // tukar poin dapat produk gratis
+  DISCOUNT     // tukar poin dapat potongan Rp
 }
 
 // ═══════════════════════════════════════════════════════
@@ -209,6 +222,7 @@ model Product {
   recipe         Recipe? // serving recipe (prepped/raw → product)
   modifierGroups ModifierGroup[] // per-product groups (Sweetness, Ice, Serving, Add-on)
   orderItems     OrderItem[]
+  loyaltyRewards LoyaltyReward[]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -504,6 +518,11 @@ model Order {
   refundedAt   DateTime?
   refundReason String?
   refundBy     String?
+  // ── Void fields ──
+  voidedAt     DateTime?
+  voidedBy     String?   // userId
+  voidReason   String?   // WRONG_ITEM | CUSTOMER_CANCEL | OVERCHARGE | SYSTEM_ERROR | OTHER
+  stockReturned Boolean  @default(false)
   items        OrderItem[]
   payment      Payment?
   createdAt    DateTime    @default(now())
@@ -572,25 +591,28 @@ model Payment {
 // ═══════════════════════════════════════════════════════
 
 model Shift {
-  id            String    @id @default(cuid())
+  id            String      @id @default(cuid())
   userId        String
-  user          User      @relation(fields: [userId], references: [id])
-  openedAt      DateTime  @default(now())
+  user          User        @relation(fields: [userId], references: [id])
+  status        ShiftStatus @default(OPEN)
+  openedAt      DateTime    @default(now())
   closedAt      DateTime?
-  openingCash   Float     @default(0)
-  closingCash   Float?
-  expectedCash  Float?
-  difference    Float?
-  cashSales     Float     @default(0)
-  qrisSales     Float     @default(0)
-  cardSales     Float     @default(0)
-  totalSales    Float     @default(0)
-  totalExpenses Float     @default(0)
+  openingCash   Float       @default(0)
+  closingCash   Float?      // kasir hitung fisik
+  expectedCash  Float?      // sistem hitung
+  difference    Float?      // closingCash - expectedCash
+  cashSales     Float       @default(0)
+  qrisSales     Float       @default(0)
+  cardSales     Float       @default(0)
+  totalSales    Float       @default(0)
+  totalExpenses Float       @default(0)
+  approvedBy    String?     // userId manager yang approve tutup
+  approvedAt    DateTime?
   notes         String?
   orders        Order[]
   expenses      Expense[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   @@index([openedAt])
   @@map("shifts")
@@ -728,4 +750,59 @@ model LoyaltyLedger {
 
   @@index([customerId])
   @@map("loyalty_ledger")
+}
+
+// ═══════════════════════════════════════════════════════
+//  LOYALTY REWARDS
+// ═══════════════════════════════════════════════════════
+
+model LoyaltyReward {
+  id             String     @id @default(cuid())
+  name           String
+  description    String?
+  pointsRequired Int
+  rewardType     RewardType
+  productId      String?    // free product reward
+  product        Product?   @relation(fields: [productId], references: [id])
+  discountAmount Float?     // fixed Rp discount
+  active         Boolean    @default(true)
+  redemptions    LoyaltyRedemption[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@map("loyalty_rewards")
+}
+
+model LoyaltyRedemption {
+  id        String        @id @default(cuid())
+  rewardId  String
+  reward    LoyaltyReward @relation(fields: [rewardId], references: [id])
+  customerId String
+  orderId   String?
+  pointsUsed Int
+  createdAt DateTime      @default(now())
+
+  @@map("loyalty_redemptions")
+}
+
+// ═══════════════════════════════════════════════════════
+//  AUDIT LOG
+// ═══════════════════════════════════════════════════════
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  userName  String   // snapshot — user bisa dihapus
+  action    String   // CREATE | UPDATE | DELETE | VOID | SHIFT_OPEN | SHIFT_CLOSE
+  entity    String   // Order | Ingredient | Product | User | Shift | Discount
+  entityId  String
+  oldValue  Json?
+  newValue  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
