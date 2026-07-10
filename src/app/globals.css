@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -40,21 +42,6 @@
   --radius-full: 9999px;
 }
 
-  --red:      #DC2626;
-  --red-bg:   #FEF2F2;
-  --amber:    #D97706;
-  --amber-bg: #FFFBEB;
-  --green-ok: #16A34A;
-  --green-bg: #F0FDF4;
-
-  --radius:    14px;
-  --radius-sm: 10px;
-  --radius-xs:  6px;
-  --radius-full: 9999px;
-}
-
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 html { -webkit-font-smoothing: antialiased; }
 
@@ -76,7 +63,14 @@ body {
 .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
 .animate-slide-up { animation: slideUp 0.3s ease-out forwards; }
 .animate-slide-in-right { animation: slideInRight 0.25s cubic-bezier(0.16,1,0.3,1) forwards; }
-.animate-pulse-green {}
+.animate-pulse-green {
+  animation: pulseGreen 1.2s ease-in-out infinite;
+}
+
+@keyframes pulseGreen {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
 
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }

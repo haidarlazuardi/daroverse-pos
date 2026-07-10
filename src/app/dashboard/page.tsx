@@ -40,15 +40,20 @@ export default function DashboardPage() {
       const to = now.toISOString().slice(0, 10);
 
       const [d, a, exp] = await Promise.all([
-        api.get<DashboardData>(`/api/dashboard?period=${period}`),
+        api.get<DashboardData>(`/api/dashboard?period=${period}`).catch(() => null),
         api.get<AlertsData>('/api/alerts').catch(() => null),
         api.get<any>(`/api/expenses?from=${from}&to=${to}`).catch(() => null),
       ]);
-      setData(d);
+      
+      // Mencegah error jika 'd' undefined
+      if (d) setData(d);
       if (a) setAlerts(a);
-      if (exp) setExpenses({ total: exp.total, byCategory: exp.byCategory });
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+      if (exp) setExpenses({ total: exp.total || 0, byCategory: exp.byCategory || {} });
+    } catch (e) { 
+      console.error(e); 
+    } finally { 
+      setLoading(false); 
+    }
   }, [period]);
 
   useEffect(() => { loadDashboard(); }, [loadDashboard]);
@@ -64,7 +69,10 @@ export default function DashboardPage() {
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div><h2 className="text-2xl font-bold font-black tracking-tight" style={{color:"var(--text-1)"}}}>Dashboard</h2><p className="text-sm mt-1" style={{color:"var(--text-2)"}}}>Business overview and analytics</p></div>
+          <div>
+            <h2 className="text-2xl font-bold font-black tracking-tight" style={{color:"var(--text-1)"}}>Dashboard</h2>
+            <p className="text-sm mt-1" style={{color:"var(--text-2)"}}>Business overview and analytics</p>
+          </div>
           <div className="flex tab-group">
             {['today', 'week', 'month', 'year'].map(p => (
               <button key={p} onClick={() => setPeriod(p)}
@@ -77,28 +85,28 @@ export default function DashboardPage() {
           <>
             {/* KPI Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-              <StatCard label="Revenue" value={formatCurrency(data.summary.totalRevenue)}
+              <StatCard label="Revenue" value={formatCurrency(data?.summary?.totalRevenue || 0)}
                 icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>} />
-              <StatCard label="Transactions" value={formatNumber(data.summary.totalTransactions)} sub={`Avg ${formatCurrency(data.summary.avgOrderValue)}`} />
-              <StatCard label="COGS" value={formatCurrency(data.summary.totalCOGS)} />
+              <StatCard label="Transactions" value={formatNumber(data?.summary?.totalTransactions || 0)} sub={`Avg ${formatCurrency(data?.summary?.avgOrderValue || 0)}`} />
+              <StatCard label="COGS" value={formatCurrency(data?.summary?.totalCOGS || 0)} />
               <StatCard label="Expenses" value={formatCurrency(expenses?.total || 0)} />
-              <StatCard label="Net Profit" value={formatCurrency(data.summary.totalProfit - (expenses?.total || 0))}
-                sub={`${data.summary.profitMargin.toFixed(1)}% gross margin`} />
+              <StatCard label="Net Profit" value={formatCurrency((data?.summary?.totalProfit || 0) - (expenses?.total || 0))}
+                sub={`${(data?.summary?.profitMargin || 0).toFixed(1)}% gross margin`} />
             </div>
 
             {/* Alerts Row */}
-            {alerts && (alerts.stockAlerts.length > 0 || alerts.predictions.length > 0 || alerts.marginAlerts.length > 0) && (
+            {alerts && ((alerts?.stockAlerts?.length || 0) > 0 || (alerts?.predictions?.length || 0) > 0 || (alerts?.marginAlerts?.length || 0) > 0) && (
               <div className="grid lg:grid-cols-3 gap-4">
                 {/* Low Stock */}
-                {alerts.stockAlerts.length > 0 && (
+                {(alerts?.stockAlerts?.length || 0) > 0 && (
                   <Card>
-                    <h3 className="font-bold mb-3" style={{color:"var(--text-1)"}} flex items-center gap-2">
+                    <h3 className="font-bold mb-3 flex items-center gap-2" style={{color:"var(--text-1)"}}>
                       <span className="text-amber-500">⚠️</span> Low Stock ({alerts.stockAlerts.length})
                     </h3>
                     <div className="space-y-2">
                       {alerts.stockAlerts.slice(0, 5).map(a => (
                         <div key={a.name} className="flex items-center justify-between text-sm">
-                          <span className="style={{color:"var(--text-2)"}}>{a.name}</span>
+                          <span style={{color:"var(--text-2)"}}>{a.name}</span>
                           <Badge variant={a.severity === 'critical' ? 'danger' : 'warning'}>{a.currentStock} {a.unit}</Badge>
                         </div>
                       ))}
@@ -107,16 +115,16 @@ export default function DashboardPage() {
                 )}
 
                 {/* Predicted Stockouts */}
-                {alerts.predictions.length > 0 && (
+                {(alerts?.predictions?.length || 0) > 0 && (
                   <Card>
-                    <h3 className="font-bold mb-3" style={{color:"var(--text-1)"}} flex items-center gap-2">
+                    <h3 className="font-bold mb-3 flex items-center gap-2" style={{color:"var(--text-1)"}}>
                       <span className="text-red-500">📉</span> Predicted Stockout
                     </h3>
                     <div className="space-y-2">
                       {alerts.predictions.slice(0, 5).map(p => (
                         <div key={p.name} className="flex items-center justify-between text-sm">
                           <div>
-                            <span className="style={{color:"var(--text-2)"}}>{p.name}</span>
+                            <span style={{color:"var(--text-2)"}}>{p.name}</span>
                             <span className="text-xs text-gray-500 ml-1">({p.avgDailyUsage}/{p.unit}/day)</span>
                           </div>
                           <Badge variant={p.severity === 'critical' ? 'danger' : p.severity === 'high' ? 'warning' : 'info'}>
@@ -129,16 +137,16 @@ export default function DashboardPage() {
                 )}
 
                 {/* Negative Margin */}
-                {alerts.marginAlerts.length > 0 && (
+                {(alerts?.marginAlerts?.length || 0) > 0 && (
                   <Card>
-                    <h3 className="font-bold mb-3" style={{color:"var(--text-1)"}} flex items-center gap-2">
+                    <h3 className="font-bold mb-3 flex items-center gap-2" style={{color:"var(--text-1)"}}>
                       <span className="text-red-500">💸</span> Negative Margin ({alerts.marginAlerts.length})
                     </h3>
                     <div className="space-y-2">
                       {alerts.marginAlerts.map(a => (
                         <div key={a.name} className="flex items-center justify-between text-sm">
-                          <span className="style={{color:"var(--text-2)"}}>{a.name}</span>
-                          <span className="text-red-600 font-bold">{formatCurrency(a.margin)}</span>
+                          <span style={{color:"var(--text-2)"}}>{a.name}</span>
+                          <span className="text-red-600 font-bold">{formatCurrency(a.margin || 0)}</span>
                         </div>
                       ))}
                     </div>
@@ -150,34 +158,34 @@ export default function DashboardPage() {
             <div className="grid lg:grid-cols-2 gap-6">
               {/* Revenue Trend */}
               <Card>
-                <h3 className="font-bold mb-4" style={{color:"var(--text-1)"}}}>Revenue Trend</h3>
-                {data.dailyTrend.length > 0 ? (
+                <h3 className="font-bold mb-4" style={{color:"var(--text-1)"}}>Revenue Trend</h3>
+                {data?.dailyTrend && data.dailyTrend.length > 0 ? (
                   <div className="space-y-2">
                     {data.dailyTrend.slice(-10).map(day => {
-                      const maxRev = Math.max(...data.dailyTrend.map(d => d.revenue), 1);
+                      const maxRev = Math.max(...(data.dailyTrend.map(d => d.revenue || 0)), 1);
                       return (
                         <div key={day.date} className="flex items-center gap-3 text-sm">
-                          <span className="w-20" style={{color:"var(--text-2)"}} text-xs">{day.date.slice(5)}</span>
-                          <div className="flex-1 h-6 rounded-full" style={{background:"var(--surface-3)"}} className="overflow-hidden">
-                            <div className="h-full bg-brand-500 rounded-full transition-all duration-500" style={{ width: `${(day.revenue / maxRev) * 100}%` }} />
+                          <span className="w-20 text-xs" style={{color:"var(--text-2)"}}>{day.date?.slice(5)}</span>
+                          <div className="flex-1 h-6 rounded-full overflow-hidden" style={{background:"var(--surface-3)"}}>
+                            <div className="h-full bg-brand-500 rounded-full transition-all duration-500" style={{ width: `${((day.revenue || 0) / maxRev) * 100}%` }} />
                           </div>
-                          <span className="font-medium" style={{color:"var(--text-1)"}} w-24 text-right text-xs">{formatCurrency(day.revenue)}</span>
+                          <span className="font-medium w-24 text-right text-xs" style={{color:"var(--text-1)"}}>{formatCurrency(day.revenue || 0)}</span>
                         </div>
                       );
                     })}
                   </div>
-                ) : <p className="text-sm py-8" style={{color:"var(--text-2)"}} text-center">No data for this period</p>}
+                ) : <p className="text-sm py-8 text-center" style={{color:"var(--text-2)"}}>No data for this period</p>}
               </Card>
 
               {/* Peak Hours */}
               <Card>
-                <h3 className="font-bold mb-4" style={{color:"var(--text-1)"}}}>Peak Hours</h3>
-                {data.peakHours.length > 0 ? (
+                <h3 className="font-bold mb-4" style={{color:"var(--text-1)"}}>Peak Hours</h3>
+                {data?.peakHours && data.peakHours.length > 0 ? (
                   <div className="grid grid-cols-4 sm:grid-cols-6 gap-1">
                     {Array.from({ length: 24 }, (_, h) => {
                       const hourData = data.peakHours.find(p => p.hour === h);
-                      const maxCount = Math.max(...data.peakHours.map(p => p.count), 1);
-                      const intensity = hourData ? hourData.count / maxCount : 0;
+                      const maxCount = Math.max(...(data.peakHours.map(p => p.count || 0)), 1);
+                      const intensity = hourData ? (hourData.count || 0) / maxCount : 0;
                       return (
                         <div key={h} className="aspect-square rounded-lg flex items-center justify-center text-[10px] font-medium"
                           style={{ backgroundColor: intensity > 0 ? `rgba(34, 197, 94, ${0.1 + intensity * 0.8})` : '#f8fafc', color: intensity > 0.5 ? 'white' : '#64748b' }}
@@ -185,41 +193,48 @@ export default function DashboardPage() {
                       );
                     })}
                   </div>
-                ) : <p className="text-sm py-8" style={{color:"var(--text-2)"}} text-center">No data</p>}
+                ) : <p className="text-sm py-8 text-center" style={{color:"var(--text-2)"}}>No data</p>}
               </Card>
 
               {/* Top Products */}
               <Card>
-                <h3 className="font-bold mb-4" style={{color:"var(--text-1)"}}}>Top Products</h3>
+                <h3 className="font-bold mb-4" style={{color:"var(--text-1)"}}>Top Products</h3>
                 <div className="space-y-3">
-                  {data.productPerformance.slice(0, 8).map((product, i) => (
+                  {data?.productPerformance?.slice(0, 8).map((product, i) => (
                     <div key={product.id} className="flex items-center gap-3">
                       <span className={clsx('w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold', i < 3 ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-500')}>{i + 1}</span>
-                      <div className="flex-1 min-w-0"><p className="text-sm font-semibold truncate" style={{color:"var(--text-1)"}}}>{product.name}</p><p className="text-xs text-gray-500">{product.qty} sold</p></div>
-                      <p className="text-sm font-bold style={{color:"var(--text-2)"}}>{formatCurrency(product.revenue)}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate" style={{color:"var(--text-1)"}}>{product.name}</p>
+                        <p className="text-xs text-gray-500">{product.qty || 0} sold</p>
+                      </div>
+                      <p className="text-sm font-bold" style={{color:"var(--text-2)"}}>{formatCurrency(product.revenue || 0)}</p>
                     </div>
                   ))}
-                  {data.productPerformance.length === 0 && <p className="text-gray-500 text-sm py-4 text-center">No sales data</p>}
+                  {(!data?.productPerformance || data.productPerformance.length === 0) && <p className="text-gray-500 text-sm py-4 text-center">No sales data</p>}
                 </div>
               </Card>
 
               {/* Menu Engineering */}
               <Card>
-                <h3 className="font-bold mb-4" style={{color:"var(--text-1)"}}}>Menu Engineering</h3>
+                <h3 className="font-bold mb-4" style={{color:"var(--text-1)"}}>Menu Engineering</h3>
                 <div className="space-y-2">
-                  {data.menuEngineering.slice(0, 10).map(product => {
+                  {data?.menuEngineering?.slice(0, 10).map(product => {
                     const cls = classIcons[product.classification] || classIcons.dog;
                     return (
                       <div key={product.id} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className={clsx('text-xs px-2 py-0.5 rounded-full font-medium', cls.color)}>{cls.label}</span>
-                          <span className="text-sm truncate" style={{color:"var(--text-1)"}}}>{product.name}</span>
+                          <span className="text-sm truncate" style={{color:"var(--text-1)"}}>{product.name}</span>
                         </div>
-                        <span className="text-xs text-gray-500 ml-2">{(product.margin * 100).toFixed(0)}%</span>
+                        <span className="text-xs text-gray-500 ml-2">
+                          {((product.margin || 0) * 100).toFixed(0)}%
+                        </span>
                       </div>
                     );
                   })}
-                  {data.menuEngineering.length === 0 && <p className="text-gray-500 text-sm py-4 text-center">No data</p>}
+                  {(!data?.menuEngineering || data.menuEngineering.length === 0) && (
+                    <p className="text-gray-500 text-sm py-4 text-center">No data</p>
+                  )}
                 </div>
               </Card>
             </div>

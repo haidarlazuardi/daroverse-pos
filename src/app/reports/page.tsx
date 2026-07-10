@@ -52,7 +52,7 @@ function getPreset(days: number): { from: string; to: string } {
 
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl" style={{background:"var(--brand)",color:"#fff"}} px-4 py-3 mb-3">
+    <div className="rounded-xl px-4 py-3 mb-3" style={{background:"var(--brand)",color:"#fff"}}>
       <h2 className="text-sm font-semibold tracking-wide">{children}</h2>
     </div>
   );
@@ -115,7 +115,10 @@ function MiniBar({ value, max, color = 'bg-brand-500' }: { value: number; max: n
   const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
     <div className="w-20 bg-gray-100 rounded-full h-1.5 hidden sm:block">
-      <div className={clsx('h-1.5 rounded-full transition-all', color)} style={{ width: `${pct}%` }} />
+      <div
+        className="h-1.5 rounded-full transition-all"
+        style={{ background: color, width: `${pct}%` }}
+      />
     </div>
   );
 }
@@ -204,8 +207,11 @@ export default function ReportsPage() {
             <h1 className="text-xl font-black text-gray-900">Laporan</h1>
             <p className="text-sm text-gray-400 mt-0.5">Performa penjualan & keuangan Soeka House</p>
           </div>
-          <button onClick={exportToExcel}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl" style={{background:"var(--brand)",color:"#fff"}} transition-colors">
+          <button
+            onClick={exportToExcel}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-colors"
+            style={{ background: "var(--brand)", color: "#fff" }}
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
             Export Excel
           </button>
@@ -303,8 +309,10 @@ export default function ReportsPage() {
                           <div key={h.hour} className="flex items-center gap-3">
                             <span className="text-xs text-gray-400 w-14 font-mono">{String(h.hour).padStart(2,'0')}:00</span>
                             <div className="flex-1 bg-gray-100 rounded-full h-2">
-                              <div className="h-2 rounded-full" style={{background:"var(--brand)"}} transition-all"
-                                style={{ width: `${(h.orders / maxOrders) * 100}%` }} />
+                              <div
+                                className="h-2 rounded-full transition-all"
+                                style={{ background: "var(--brand)", width: `${(h.orders / maxOrders) * 100}%` }}
+                              />
                             </div>
                             <span className="text-xs font-bold text-gray-700 w-16 text-right">{h.orders} order</span>
                             <span className="text-xs text-gray-400 w-28 text-right hidden sm:block">{formatCurrency(h.revenue)}</span>
@@ -522,7 +530,10 @@ export default function ReportsPage() {
                         </div>
                       </div>
                       <div className="bg-gray-100 rounded-full h-2">
-                        <div className="h-2 rounded-full" style={{background:"var(--brand)"}} transition-all" style={{ width: `${pct}%` }} />
+                        <div
+                          className="h-2 rounded-full transition-all"
+                          style={{ background: "var(--brand)", width: `${pct}%` }}
+                        />
                       </div>
                     </div>
                   );
