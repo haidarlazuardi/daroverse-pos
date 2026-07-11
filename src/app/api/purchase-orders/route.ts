@@ -73,6 +73,35 @@ export const PATCH = withAuth(async (req, user) => {
 
     if (action === 'complete') {
       await receivePurchaseOrder(id, user.userId);
+
+      // Auto-create expense record for this PO
+      try {
+        const po = await prisma.purchaseOrder.findUnique({
+          where: { id },
+          include: {
+            supplier: { select: { name: true } },
+            items: { select: { quantity: true, unitPrice: true } },
+          },
+        });
+        if (po) {
+          const totalCost = po.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+          if (totalCost > 0) {
+            await prisma.expense.create({
+              data: {
+                category: 'PURCHASE',
+                description: `Pembelian PO #${po.poNumber} — ${po.supplier?.name || 'Supplier'}`,
+                amount: totalCost,
+                paidBy: user.name || user.userId,
+                ...(po.shiftId ? { shiftId: po.shiftId } : {}),
+              },
+            });
+          }
+        }
+      } catch (expErr) {
+        // Don't fail PO completion if expense creation fails
+        console.error('Failed to create expense for PO:', expErr);
+      }
+
       return success({ completed: true });
     }
     if (action === 'cancel') {

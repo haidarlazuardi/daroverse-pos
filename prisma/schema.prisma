@@ -122,6 +122,7 @@ enum ExpenseCategory {
   TRANSPORT
   MAINTENANCE
   SALARY
+  PURCHASE
   OTHER
 }
 
