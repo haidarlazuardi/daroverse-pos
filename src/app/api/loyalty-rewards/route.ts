@@ -24,7 +24,7 @@ export const POST = withAuth(async (req: NextRequest) => {
       station: station || null,
       maxPrice: maxPrice ? parseFloat(maxPrice) : null,
       discountAmount: discountAmount ? parseFloat(discountAmount) : null,
-    },
+    } as any,
   });
   return success(reward, 201);
 }, SENIOR_ROLES);
@@ -43,7 +43,7 @@ export const PATCH = withAuth(async (req: NextRequest) => {
       ...(maxPrice !== undefined && { maxPrice: maxPrice ? parseFloat(maxPrice) : null }),
       ...(discountAmount !== undefined && { discountAmount: discountAmount ? parseFloat(discountAmount) : null }),
       ...(active !== undefined && { active }),
-    },
+    } as any,
   });
   return success(reward);
 }, SENIOR_ROLES);
