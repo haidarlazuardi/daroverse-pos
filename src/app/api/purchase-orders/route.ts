@@ -92,7 +92,6 @@ export const PATCH = withAuth(async (req, user) => {
                 description: `Pembelian PO #${po.poNumber} — ${po.supplier?.name || 'Supplier'}`,
                 amount: totalCost,
                 paidBy: user.name || user.userId,
-                ...(po.shiftId ? { shiftId: po.shiftId } : {}),
               },
             });
           }
