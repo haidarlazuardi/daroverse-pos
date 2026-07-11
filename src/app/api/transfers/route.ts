@@ -5,8 +5,9 @@ import prisma from '@/lib/prisma';
 import { success, error } from '@/lib/api-helpers';
 import { authenticate } from '@/lib/auth';
 import { transferStock } from '@/lib/stock-engine';
+type StockLocation = Parameters<typeof transferStock>[1];
 import { ensureCan } from '@/lib/permissions';
-import { StockLocation } from '@prisma/client';
+
 
 // GET — recent transfer movements (incoming side, per destination)
 export async function GET(req: NextRequest) {
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
       toLocation as StockLocation,
       quantity,
       user.userId,
-      (fromLocation as StockLocation) || StockLocation.GUDANG
+      ((fromLocation as string) || 'GUDANG') as StockLocation
     );
     return success(result, 201);
   } catch (e: any) {

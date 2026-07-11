@@ -36,7 +36,7 @@ async function getSettings() {
   });
   const map = new Map(rows.map((r) => [r.key, r.value]));
   const num = (k: string, d: number) => {
-    const v = parseFloat(map.get(k) || '');
+    const v = parseFloat(String(map.get(k) || ''));
     return Number.isFinite(v) ? v : d;
   };
   return {
@@ -118,7 +118,7 @@ export async function GET(req: NextRequest) {
     return success(order);
   }
 
-  const where: Prisma.OrderWhereInput = {};
+  const where: any = {};
   if (status) where.status = status as any;
   if (shiftId) where.shiftId = shiftId;
   if (!ADMIN_ROLES.includes(user.role)) where.userId = user.userId;
@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
     ]);
     if (products.length !== new Set(productIds).size) return error('Sebagian produk tidak tersedia');
 
-    const productMap = new Map(products.map((p) => [p.id, p]));
+    const productMap = new Map((products as any[]).map((p: any) => [p.id, p]));
 
     // Build order items (price includes add-on priceDelta; cost from engine lines).
     const orderItems = items.map((item, idx) => {
@@ -326,7 +326,7 @@ export async function POST(req: NextRequest) {
 
       // Loyalty only settles on a completed sale.
       if (!open && finalCustomerId) {
-        const ledger: Prisma.LoyaltyLedgerCreateManyInput[] = [];
+        const ledger: any[] = [];
         if (pointsEarned > 0) ledger.push({ customerId: finalCustomerId, orderId: ord.id, type: 'EARN', points: pointsEarned });
         if (pointsRedeemed > 0) ledger.push({ customerId: finalCustomerId, orderId: ord.id, type: 'REDEEM', points: -pointsRedeemed });
         if (ledger.length) await tx.loyaltyLedger.createMany({ data: ledger });
@@ -388,7 +388,7 @@ export async function PATCH(req: NextRequest) {
         prisma.product.findMany({ where: { id: { in: productIds }, active: true }, select: { id: true, price: true } }),
         computeOrderRequirements(toEngineItems(newItems), order.orderType as 'DINE_IN' | 'TAKEAWAY'),
       ]);
-      const pm = new Map(products.map((p) => [p.id, p]));
+      const pm = new Map((products as any[]).map((p: any) => [p.id, p]));
 
       const created = newItems.map((item, idx) => {
         const p = pm.get(item.productId)!;

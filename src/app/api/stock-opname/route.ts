@@ -1,9 +1,10 @@
 export const dynamic = 'force-dynamic';
+type StockLocation = 'GUDANG' | 'BAR' | 'KITCHEN';
 
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, withAuth } from '@/lib/api-helpers';
-import { StockLocation } from '@prisma/client';
+
 import { ensureCan } from '@/lib/permissions';
 
 export const GET = withAuth(async (req) => {

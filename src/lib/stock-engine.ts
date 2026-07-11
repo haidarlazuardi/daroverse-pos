@@ -1,5 +1,12 @@
 import prisma from './prisma';
-import { Prisma, StockLocation, IngredientType } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+
+// Type aliases — avoid importing enums from Prisma client since they may vary per generated version
+type StockLocation = 'GUDANG' | 'BAR' | 'KITCHEN';
+type IngredientType = 'RAW' | 'PREPPED';
+// Re-export constants to match enum usage
+const StockLocation = { GUDANG: 'GUDANG' as StockLocation, BAR: 'BAR' as StockLocation, KITCHEN: 'KITCHEN' as StockLocation };
+const IngredientType = { RAW: 'RAW' as IngredientType, PREPPED: 'PREPPED' as IngredientType };
 
 type TxClient = Prisma.TransactionClient;
 
@@ -45,7 +52,7 @@ function locationForStation(station: 'FOOD' | 'DRINK'): StockLocation {
 // resolves in 1 level and a nested batch keeps descending — guarded against
 // cycles and runaway depth.
 function makeUnitCostResolver(
-  ingredientMap: Map<string, { type: IngredientType; latestPrice: number; name: string }>,
+  ingredientMap: Map<string, any>,
   prepRecipeMap: Map<string, { yieldQty: number | null; items: { ingredientId: string; quantity: number }[] }>,
   warnings: string[]
 ) {
@@ -108,10 +115,10 @@ export async function computeOrderRequirements(
     prisma.ingredient.findMany({ select: { id: true, type: true, latestPrice: true, name: true } }),
   ]);
 
-  const productMap = new Map(products.map((p) => [p.id, p]));
-  const ingredientMap = new Map(allIngredients.map((i) => [i.id, i]));
+  const productMap = new Map((products as any[]).map((p: any) => [p.id, p]));
+  const ingredientMap = new Map((allIngredients as any[]).map((i: any) => [i.id, i]));
   const prepRecipeMap = new Map(
-    prepRecipes
+    (prepRecipes as any[])
       .filter((r) => r.ingredientId)
       .map((r) => [r.ingredientId as string, { yieldQty: r.yieldQty, items: r.items.map((it) => ({ ingredientId: it.ingredientId, quantity: it.quantity })) }])
   );
@@ -189,7 +196,7 @@ export async function applyDeductionsInTx(
   orderId: string,
   userId: string
 ) {
-  const movementRows: Prisma.StockMovementCreateManyInput[] = [];
+  const movementRows: any[] = [];
 
   for (const [location, ingredients] of deductions) {
     for (const [ingredientId, qty] of ingredients) {
@@ -231,7 +238,7 @@ export async function reverseStockForOrder(
   const { deductions } = await computeOrderRequirements(items, orderType);
 
   await prisma.$transaction(async (tx) => {
-    const rows: Prisma.StockMovementCreateManyInput[] = [];
+    const rows: any[] = [];
     for (const [location, ingredients] of deductions) {
       for (const [ingredientId, qty] of ingredients) {
         if (qty <= 0) continue;
@@ -267,7 +274,7 @@ export async function executeProductionOrder(productionOrderId: string, userId: 
   const yieldQty = actualYield != null && actualYield > 0 ? actualYield : po.plannedYield;
 
   await prisma.$transaction(async (tx) => {
-    const rows: Prisma.StockMovementCreateManyInput[] = [];
+    const rows: any[] = [];
 
     // 1) consume raw (guarded against overselling)
     for (const it of po.items) {
@@ -377,7 +384,7 @@ export async function receivePurchaseOrder(poId: string, userId: string) {
   if (po.status === 'COMPLETED') throw new Error('PO sudah selesai');
 
   await prisma.$transaction(async (tx) => {
-    const rows: Prisma.StockMovementCreateManyInput[] = [];
+    const rows: any[] = [];
     for (const item of po.items) {
       const conv = item.ingredient.conversionRate && item.ingredient.purchaseUnit ? item.ingredient.conversionRate : 1;
       const baseQty = item.quantity * conv; // carton → base unit
@@ -415,9 +422,9 @@ export async function recalculateProductCosts(changedIngredientIds?: string[]) {
     prisma.ingredient.findMany({ select: { id: true, type: true, latestPrice: true, name: true } }),
   ]);
 
-  const ingredientMap = new Map(allIngredients.map((i) => [i.id, i]));
+  const ingredientMap = new Map((allIngredients as any[]).map((i: any) => [i.id, i]));
   const prepRecipeMap = new Map(
-    prepRecipes
+    (prepRecipes as any[])
       .filter((r) => r.ingredientId)
       .map((r) => [r.ingredientId as string, { yieldQty: r.yieldQty, items: r.items.map((it) => ({ ingredientId: it.ingredientId, quantity: it.quantity })) }])
   );
@@ -479,13 +486,13 @@ export async function getPredictedStockouts() {
   });
 
   const ingredients = await prisma.ingredient.findMany({ where: { active: true }, select: { id: true, name: true, unit: true } });
-  const ingMap = new Map(ingredients.map((i) => [i.id, i]));
+  const ingMap = new Map((ingredients as any[]).map((i: any) => [i.id, i]));
 
   const predictions: Array<Record<string, unknown>> = [];
   for (const s of stock) {
     const ing = ingMap.get(s.ingredientId);
     if (!ing) continue;
-    const avgDailyUsage = (usageMap.get(s.ingredientId) || 0) / 14;
+    const avgDailyUsage = (Number(usageMap.get(s.ingredientId)) || 0) / 14;
     if (avgDailyUsage <= 0) continue;
     const current = s._sum.quantity || 0;
     const daysUntilOut = current / avgDailyUsage;

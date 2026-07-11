@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+type StockLocation = 'GUDANG' | 'BAR' | 'KITCHEN';
 
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
@@ -6,7 +7,7 @@ import { success, error } from '@/lib/api-helpers';
 import { authenticate } from '@/lib/auth';
 import { buildProductionDraft, executeProductionOrder } from '@/lib/stock-engine';
 import { ensureCan } from '@/lib/permissions';
-import { StockLocation } from '@prisma/client';
+
 
 function genNumber() {
   const date = new Date().toISOString().slice(2, 10).replace(/-/g, '');

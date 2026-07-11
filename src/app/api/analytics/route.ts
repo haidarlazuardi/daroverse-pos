@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, withAuth } from '@/lib/api-helpers';
 import { ADMIN_ROLES } from '@/lib/auth';
-import { StockLocation } from '@prisma/client';
+
 
 export const GET = withAuth(async (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
@@ -64,8 +64,8 @@ export const GET = withAuth(async (req: NextRequest) => {
   // 2) COGS vs leak
   const revenue          = orders.reduce((s, o) => s + o.total, 0);
   const theoreticalCOGS  = orders.reduce((s, o) => s + o.costTotal, 0);
-  const wasteValue       = wasteMoves.reduce((s, m) => s + Math.abs(m.quantity) * (priceOf.get(m.ingredientId) || 0), 0);
-  const shrinkValue      = opnameMoves.reduce((s, m) => s + Math.abs(m.quantity) * (priceOf.get(m.ingredientId) || 0), 0);
+  const wasteValue       = wasteMoves.reduce((s, m) => s + Math.abs(m.quantity) * (Number(priceOf.get(m.ingredientId)) || 0), 0);
+  const shrinkValue      = opnameMoves.reduce((s, m) => s + Math.abs(m.quantity) * (Number(priceOf.get(m.ingredientId)) || 0), 0);
   const leakTotal        = wasteValue + shrinkValue;
   const cogs = { revenue, theoreticalCOGS, theoreticalPct: revenue ? theoreticalCOGS/revenue*100 : 0, wasteValue, shrinkValue, leakTotal, leakPct: theoreticalCOGS ? leakTotal/theoreticalCOGS*100 : 0 };
 

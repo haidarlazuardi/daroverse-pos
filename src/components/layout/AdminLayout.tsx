@@ -192,11 +192,11 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             style={{ background: 'var(--surface-3)', border: '1px solid var(--border)' }}>
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0 text-white"
               style={{ background: 'var(--brand)' }}>
-              {user?.name?.charAt(0).toUpperCase()}
+              {user?.name?.charAt(0)?.toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold truncate" style={{ color: 'var(--text-1)' }}>{user?.name}</p>
-              <p className="text-[10px]" style={{ color: 'var(--text-3)' }}>{ROLE_LABELS[role]}</p>
+              <p className="text-[10px]" style={{ color: 'var(--text-3)' }}>{ROLE_LABELS[role as Role]}</p>
             </div>
           </div>
           <button onClick={handleLogout}
@@ -249,7 +249,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white cursor-pointer"
               style={{ background: 'var(--brand)' }}>
-              {user?.name?.charAt(0).toUpperCase()}
+              {user?.name?.charAt(0)?.toUpperCase()}
             </div>
           </div>
         </header>
