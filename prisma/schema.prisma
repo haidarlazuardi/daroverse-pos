@@ -12,12 +12,11 @@ datasource db {
 // ═══════════════════════════════════════════════════════
 
 enum Role {
-  SUPER_ADMIN  // Full access incl. delete & settings
-  OWNER        // Full access except user management & delete permanent
-  MANAGER      // Ops + purchasing + reports, no settings
-  CASHIER      // POS + shift only
-  KITCHEN      // Production + batch + view kitchen stock
-  INVENTORY    // Stock, transfer, opname, PO, supplier
+  SUPER_ADMIN
+  OWNER
+  MANAGER
+  CASHIER
+  KITCHEN
 }
 
 // 3 stock locations within the single business.
