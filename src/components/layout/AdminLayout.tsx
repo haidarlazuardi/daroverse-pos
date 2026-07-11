@@ -121,12 +121,12 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     if (pathname === '/') router.replace(ROLE_HOME[user.role as Role] ?? '/pos');
 
     // Cashier: only allowed specific pages
-    if (user?.role === 'CASHIER') {
+    if ((user?.role as string) === 'CASHIER') {
       const allowed = ['/pos', '/shift', '/expenses-input', '/staff'];
       if (!allowed.some(p => pathname.startsWith(p))) router.replace('/pos');
     }
     // Kitchen: only allowed specific pages
-    if (user?.role === 'KITCHEN') {
+    if ((user?.role as string) === 'KITCHEN') {
       const allowed = ['/pos', '/shift', '/production', '/menu-view', '/staff'];
       if (!allowed.some(p => pathname.startsWith(p))) router.replace('/production');
     }
