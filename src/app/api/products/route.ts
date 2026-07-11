@@ -137,6 +137,14 @@ export const PUT = withAuth(async (req) => {
     if (newRecipe) {
       await prisma.recipe.deleteMany({ where: { productId: id } });
       if (newRecipe.items?.length) {
+        // Dedupe by ingredientId — keep last occurrence
+        const deduped = Object.values(
+          newRecipe.items.reduce((acc: any, item: any) => {
+            acc[item.ingredientId] = item;
+            return acc;
+          }, {})
+        ) as any[];
+
         await prisma.recipe.create({
           data: {
             productId: id,
