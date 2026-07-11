@@ -24,7 +24,7 @@ export default function ShiftPage() {
   const [closeNotes, setCloseNotes]   = useState('');
   const [saving, setSaving]   = useState(false);
 
-  const isManager = user && (SENIOR_ROLES as string[]).includes(user.role);
+  const isManager = user && (['SUPER_ADMIN','OWNER','MANAGER'] as string[]).includes(user.role);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -33,7 +33,7 @@ export default function ShiftPage() {
         api.get<any>('/api/shifts?active=true'),
         api.get<any>('/api/shifts?limit=20'),
       ]);
-      setActiveShift(active.shift);
+      setActiveShift(Array.isArray(active) ? active[0] || null : active.shift || null);
       const pending = (all.shifts || []).filter((s: any) => s.status === 'PENDING_CLOSE');
       const closed  = (all.shifts || []).filter((s: any) => s.status === 'CLOSED');
       setPendingShifts(pending);
