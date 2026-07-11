@@ -106,11 +106,131 @@ export default function ProductsPage() {
   }
 
   function handleExport() {
-    const rows = products.map(p => ({ id: p.id, name: p.name, sku: p.sku??'', category: p.category.name, station: p.station, price: p.price, cost: p.cost, margin_pct: p.price > 0 ? ((p.price-p.cost)/p.price*100).toFixed(1) : 0, active: p.active, recipe_items: p.recipe?.items.length??0 }));
-    const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Products');
-    XLSX.writeFile(wb, 'products-export.xlsx');
+
+    // Group products by category
+    const grouped = new Map<string, typeof products>();
+    for (const p of products) {
+      const cat = p.category?.name || 'Lainnya';
+      if (!grouped.has(cat)) grouped.set(cat, []);
+      grouped.get(cat)!.push(p);
+    }
+
+    // ── Sheet 1: Ringkasan per Kategori ─────────────────────────
+    const summaryRows: any[] = [];
+    for (const [cat, items] of grouped) {
+      const totalRevenue = items.reduce((s, p) => s + p.price, 0);
+      const avgMargin = items.length > 0
+        ? items.reduce((s, p) => s + (p.price > 0 ? (p.price - p.cost) / p.price * 100 : 0), 0) / items.length
+        : 0;
+      summaryRows.push({
+        'Kategori': cat,
+        'Jumlah Menu': items.length,
+        'Rata-rata Harga Jual': Math.round(totalRevenue / items.length),
+        'Rata-rata Margin (%)': avgMargin.toFixed(1),
+        'Menu Aktif': items.filter(p => p.active).length,
+        'Menu Nonaktif': items.filter(p => !p.active).length,
+      });
+    }
+    summaryRows.push({
+      'Kategori': 'TOTAL',
+      'Jumlah Menu': products.length,
+      'Rata-rata Harga Jual': '',
+      'Rata-rata Margin (%)': '',
+      'Menu Aktif': products.filter(p => p.active).length,
+      'Menu Nonaktif': products.filter(p => !p.active).length,
+    });
+
+    const wsSum = XLSX.utils.json_to_sheet(summaryRows);
+    wsSum['!cols'] = [{ wch: 22 }, { wch: 14 }, { wch: 22 }, { wch: 18 }, { wch: 12 }, { wch: 14 }];
+    XLSX.utils.book_append_sheet(wb, wsSum, '📊 Ringkasan');
+
+    // ── Sheet 2: Semua Produk per Kategori ───────────────────────
+    const allRows: any[] = [];
+    for (const [cat, items] of grouped) {
+      // Category header row
+      allRows.push({ '': `── ${cat} (${items.length} menu) ──` });
+      // Column headers
+      allRows.push({
+        '': 'Nama Produk',
+        ' ': 'SKU',
+        '  ': 'Station',
+        '   ': 'Harga Jual',
+        '    ': 'HPP',
+        '     ': 'Margin %',
+        '      ': 'Profit/Porsi',
+        '       ': 'Status',
+      });
+      // Product rows
+      for (const p of items) {
+        const margin = p.price > 0 ? ((p.price - p.cost) / p.price * 100) : 0;
+        allRows.push({
+          '': p.name,
+          ' ': p.sku ?? '-',
+          '  ': p.station === 'FOOD' ? 'Dapur' : 'Bar',
+          '   ': p.price,
+          '    ': p.cost,
+          '     ': `${margin.toFixed(1)}%`,
+          '      ': p.price - p.cost,
+          '       ': p.active ? 'Aktif' : 'Nonaktif',
+        });
+      }
+      // Empty spacer
+      allRows.push({});
+    }
+
+    const wsAll = XLSX.utils.json_to_sheet(allRows, { skipHeader: true });
+    wsAll['!cols'] = [{ wch: 32 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, wsAll, '📋 Semua Produk');
+
+    // ── Sheet per kategori (kalau ada filter) ────────────────────
+    for (const [cat, items] of grouped) {
+      const rows = items.map(p => {
+        const margin = p.price > 0 ? ((p.price - p.cost) / p.price * 100) : 0;
+        return {
+          'Nama Produk': p.name,
+          'SKU': p.sku ?? '-',
+          'Station': p.station === 'FOOD' ? 'Dapur' : 'Bar',
+          'Harga Jual (Rp)': p.price,
+          'HPP (Rp)': p.cost,
+          'Margin (%)': parseFloat(margin.toFixed(1)),
+          'Profit per Porsi (Rp)': p.price - p.cost,
+          'Jumlah Bahan': p.recipe?.items.length ?? 0,
+          'Status': p.active ? 'Aktif' : 'Nonaktif',
+        };
+      });
+      const ws = XLSX.utils.json_to_sheet(rows);
+      ws['!cols'] = [{ wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 20 }, { wch: 14 }, { wch: 10 }];
+      // Sheet name max 31 chars
+      const sheetName = cat.slice(0, 28);
+      XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    }
+
+    // ── Sheet: Resep Detail ───────────────────────────────────────
+    const recipeRows: any[] = [];
+    for (const p of products) {
+      if (!p.recipe?.items.length) continue;
+      for (const ri of p.recipe.items) {
+        recipeRows.push({
+          'Produk': p.name,
+          'Kategori': p.category?.name ?? '',
+          'Station': p.station === 'FOOD' ? 'Dapur' : 'Bar',
+          'Bahan': ri.ingredient.name,
+          'Jumlah': ri.quantity,
+          'Satuan': ri.ingredient.unit,
+          'Harga Jual': p.price,
+          'HPP': p.cost,
+        });
+      }
+    }
+    if (recipeRows.length > 0) {
+      const wsR = XLSX.utils.json_to_sheet(recipeRows);
+      wsR['!cols'] = [{ wch: 30 }, { wch: 16 }, { wch: 10 }, { wch: 28 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 12 }];
+      XLSX.utils.book_append_sheet(wb, wsR, '🧪 Resep Detail');
+    }
+
+    const date = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `soeka-menu-${date}.xlsx`);
   }
 
   // Modifier helpers
