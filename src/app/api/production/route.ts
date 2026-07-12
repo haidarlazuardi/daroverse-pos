@@ -88,18 +88,29 @@ export async function PATCH(req: NextRequest) {
   { const d = await ensureCan(user, 'batch'); if (d) return error(d, 403); }
 
   try {
-    const { productionOrderId, action, actualYield } = await req.json();
-    if (!productionOrderId || !action) return error('productionOrderId dan action wajib diisi');
+    const body = await req.json();
+    // Support both 'id' and 'productionOrderId' for backward compat
+    const id = body.id || body.productionOrderId;
+    const { action, actualYield, location, notes } = body;
+    if (!id || !action) return error('id dan action wajib diisi');
 
     if (action === 'execute') {
-      await executeProductionOrder(productionOrderId, user.userId, actualYield);
+      await executeProductionOrder(id, user.userId, actualYield);
       return success({ executed: true });
     }
+    if (action === 'update') {
+      const updateData: any = {};
+      if (location !== undefined)    updateData.location    = location;
+      if (notes !== undefined)       updateData.notes       = notes;
+      if (actualYield !== undefined) updateData.actualYield = actualYield;
+      await prisma.productionOrder.update({ where: { id }, data: updateData });
+      return success({ updated: true });
+    }
     if (action === 'cancel') {
-      const po = await prisma.productionOrder.findUnique({ where: { id: productionOrderId } });
+      const po = await prisma.productionOrder.findUnique({ where: { id } });
       if (!po) return error('Production order tidak ditemukan');
       if (po.status === 'COMPLETED') return error('Tidak bisa membatalkan produksi yang sudah selesai');
-      await prisma.productionOrder.update({ where: { id: productionOrderId }, data: { status: 'CANCELLED' } });
+      await prisma.productionOrder.update({ where: { id }, data: { status: 'CANCELLED' } });
       return success({ cancelled: true });
     }
     return error('Aksi tidak valid');

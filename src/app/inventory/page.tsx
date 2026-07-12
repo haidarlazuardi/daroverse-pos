@@ -42,7 +42,9 @@ export default function InventoryPage() {
   const [formError, setFormError] = useState('');
   const [tab, setTab]           = useState<'stock'|'alerts'>('stock');
 
-  const rawIngredients = data.filter(i => i.type === 'RAW');
+  const [allRaw, setAllRaw] = useState<Ingredient[]>([]);
+
+  const rawIngredients = allRaw; // always full list, not filtered
 
   const totalStock = (ing: Ingredient) => ing.stockLevels.reduce((s, sl) => s + sl.quantity, 0);
   const isLow = (ing: Ingredient) => totalStock(ing) <= ing.minStock;
@@ -55,7 +57,12 @@ export default function InventoryPage() {
       let url = '/api/ingredients?';
       if (typeFilter) url += `type=${typeFilter}&`;
       if (search)     url += `search=${encodeURIComponent(search)}&`;
-      setData(await api.get<Ingredient[]>(url));
+      const [result, raw] = await Promise.all([
+        api.get<Ingredient[]>(url),
+        api.get<Ingredient[]>('/api/ingredients?type=RAW'),
+      ]);
+      setData(result);
+      setAllRaw(raw);
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, [search, typeFilter]);

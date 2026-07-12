@@ -26,6 +26,7 @@ export default function ProductionPage() {
   const [slideOpen, setSlideOpen] = useState(false);
   const [form, setForm]       = useState({ ingredientId:'', batchMultiplier:'1', location:'BAR', actualYield:'', notes:'' });
   const [saving, setSaving]   = useState(false);
+  const [editing, setEditing] = useState<PO | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PO | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -44,19 +45,50 @@ export default function ProductionPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  function openAdd() {
+    setEditing(null);
+    setForm({ ingredientId:'', batchMultiplier:'1', location:'BAR', actualYield:'', notes:'' });
+    setSlideOpen(true);
+  }
+
+  function openEdit(po: PO) {
+    setEditing(po);
+    const ing = prepped.find(i => i.name === po.ingredient?.name);
+    setForm({
+      ingredientId: ing?.id || '',
+      batchMultiplier: '1',
+      location: po.location,
+      actualYield: po.actualYield ? String(po.actualYield) : '',
+      notes: po.notes || '',
+    });
+    setSlideOpen(true);
+  }
+
   async function handleSubmit() {
     if (!form.ingredientId) return;
     setSaving(true);
     try {
-      await api.post('/api/production', {
-        ingredientId: form.ingredientId,
-        batchMultiplier: parseFloat(form.batchMultiplier) || 1,
-        location: form.location,
-        actualYield: form.actualYield ? parseFloat(form.actualYield) : undefined,
-        notes: form.notes || undefined,
-        execute: true,
-      });
+      if (editing) {
+        // Edit — update location, notes, actualYield
+        await api.patch('/api/production', {
+          id: editing.id,
+          action: 'update',
+          location: form.location,
+          actualYield: form.actualYield ? parseFloat(form.actualYield) : null,
+          notes: form.notes || null,
+        });
+      } else {
+        await api.post('/api/production', {
+          ingredientId: form.ingredientId,
+          batchMultiplier: parseFloat(form.batchMultiplier) || 1,
+          location: form.location,
+          actualYield: form.actualYield ? parseFloat(form.actualYield) : undefined,
+          notes: form.notes || undefined,
+          execute: true,
+        });
+      }
       setSlideOpen(false);
+      setEditing(null);
       setForm({ ingredientId:'', batchMultiplier:'1', location:'BAR', actualYield:'', notes:'' });
       load();
     } catch (e: any) { alert(e.message || 'Gagal'); }
@@ -114,29 +146,30 @@ export default function ProductionPage() {
         <Toolbar
           search={search} onSearch={setSearch} searchPlaceholder="Cari nama olahan atau no produksi..."
           filters={[{ key:'status', label:'Status', value:filterStatus, onChange:setFilterStatus, options:[{value:'PLANNED',label:'Rencana'},{value:'IN_PROGRESS',label:'Proses'},{value:'COMPLETED',label:'Selesai'},{value:'CANCELLED',label:'Dibatal'}] }]}
-          onExport={handleExport} onAdd={() => setSlideOpen(true)} addLabel="Bikin Batch"
+          onExport={handleExport} onAdd={openAdd} addLabel="Bikin Batch"
         />
 
         <DataTable data={filtered} columns={columns} keyField="id" loading={loading} emptyMessage="Belum ada produksi"
           rowActions={o => (
             <div className="flex gap-1">
+              <button onClick={() => openEdit(o)} className="p-1.5 hover:bg-brand-50 rounded-lg text-gray-400 hover:text-brand-600" title="Edit">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
               {o.status === 'PLANNED' && (
-                <button onClick={() => handleCancel(o)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500" title="Batalkan">
+                <button onClick={() => handleCancel(o)} className="p-1.5 hover:bg-orange-50 rounded-lg text-gray-400 hover:text-orange-500" title="Batalkan">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                 </button>
               )}
-              {o.status === 'CANCELLED' && (
-                <button onClick={() => setDeleteTarget(o)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500" title="Hapus">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
-                </button>
-              )}
+              <button onClick={() => setDeleteTarget(o)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500" title="Hapus">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+              </button>
             </div>
           )}
         />
       </div>
 
-      <SlideOver open={slideOpen} onClose={() => setSlideOpen(false)} title="Bikin Batch Produksi"
-        footer={<div className="flex justify-end gap-3"><button onClick={() => setSlideOpen(false)} className="btn btn-secondary btn-md">Batal</button><Button onClick={handleSubmit} disabled={saving||!form.ingredientId}>{saving ? 'Memproses...' : 'Bikin & Potong Stok'}</Button></div>}>
+      <SlideOver open={slideOpen} onClose={() => { setSlideOpen(false); setEditing(null); }} title={editing ? `Edit Produksi ${editing.number}` : 'Bikin Batch Produksi'}
+        footer={<div className="flex justify-end gap-3"><button onClick={() => { setSlideOpen(false); setEditing(null); }} className="btn btn-secondary btn-md">Batal</button><Button onClick={handleSubmit} disabled={saving || (!editing && !form.ingredientId)}>{saving ? 'Memproses...' : editing ? 'Simpan Perubahan' : 'Bikin & Potong Stok'}</Button></div>}>
         <div className="space-y-4">
           <div><label className="label">Olahan *</label>
             <select className="select" value={form.ingredientId} onChange={e => f('ingredientId',e.target.value)}>
