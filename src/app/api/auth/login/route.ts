@@ -25,9 +25,9 @@ export async function POST(req: NextRequest) {
 
     const payload = {
       userId: user.id,
-      email: user.email,
-      role: user.role,
-      name: user.name,
+      email:  user.email,
+      role:   user.role as any,
+      name:   user.name,
     };
 
     const token = signToken(payload);

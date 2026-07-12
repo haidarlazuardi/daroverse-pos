@@ -26,7 +26,7 @@ const EMPTY_RAW = {
   name: '', type: 'RAW', unit: 'g', purchaseUnit: '', conversionRate: '',
   latestPrice: '', purchasePrice: '', minStock: '', defaultLocation: '', isPackaging: false,
 };
-const EMPTY_PREP = { name: '', unit: 'ml', yieldQty: '', yieldUnit: 'ml', minStock: '', latestPrice: '' };
+const EMPTY_PREP = { name: '', unit: 'ml', yieldQty: '', yieldUnit: 'ml', minStock: '', latestPrice: '', shelfLifeDays: '', instructions: '' };
 const UNITS = ['g','ml','pcs','kg','liter','botol','pack','kaleng','lembar','buah'];
 
 const GROUPS: { label: string; keys: string[] }[] = [
@@ -140,7 +140,7 @@ export default function BahanBakuPage() {
   }
   function openEditPrep(ing: PrepIngredient) {
     setEditingPrep(ing);
-    setPrepForm({ name: ing.name, unit: ing.unit, yieldQty: ing.prepRecipe?.yieldQty ? String(ing.prepRecipe.yieldQty) : '', yieldUnit: ing.prepRecipe?.yieldUnit || ing.unit, minStock: String(ing.minStock), latestPrice: String(ing.latestPrice) });
+    setPrepForm({ name: ing.name, unit: ing.unit, yieldQty: ing.prepRecipe?.yieldQty ? String(ing.prepRecipe.yieldQty) : '', yieldUnit: ing.prepRecipe?.yieldUnit || ing.unit, minStock: String(ing.minStock), latestPrice: String(ing.latestPrice), shelfLifeDays: ing.prepRecipe?.shelfLifeDays ? String(ing.prepRecipe.shelfLifeDays) : '', instructions: ing.prepRecipe?.instructions ? (ing.prepRecipe.instructions as any[]).map((s: any) => `${s.title}: ${s.description}`).join('\n') : '' });
     setRecipeItems(ing.prepRecipe?.items.map(ri => ({ ingredientId: ri.ingredient.id, quantity: String(ri.quantity) })) || [{ ingredientId: '', quantity: '' }]);
     setPrepSlide(true);
   }
@@ -159,6 +159,11 @@ export default function BahanBakuPage() {
         prepRecipe: validItems.length > 0 ? {
           yieldQty: parseFloat(prepForm.yieldQty) || null,
           yieldUnit: prepForm.yieldUnit || prepForm.unit,
+          shelfLifeDays: prepForm.shelfLifeDays ? parseInt(prepForm.shelfLifeDays) : null,
+          instructions: prepForm.instructions ? prepForm.instructions.split('\n').filter(Boolean).map(line => {
+            const [title, ...rest] = line.split(':');
+            return { title: title.trim(), description: rest.join(':').trim() };
+          }) : null,
           items: validItems.map(ri => ({ ingredientId: ri.ingredientId, quantity: parseFloat(ri.quantity) })),
         } : undefined,
       };
@@ -516,6 +521,11 @@ export default function BahanBakuPage() {
             <div><label className="label">Yield per Batch ({prepForm.unit})</label><input className="input" type="number" value={prepForm.yieldQty} onChange={e => pf('yieldQty', e.target.value)} placeholder="cth. 3847" /></div>
           </div>
           <div><label className="label">Min Stok ({prepForm.unit})</label><input className="input" type="number" value={prepForm.minStock} onChange={e => pf('minStock', e.target.value)} /></div>
+          <div>
+            <label className="label">Shelf Life (hari)</label>
+            <input className="input" type="number" value={prepForm.shelfLifeDays} onChange={e => pf('shelfLifeDays', e.target.value)} placeholder="cth. 3 (tahan 3 hari)" />
+            <p className="text-xs mt-1" style={{ color: 'var(--text-3)' }}>Sistem akan alert jika batch sudah lewat dari tanggal ini</p>
+          </div>
 
           {/* Recipe items */}
           <div>
@@ -560,6 +570,14 @@ export default function BahanBakuPage() {
               )}
             </div>
           )}
+
+          {/* Cara pembuatan */}
+          <div>
+            <label className="label">Cara Pembuatan</label>
+            <p className="text-xs mb-2" style={{ color: 'var(--text-3)' }}>Format per baris: "Judul: Deskripsi langkah"</p>
+            <textarea className="input" rows={5} value={prepForm.instructions} onChange={e => pf('instructions', e.target.value)}
+              placeholder={"Langkah 1: Panaskan susu hingga 65°C\nLangkah 2: Campurkan dengan creamer\nLangkah 3: Aduk rata dan dinginkan"} />
+          </div>
         </div>
       </SlideOver>
 

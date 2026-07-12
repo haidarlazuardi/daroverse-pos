@@ -34,7 +34,6 @@ export default function InventoryPage() {
   const [loading, setLoading]   = useState(true);
   const [search, setSearch]     = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [locationFilter, setLocationFilter] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [slideOpen, setSlideOpen] = useState(false);
   const [editing, setEditing]   = useState<Ingredient | null>(null);
@@ -51,6 +50,21 @@ export default function InventoryPage() {
   const isLow = (ing: Ingredient) => totalStock(ing) <= ing.minStock;
   const isCritical = (ing: Ingredient) => totalStock(ing) <= 0;
   const alertItems = data.filter(isLow);
+
+  // Shelf life alert — check production orders that are past shelf life
+  const [expiredBatches, setExpiredBatches] = useState<any[]>([]);
+  useEffect(() => {
+    api.get<any[]>('/api/production?status=COMPLETED&limit=50').then(orders => {
+      const now = Date.now();
+      const expired = orders.filter((o: any) => {
+        const shelfLife = o.ingredient?.prepRecipe?.shelfLifeDays;
+        if (!shelfLife || !o.completedAt) return false;
+        const expiryMs = new Date(o.completedAt).getTime() + shelfLife * 86400000;
+        return expiryMs < now;
+      });
+      setExpiredBatches(expired);
+    }).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -241,7 +255,7 @@ export default function InventoryPage() {
 
         {/* Alert banner */}
         {alertItems.length > 0 && (
-          <div className="mb-4 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between">
+          <div className="mb-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-amber-500">
                 <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
@@ -253,6 +267,21 @@ export default function InventoryPage() {
             <button onClick={() => setTab('alerts')} className="text-xs text-amber-700 font-medium hover:underline">
               Lihat semua →
             </button>
+          </div>
+        )}
+        {expiredBatches.length > 0 && (
+          <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="text-red-500">
+                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <span className="text-sm font-medium text-red-800">
+                ⚠️ {expiredBatches.length} batch olahan melewati shelf life — segera buang atau cek kondisi
+              </span>
+            </div>
+            <span className="text-xs text-red-600 font-medium">
+              {expiredBatches.map((b: any) => b.ingredient?.name).filter(Boolean).join(', ')}
+            </span>
           </div>
         )}
 
@@ -269,12 +298,11 @@ export default function InventoryPage() {
 
         <Toolbar
           search={search} onSearch={setSearch} searchPlaceholder="Cari bahan..."
-          filters={[
-            { key: 'type', label: 'Tipe', value: typeFilter, onChange: setTypeFilter,
-              options: [{ value: 'RAW', label: 'Bahan Baku' }, { value: 'PREPPED', label: 'Olahan' }] },
-            { key: 'location', label: 'Station', value: locationFilter, onChange: setLocationFilter,
-              options: [{ value: 'GUDANG', label: 'Gudang' }, { value: 'BAR', label: 'Bar' }, { value: 'KITCHEN', label: 'Dapur' }] },
-          ]}
+          filters={[{
+            key: 'type', label: 'Tipe', value: typeFilter,
+            options: [{ value: 'RAW', label: 'Bahan Baku' }, { value: 'PREPPED', label: 'Olahan' }],
+            onChange: setTypeFilter,
+          }]}
           onExport={handleExport} onDownloadTemplate={handleDownloadTemplate} onImport={handleImport}
           selected={selected}
           bulkActions={
@@ -286,7 +314,7 @@ export default function InventoryPage() {
         />
 
         <DataTable
-          data={tab === 'alerts' ? alertItems : (locationFilter ? data.filter(i => i.stockLevels.some((s: any) => s.location === locationFilter && s.quantity > 0)) : data)}
+          data={tab === 'alerts' ? alertItems : data}
           columns={columns}
           keyField="id"
           loading={loading}

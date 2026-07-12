@@ -54,6 +54,93 @@ export default function PurchaseOrdersPage() {
   }
 
   function openDetail(po: PO) { setDetailPO(po); setSlideOpen(true); }
+
+  function printPO(po: PO) {
+    const date = new Date(po.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+    const rows = po.items.map((item, i) => `
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">${i + 1}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee">${item.ingredient.name}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">${item.quantity} ${item.ingredient.unit}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right">Rp ${item.unitPrice.toLocaleString('id-ID')}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right">Rp ${(item.quantity * item.unitPrice).toLocaleString('id-ID')}</td>
+      </tr>`).join('');
+
+    const html = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>PO ${po.poNumber}</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; color: #111; margin: 0; padding: 32px; }
+  h1 { font-size: 22px; margin: 0 0 4px; color: #2D4A32; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; border-bottom: 2px solid #2D4A32; padding-bottom: 16px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: bold; background: #e8f5e9; color: #2D4A32; }
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .info-box { background: #f9f9f7; border-radius: 8px; padding: 12px 16px; }
+  .info-box p { margin: 0; line-height: 1.7; }
+  .info-label { font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.08em; color: #888; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+  thead tr { background: #2D4A32; color: white; }
+  thead th { padding: 10px 12px; text-align: left; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+  thead th:last-child, thead th:nth-child(4), thead th:nth-child(3) { text-align: right; }
+  thead th:nth-child(1) { text-align: center; }
+  .total-row { background: #f0f4f0; font-weight: bold; }
+  .total-row td { padding: 10px 12px; }
+  .footer { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+  .sign-box { text-align: center; }
+  .sign-line { border-top: 1px solid #ccc; margin-top: 60px; padding-top: 8px; font-size: 11px; color: #666; }
+  @media print { body { padding: 16px; } }
+</style></head><body>
+<div class="header">
+  <div>
+    <h1>PURCHASE ORDER</h1>
+    <p style="margin:4px 0 8px;color:#666">Soeka House — Jl. Raya Tajur, Bogor</p>
+    <span class="badge">${po.status}</span>
+  </div>
+  <div style="text-align:right">
+    <p style="font-size:20px;font-weight:bold;color:#2D4A32;margin:0">${po.poNumber}</p>
+    <p style="margin:4px 0 0;color:#666">${date}</p>
+  </div>
+</div>
+
+<div class="info-grid">
+  <div class="info-box">
+    <p class="info-label">Supplier</p>
+    <p style="font-size:15px;font-weight:bold;margin-top:4px">${po.supplier.name}</p>
+  </div>
+  <div class="info-box">
+    <p class="info-label">Catatan</p>
+    <p style="margin-top:4px">${po.notes || '—'}</p>
+  </div>
+</div>
+
+<table>
+  <thead><tr>
+    <th style="width:40px">No</th>
+    <th>Nama Bahan</th>
+    <th style="text-align:center">Qty</th>
+    <th style="text-align:right">Harga Satuan</th>
+    <th style="text-align:right">Subtotal</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+  <tfoot>
+    <tr class="total-row">
+      <td colspan="4" style="text-align:right;padding:10px 12px;font-weight:bold">TOTAL</td>
+      <td style="text-align:right;padding:10px 12px;font-weight:bold;font-size:15px;color:#2D4A32">Rp ${po.totalAmount.toLocaleString('id-ID')}</td>
+    </tr>
+  </tfoot>
+</table>
+
+<div class="footer">
+  <div class="sign-box"><div class="sign-line">Dibuat oleh</div></div>
+  <div class="sign-box"><div class="sign-line">Disetujui oleh</div></div>
+  <div class="sign-box"><div class="sign-line">Diterima oleh</div></div>
+</div>
+
+<script>window.onload = () => { window.print(); }</script>
+</body></html>`;
+
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
+  }
   function closeSlide() { setSlideOpen(false); setDetailPO(null); setFormError(''); }
 
   function addItem() { setForm({ ...form, items: [...form.items, { ingredientId: '', quantity: '', unitPrice: '' }] }); }
@@ -154,14 +241,18 @@ export default function PurchaseOrdersPage() {
           data={data.filter(po => !search || po.poNumber?.toLowerCase().includes(search.toLowerCase()) || po.supplier?.name?.toLowerCase().includes(search.toLowerCase()))} columns={columns} keyField="id" loading={loading}
           emptyMessage="Belum ada purchase order."
           onRowClick={openDetail}
-          rowActions={po => po.status === 'DRAFT' ? (
-            <>
-              <button onClick={e => { e.stopPropagation(); handleAction(po, 'complete'); }}
-                className="px-2 py-1 text-xs bg-brand-50 text-brand-700 hover:bg-brand-100 rounded-lg font-medium transition-colors">Terima</button>
-              <button onClick={e => { e.stopPropagation(); handleAction(po, 'cancel'); }}
-                className="px-2 py-1 text-xs bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-medium transition-colors">Batal</button>
-            </>
-          ) : null}
+          rowActions={po => (
+            <div className="flex gap-1">
+              <button onClick={e => { e.stopPropagation(); printPO(po); }}
+                className="px-2 py-1 text-xs bg-gray-50 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">PDF</button>
+              {po.status === 'DRAFT' && <>
+                <button onClick={e => { e.stopPropagation(); handleAction(po, 'complete'); }}
+                  className="px-2 py-1 text-xs bg-brand-50 text-brand-700 hover:bg-brand-100 rounded-lg font-medium transition-colors">Terima</button>
+                <button onClick={e => { e.stopPropagation(); handleAction(po, 'cancel'); }}
+                  className="px-2 py-1 text-xs bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-medium transition-colors">Batal</button>
+              </>}
+            </div>
+          )}
         />
       </div>
 
@@ -172,10 +263,15 @@ export default function PurchaseOrdersPage() {
         footer={detailPO ? (
           detailPO.status === 'DRAFT' ? (
             <div className="flex gap-3 justify-end">
+              <button onClick={() => printPO(detailPO)} className="btn btn-secondary btn-md">🖨️ Print PDF</button>
               <Button variant="danger" size="sm" onClick={() => handleAction(detailPO, 'cancel')}>Batalkan PO</Button>
               <Button onClick={() => handleAction(detailPO, 'complete')}>Terima & Update Stok</Button>
             </div>
-          ) : null
+          ) : (
+            <div className="flex justify-end">
+              <button onClick={() => printPO(detailPO)} className="btn btn-secondary btn-md">🖨️ Print PDF</button>
+            </div>
+          )
         ) : (
           <div className="flex justify-end gap-3">
             <Button variant="secondary" onClick={closeSlide} disabled={saving}>Batal</Button>

@@ -13,15 +13,13 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const categoryId = searchParams.get('categoryId');
-    const active  = searchParams.get('active');
-    const search  = searchParams.get('search');
-    const station = searchParams.get('station');
+    const active = searchParams.get('active');
+    const search = searchParams.get('search');
 
     const where: Record<string, unknown> = {};
     if (categoryId) where.categoryId = categoryId;
     if (active !== null && active !== undefined) where.active = active !== 'false';
-    if (search)  where.name    = { contains: search, mode: 'insensitive' };
-    if (station) where.station = station;
+    if (search) where.name = { contains: search, mode: 'insensitive' };
 
     const products = await prisma.product.findMany({
       where,

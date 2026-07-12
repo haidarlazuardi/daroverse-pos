@@ -114,20 +114,24 @@ export const PATCH = withAuth(async (req) => {
     const existing = await prisma.recipe.findFirst({ where: { ingredientId: id } });
     if (existing) {
       await prisma.recipeItem.deleteMany({ where: { recipeId: existing.id } });
-      await prisma.recipe.update({
+      await (prisma.recipe as any).update({
         where: { id: existing.id },
         data: {
           yieldQty: prepRecipe.yieldQty ? parseFloat(prepRecipe.yieldQty) : null,
           yieldUnit: prepRecipe.yieldUnit || data.unit,
+          shelfLifeDays: prepRecipe.shelfLifeDays ? parseInt(prepRecipe.shelfLifeDays) : null,
+          instructions: prepRecipe.instructions || null,
           items: { create: prepRecipe.items.map((i: any) => ({ ingredientId: i.ingredientId, quantity: parseFloat(i.quantity) })) },
         },
       });
     } else {
-      await prisma.recipe.create({
+      await (prisma.recipe as any).create({
         data: {
           ingredientId: id,
           yieldQty: prepRecipe.yieldQty ? parseFloat(prepRecipe.yieldQty) : null,
           yieldUnit: prepRecipe.yieldUnit || data.unit,
+          shelfLifeDays: prepRecipe.shelfLifeDays ? parseInt(prepRecipe.shelfLifeDays) : null,
+          instructions: prepRecipe.instructions || null,
           items: { create: prepRecipe.items.map((i: any) => ({ ingredientId: i.ingredientId, quantity: parseFloat(i.quantity) })) },
         },
       });
