@@ -116,6 +116,11 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
       data: { status: 'CLOSED', closedAt: new Date(), approvedBy: user.userId, approvedAt: new Date() },
       include: { user: { select: { name: true } } },
     });
+    try {
+      await (prisma as any).auditLog.create({
+        data: { userId: user.userId, userName: user.name || '', action: 'SHIFT_CLOSE', entity: 'Shift', entityId: id, newValue: { approvedBy: user.userId, closedAt: new Date() } },
+      });
+    } catch { /* silent if auditLog not migrated yet */ }
     return success(updated);
   }
 
