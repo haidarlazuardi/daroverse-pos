@@ -273,7 +273,6 @@ export default function InventoryPage() {
             options: [{ value: 'RAW', label: 'Bahan Baku' }, { value: 'PREPPED', label: 'Olahan' }],
             onChange: setTypeFilter,
           }]}
-          onAdd={openAdd} addLabel="Bahan Baru"
           onExport={handleExport} onDownloadTemplate={handleDownloadTemplate} onImport={handleImport}
           selected={selected}
           bulkActions={

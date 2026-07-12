@@ -22,7 +22,10 @@ interface PrepIngredient extends Ingredient {
   prepRecipe?: PrepRecipe;
 }
 
-const EMPTY_RAW  = { name: '', unit: 'g', purchaseUnit: '', conversionRate: '', latestPrice: '', minStock: '' };
+const EMPTY_RAW = {
+  name: '', type: 'RAW', unit: 'g', purchaseUnit: '', conversionRate: '',
+  latestPrice: '', purchasePrice: '', minStock: '', defaultLocation: '', isPackaging: false,
+};
 const EMPTY_PREP = { name: '', unit: 'ml', yieldQty: '', yieldUnit: 'ml', minStock: '', latestPrice: '' };
 const UNITS = ['g','ml','pcs','kg','liter','botol','pack','kaleng','lembar','buah'];
 
@@ -85,14 +88,42 @@ export default function BahanBakuPage() {
   function openAddRaw() { setEditingRaw(null); setRawForm({ ...EMPTY_RAW }); setRawSlide(true); }
   function openEditRaw(ing: Ingredient) {
     setEditingRaw(ing);
-    setRawForm({ name: ing.name, unit: ing.unit, purchaseUnit: ing.purchaseUnit || '', conversionRate: ing.conversionRate ? String(ing.conversionRate) : '', latestPrice: String(ing.latestPrice), minStock: String(ing.minStock) });
+    const conv = ing.conversionRate || 1;
+    setRawForm({
+      name: ing.name,
+      type: ing.type || 'RAW',
+      unit: ing.unit,
+      purchaseUnit: ing.purchaseUnit || '',
+      conversionRate: ing.conversionRate ? String(ing.conversionRate) : '',
+      latestPrice: String(ing.latestPrice),
+      purchasePrice: ing.conversionRate ? String(ing.latestPrice * ing.conversionRate) : '',
+      minStock: String(ing.minStock),
+      defaultLocation: (ing as any).defaultLocation || '',
+      isPackaging: (ing as any).isPackaging || false,
+    });
     setRawSlide(true);
   }
   async function handleSaveRaw() {
-    if (!rawForm.name || !rawForm.latestPrice) return;
+    if (!rawForm.name.trim()) return;
     setSavingRaw(true);
     try {
-      const payload = { name: rawForm.name.trim(), unit: rawForm.unit, purchaseUnit: rawForm.purchaseUnit || null, conversionRate: rawForm.conversionRate ? parseFloat(rawForm.conversionRate) : null, latestPrice: parseFloat(rawForm.latestPrice), minStock: parseFloat(rawForm.minStock) || 0, type: 'RAW', active: true };
+      // Hitung latestPrice dari purchasePrice / conversionRate jika diisi
+      let latestPrice = parseFloat(rawForm.latestPrice) || 0;
+      if (rawForm.purchasePrice && rawForm.conversionRate) {
+        latestPrice = parseFloat(rawForm.purchasePrice) / parseFloat(rawForm.conversionRate);
+      }
+      const payload = {
+        name: rawForm.name.trim(),
+        type: 'RAW',
+        unit: rawForm.unit,
+        purchaseUnit: rawForm.purchaseUnit || null,
+        conversionRate: rawForm.conversionRate ? parseFloat(rawForm.conversionRate) : null,
+        latestPrice,
+        minStock: parseFloat(rawForm.minStock) || 0,
+        defaultLocation: rawForm.defaultLocation || null,
+        isPackaging: rawForm.isPackaging,
+        active: true,
+      };
       if (editingRaw) await api.patch('/api/ingredients', { id: editingRaw.id, ...payload });
       else await api.post('/api/ingredients', payload);
       setRawSlide(false); load();
@@ -135,12 +166,67 @@ export default function BahanBakuPage() {
     finally { setDeleting(false); }
   }
 
-  // ── Export ────────────────────────────────────────────────────────────────
+  // ── Export / Import / Template ────────────────────────────────────────────
   function handleExport() {
-    const rows = rawData.map(ing => ({ Nama: ing.name, 'Satuan Pakai': ing.unit, 'Satuan Beli': ing.purchaseUnit || '', 'Isi per Satuan': ing.conversionRate || '', 'Harga Beli': (ing.latestPrice || 0) * (ing.conversionRate || 1), 'Harga/Unit': ing.latestPrice, 'Min Stok': ing.minStock, Kategori: categorize(ing.name) }));
+    const rows = rawData.map(i => ({
+      name: i.name, type: i.type, unit: i.unit,
+      purchase_unit: i.purchaseUnit ?? '',
+      conversion_rate: i.conversionRate ?? '',
+      latest_price: i.latestPrice,
+      purchase_price: i.conversionRate ? i.latestPrice * i.conversionRate : '',
+      min_stock: i.minStock,
+      default_location: (i as any).defaultLocation ?? '',
+      is_packaging: (i as any).isPackaging ?? false,
+    }));
     const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Bahan Baku');
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Bahan Baku');
     XLSX.writeFile(wb, 'bahan-baku-soeka.xlsx');
+  }
+
+  function handleDownloadTemplate() {
+    const rows = [{
+      name: 'Contoh: Susu Freshmilk', type: 'RAW', unit: 'ml',
+      purchase_unit: 'liter', conversion_rate: 1000,
+      purchase_price: 24000, latest_price: 24,
+      min_stock: 2000, default_location: 'BAR', is_packaging: false,
+    }];
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Template');
+    XLSX.writeFile(wb, 'template-bahan-baku.xlsx');
+  }
+
+  async function handleImport(file: File) {
+    try {
+      const buf  = await file.arrayBuffer();
+      const wb   = XLSX.read(buf);
+      const rows = XLSX.utils.sheet_to_json<any>(wb.Sheets[wb.SheetNames[0]]);
+      if (!rows.length) { alert('File kosong'); return; }
+      let ok = 0; const errors: string[] = [];
+      for (const [i, row] of rows.entries()) {
+        if (!row.name || !row.unit) { errors.push(`Baris ${i + 2}: name dan unit wajib`); continue; }
+        try {
+          // Hitung latestPrice dari purchase_price / conversion_rate jika ada
+          let latestPrice = parseFloat(row.latest_price) || 0;
+          if (row.purchase_price && row.conversion_rate) {
+            latestPrice = parseFloat(row.purchase_price) / parseFloat(row.conversion_rate);
+          }
+          await api.post('/api/ingredients', {
+            name: String(row.name).trim(), type: row.type || 'RAW', unit: row.unit,
+            purchaseUnit: row.purchase_unit || null,
+            conversionRate: row.conversion_rate ? parseFloat(row.conversion_rate) : null,
+            minStock: parseFloat(row.min_stock) || 0,
+            latestPrice,
+            defaultLocation: row.default_location || null,
+            isPackaging: row.is_packaging === true || row.is_packaging === 'true',
+          });
+          ok++;
+        } catch (e: any) { errors.push(`Baris ${i + 2} "${row.name}": ${e?.message}`); }
+      }
+      alert(`Import selesai: ${ok} berhasil${errors.length ? `\n\nGagal:\n${errors.join('\n')}` : ''}`);
+      load();
+    } catch { alert('Gagal membaca file'); }
   }
 
   // ── Filtered & grouped ────────────────────────────────────────────────────
@@ -158,7 +244,7 @@ export default function BahanBakuPage() {
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
   });
 
-  const rf = (k: string, v: string) => setRawForm(p => ({ ...p, [k]: v }));
+  const rf = (k: string, v: string | boolean) => setRawForm(p => ({ ...p, [k]: v }));
   const pf = (k: string, v: string) => setPrepForm(p => ({ ...p, [k]: v }));
 
   // ── Computed recipe cost ──────────────────────────────────────────────────
@@ -194,7 +280,7 @@ export default function BahanBakuPage() {
 
         {tab === 'raw' ? (
           <>
-            <Toolbar search={search} onSearch={setSearch} searchPlaceholder="Cari bahan..." onExport={handleExport} onAdd={openAddRaw} addLabel="Tambah Bahan" />
+            <Toolbar search={search} onSearch={setSearch} searchPlaceholder="Cari bahan..." onExport={handleExport} onDownloadTemplate={handleDownloadTemplate} onImport={handleImport} onAdd={openAddRaw} addLabel="Bahan Baru" />
             {loading ? (
               <div className="flex justify-center py-16"><div className="w-7 h-7 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--brand)', borderTopColor: 'transparent' }} /></div>
             ) : sortedGroups.length === 0 ? (
@@ -327,30 +413,83 @@ export default function BahanBakuPage() {
 
       {/* ── SlideOver RAW ────────────────────────────────────────────────── */}
       <SlideOver open={rawSlide} onClose={() => setRawSlide(false)}
-        title={editingRaw ? `Edit: ${editingRaw.name}` : 'Tambah Bahan Mentah'}
-        footer={<div className="flex justify-end gap-3"><button onClick={() => setRawSlide(false)} className="btn btn-secondary btn-md">Batal</button><Button onClick={handleSaveRaw} disabled={savingRaw || !rawForm.name || !rawForm.latestPrice}>{savingRaw ? 'Menyimpan...' : 'Simpan'}</Button></div>}>
-        <div className="space-y-4">
-          <div><label className="label">Nama Bahan *</label><input className="input" value={rawForm.name} onChange={e => rf('name', e.target.value)} placeholder="cth. Susu Freshmilk Diamond" /></div>
-          <div><label className="label">Satuan Pakai *</label><select className="select" value={rawForm.unit} onChange={e => rf('unit', e.target.value)}>{UNITS.map(u => <option key={u} value={u}>{u}</option>)}</select></div>
-          <div><label className="label">Satuan Beli</label><input className="input" value={rawForm.purchaseUnit} onChange={e => rf('purchaseUnit', e.target.value)} placeholder="cth. kg, pack, botol" /></div>
-          <div>
-            <label className="label">Isi per Satuan Beli ({rawForm.unit})</label>
-            <input className="input" type="number" value={rawForm.conversionRate} onChange={e => rf('conversionRate', e.target.value)} placeholder="cth. 1000" />
+        title={editingRaw ? `Edit: ${editingRaw.name}` : 'Bahan Baru'}
+        subtitle={editingRaw ? editingRaw.name : 'Isi detail bahan baru'}
+        footer={<div className="flex justify-end gap-3"><button onClick={() => setRawSlide(false)} className="btn btn-secondary btn-md">Batal</button><Button onClick={handleSaveRaw} disabled={savingRaw || !rawForm.name}>{savingRaw ? 'Menyimpan...' : editingRaw ? 'Simpan' : 'Buat Bahan'}</Button></div>}>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="col-span-2">
+            <label className="label">Nama Bahan <span className="text-red-400">*</span></label>
+            <input className="input w-full" placeholder="cth. Susu Freshmilk Diamond, Kopi Robusta..." value={rawForm.name} autoFocus
+              onChange={e => rf('name', e.target.value)} />
           </div>
           <div>
-            <label className="label">Harga Beli per {rawForm.purchaseUnit || 'Satuan Beli'} (Rp) *</label>
-            <input className="input" type="number"
-              value={rawForm.latestPrice && rawForm.conversionRate ? String(parseFloat(rawForm.latestPrice) * parseFloat(rawForm.conversionRate)) : rawForm.latestPrice}
+            <label className="label">Satuan Dasar <span className="text-red-400">*</span></label>
+            <select className="select w-full" value={rawForm.unit} onChange={e => rf('unit', e.target.value)}>
+              {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Satuan Beli <span className="text-gray-400 font-normal">(opsional)</span></label>
+            <input className="input w-full" placeholder="cth. kg, karton, botol" value={rawForm.purchaseUnit}
+              onChange={e => rf('purchaseUnit', e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Konversi ke {rawForm.unit || 'satuan dasar'}</label>
+            <input className="input w-full" type="number"
+              placeholder={`cth. 1000 (1 ${rawForm.purchaseUnit || 'beli'} = 1000 ${rawForm.unit})`}
+              value={rawForm.conversionRate}
               onChange={e => {
-                const total = parseFloat(e.target.value) || 0;
-                const conv  = parseFloat(rawForm.conversionRate) || 1;
-                rf('latestPrice', String(total / conv));
-              }} placeholder="cth. 24000" />
-            {rawForm.latestPrice && rawForm.conversionRate && (
-              <p className="text-xs mt-1 font-semibold" style={{ color: 'var(--brand)' }}>= {formatCurrency(parseFloat(rawForm.latestPrice))} / {rawForm.unit}</p>
+                rf('conversionRate', e.target.value);
+                // Recalc latestPrice jika purchasePrice sudah diisi
+                if (rawForm.purchasePrice && e.target.value) {
+                  rf('latestPrice', String(parseFloat(rawForm.purchasePrice) / parseFloat(e.target.value)));
+                }
+              }} />
+          </div>
+          <div>
+            <label className="label">Harga Beli per {rawForm.purchaseUnit || 'Satuan Beli'} (Rp)</label>
+            <input className="input w-full" type="number"
+              placeholder="cth. 24000"
+              value={rawForm.purchasePrice}
+              onChange={e => {
+                rf('purchasePrice', e.target.value);
+                // Auto-hitung harga per satuan dasar
+                const conv = parseFloat(rawForm.conversionRate) || 1;
+                rf('latestPrice', String((parseFloat(e.target.value) || 0) / conv));
+              }} />
+          </div>
+          <div>
+            <label className="label">Harga / {rawForm.unit} (Rp) <span className="text-gray-400 font-normal">— auto</span></label>
+            <input className="input w-full" type="number"
+              placeholder="Otomatis dari harga beli ÷ konversi"
+              value={rawForm.latestPrice ? String(parseFloat(rawForm.latestPrice).toFixed(2)) : ''}
+              onChange={e => rf('latestPrice', e.target.value)} />
+            {rawForm.latestPrice && rawForm.unit && (
+              <p className="text-xs mt-1 font-semibold" style={{ color: 'var(--brand)' }}>
+                = {formatCurrency(parseFloat(rawForm.latestPrice))} / {rawForm.unit}
+              </p>
             )}
           </div>
-          <div><label className="label">Minimum Stok ({rawForm.unit})</label><input className="input" type="number" value={rawForm.minStock} onChange={e => rf('minStock', e.target.value)} placeholder="cth. 500" /></div>
+          <div>
+            <label className="label">Min Stok ({rawForm.unit})</label>
+            <input className="input w-full" type="number" value={rawForm.minStock}
+              onChange={e => rf('minStock', e.target.value)} />
+          </div>
+          <div>
+            <label className="label">Lokasi Default</label>
+            <select className="select w-full" value={rawForm.defaultLocation} onChange={e => rf('defaultLocation', e.target.value)}>
+              <option value="">— Pilih lokasi —</option>
+              <option value="GUDANG">Gudang</option>
+              <option value="BAR">Bar</option>
+              <option value="KITCHEN">Dapur</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-3 pt-6">
+            <input type="checkbox" id="isPackaging" checked={rawForm.isPackaging}
+              onChange={e => setRawForm(p => ({ ...p, isPackaging: e.target.checked }))}
+              className="rounded border-gray-300" />
+            <label htmlFor="isPackaging" className="text-sm" style={{ color: 'var(--text-1)' }}>Packaging (cup, box, dll)</label>
+          </div>
         </div>
       </SlideOver>
 
