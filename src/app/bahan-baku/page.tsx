@@ -16,6 +16,7 @@ interface Ingredient {
 }
 interface PrepRecipe {
   id: string; yieldQty: number | null; yieldUnit: string | null;
+  shelfLifeDays: number | null; instructions: any | null;
   items: { quantity: number; ingredient: { id: string; name: string; unit: string; latestPrice: number } }[];
 }
 interface PrepIngredient extends Ingredient {
