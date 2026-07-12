@@ -223,6 +223,7 @@ model Product {
   modifierGroups ModifierGroup[] // per-product groups (Sweetness, Ice, Serving, Add-on)
   orderItems     OrderItem[]
   loyaltyRewards LoyaltyReward[]
+  instructions   Json?   // [{title: string, description: string}]
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -281,6 +282,8 @@ model Recipe {
   ingredient   Ingredient?  @relation("PrepRecipe", fields: [ingredientId], references: [id], onDelete: Cascade)
   yieldQty     Float? // batch recipe: how much base-unit one standard batch yields
   yieldUnit    String?
+  shelfLifeDays Int?  // untuk PREPPED — berapa hari hasil batch ini tahan
+  instructions Json? // [{title: string, description: string}]
   items        RecipeItem[]
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
@@ -805,4 +808,42 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ═══════════════════════════════════════════════════════
+//  LOGBOOK
+// ═══════════════════════════════════════════════════════
+
+enum LogbookTag {
+  INFO
+  WARNING
+  URGENT
+}
+
+model LogbookEntry {
+  id        String      @id @default(cuid())
+  userId    String
+  userName  String      // snapshot
+  userRole  String      // snapshot
+  tag       LogbookTag  @default(INFO)
+  title     String
+  body      String?
+  pinned    Boolean     @default(false) // URGENT entries auto-pinned
+  reads     LogbookRead[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([createdAt])
+  @@map("logbook_entries")
+}
+
+model LogbookRead {
+  id       String       @id @default(cuid())
+  entryId  String
+  entry    LogbookEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  userId   String
+  readAt   DateTime     @default(now())
+
+  @@unique([entryId, userId])
+  @@map("logbook_reads")
 }
