@@ -112,7 +112,7 @@ export default function LogbookPage() {
                         <span className="text-xs" style={{ color: 'var(--text-3)' }}>
                           {new Date(entry.createdAt).toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}
                         </span>
-                        {(entry.userId === user?.id || ['SUPER_ADMIN','OWNER','MANAGER'].includes(user?.role || '')) && (
+                        {(entry.userId === user?.userId || ['SUPER_ADMIN','OWNER','MANAGER'].includes(user?.role || '')) && (
                           <button onClick={e => { e.stopPropagation(); handleDelete(entry.id); }}
                             className="ml-auto text-xs text-gray-400 hover:text-red-500">Hapus</button>
                         )}
