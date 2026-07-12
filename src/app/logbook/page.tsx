@@ -90,7 +90,7 @@ export default function LogbookPage() {
               return (
                 <div key={entry.id} onClick={() => !entry.isRead && markRead(entry.id)}
                   className={clsx('card p-4 cursor-pointer transition-all', !entry.isRead && 'ring-2 ring-offset-1')}
-                  style={!entry.isRead ? { ringColor: tag.color } : {}}>
+                  style={!entry.isRead ? { outline: `2px solid ${tag.color}`, outlineOffset: '2px' } : {}}>
                   <div className="flex items-start gap-3">
                     <div className="flex-shrink-0 mt-0.5">
                       {!entry.isRead && <div className="w-2.5 h-2.5 rounded-full" style={{ background: tag.color }} />}
