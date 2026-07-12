@@ -106,7 +106,34 @@ export const PATCH = withAuth(async (req) => {
   if (data.defaultLocation !== undefined) updateData.defaultLocation = data.defaultLocation || null;
   if (data.isPackaging !== undefined)     updateData.isPackaging    = !!data.isPackaging;
 
-  const ingredient = await prisma.ingredient.update({ where: { id }, data: updateData, include: { stockLevels: true } });
+  const ingredient = await prisma.ingredient.update({ where: { id }, data: updateData, include: { stockLevels: true, prepRecipe: { include: { items: { include: { ingredient: true } } } } } });
+
+  // Update prepRecipe if provided
+  if (prepRecipe?.items?.length) {
+    // Delete existing and recreate
+    const existing = await prisma.recipe.findFirst({ where: { ingredientId: id } });
+    if (existing) {
+      await prisma.recipeItem.deleteMany({ where: { recipeId: existing.id } });
+      await prisma.recipe.update({
+        where: { id: existing.id },
+        data: {
+          yieldQty: prepRecipe.yieldQty ? parseFloat(prepRecipe.yieldQty) : null,
+          yieldUnit: prepRecipe.yieldUnit || data.unit,
+          items: { create: prepRecipe.items.map((i: any) => ({ ingredientId: i.ingredientId, quantity: parseFloat(i.quantity) })) },
+        },
+      });
+    } else {
+      await prisma.recipe.create({
+        data: {
+          ingredientId: id,
+          yieldQty: prepRecipe.yieldQty ? parseFloat(prepRecipe.yieldQty) : null,
+          yieldUnit: prepRecipe.yieldUnit || data.unit,
+          items: { create: prepRecipe.items.map((i: any) => ({ ingredientId: i.ingredientId, quantity: parseFloat(i.quantity) })) },
+        },
+      });
+    }
+  }
+
   return success(ingredient);
 }, ADMIN_ROLES);
 

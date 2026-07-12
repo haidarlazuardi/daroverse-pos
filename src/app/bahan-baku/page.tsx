@@ -72,9 +72,9 @@ export default function BahanBakuPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<any[]>('/api/ingredients?includePrepped=true');
-      const raw  = res.filter(i => i.type === 'RAW'     && i.active);
-      const prep = res.filter(i => i.type === 'PREPPED'  && i.active);
+      const res = await api.get<any[]>('/api/ingredients');
+      const raw  = res.filter((i: any) => i.type === 'RAW'     && i.active);
+      const prep = res.filter((i: any) => i.type === 'PREPPED'  && i.active);
       setRawData(raw);
       setRawAll(raw);
       setPrepData(prep);
@@ -149,7 +149,19 @@ export default function BahanBakuPage() {
     setSavingPrep(true);
     try {
       const validItems = recipeItems.filter(ri => ri.ingredientId && ri.quantity);
-      const payload = { name: prepForm.name.trim(), unit: prepForm.unit, minStock: parseFloat(prepForm.minStock) || 0, latestPrice: parseFloat(prepForm.latestPrice) || 0, type: 'PREPPED', active: true, recipe: validItems.length > 0 ? { yieldQty: parseFloat(prepForm.yieldQty) || null, yieldUnit: prepForm.yieldUnit || prepForm.unit, items: validItems.map(ri => ({ ingredientId: ri.ingredientId, quantity: parseFloat(ri.quantity) })) } : undefined };
+      const payload = {
+        name: prepForm.name.trim(),
+        unit: prepForm.unit,
+        minStock: parseFloat(prepForm.minStock) || 0,
+        latestPrice: parseFloat(prepForm.latestPrice) || 0,
+        type: 'PREPPED',
+        active: true,
+        prepRecipe: validItems.length > 0 ? {
+          yieldQty: parseFloat(prepForm.yieldQty) || null,
+          yieldUnit: prepForm.yieldUnit || prepForm.unit,
+          items: validItems.map(ri => ({ ingredientId: ri.ingredientId, quantity: parseFloat(ri.quantity) })),
+        } : undefined,
+      };
       if (editingPrep) await api.patch('/api/ingredients', { id: editingPrep.id, ...payload });
       else await api.post('/api/ingredients', payload);
       setPrepSlide(false); load();
