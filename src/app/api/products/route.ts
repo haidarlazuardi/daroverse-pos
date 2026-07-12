@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
 export const POST = withAuth(async (req) => {
   try {
     const body = await req.json();
-    const { name, sku, categoryId, price, image, recipe, station, takeawayCharge, packagingIngredientId, modifierGroups } = body;
+    const { name, sku, categoryId, price, image, recipe, station, takeawayCharge, packagingIngredientId, modifierGroups, instructions } = body;
 
     if (!name || (!categoryId && !body.recommendOnly)) return error('Name and category are required');
 
@@ -97,6 +97,7 @@ export const POST = withAuth(async (req) => {
         station: station === 'FOOD' ? 'FOOD' : 'DRINK',
         takeawayCharge: takeawayCharge ? parseFloat(String(takeawayCharge)) : 0,
         packagingIngredientId: packagingIngredientId || null,
+        ...(instructions ? { instructions } : {}),
       },
     });
 
@@ -135,6 +136,7 @@ export const PUT = withAuth(async (req) => {
     if (data.station !== undefined) updateData.station = data.station === 'FOOD' ? 'FOOD' : 'DRINK';
     if (data.takeawayCharge !== undefined) updateData.takeawayCharge = parseFloat(data.takeawayCharge) || 0;
     if (data.packagingIngredientId !== undefined) updateData.packagingIngredientId = data.packagingIngredientId || null;
+    if (data.instructions !== undefined) updateData.instructions = data.instructions;
 
     if (newRecipe) {
       await prisma.recipe.deleteMany({ where: { productId: id } });

@@ -27,7 +27,7 @@ const EMPTY_RAW = {
   name: '', type: 'RAW', unit: 'g', purchaseUnit: '', conversionRate: '',
   latestPrice: '', purchasePrice: '', minStock: '', defaultLocation: '', isPackaging: false,
 };
-const EMPTY_PREP = { name: '', unit: 'ml', yieldQty: '', yieldUnit: 'ml', minStock: '', latestPrice: '', shelfLifeDays: '', instructions: '' };
+const EMPTY_PREP = { name: '', unit: 'ml', yieldQty: '', yieldUnit: 'ml', minStock: '', latestPrice: '', shelfLifeDays: '', steps: [] as { title: string; description: string }[] };
 const UNITS = ['g','ml','pcs','kg','liter','botol','pack','kaleng','lembar','buah'];
 
 const GROUPS: { label: string; keys: string[] }[] = [
@@ -141,7 +141,7 @@ export default function BahanBakuPage() {
   }
   function openEditPrep(ing: PrepIngredient) {
     setEditingPrep(ing);
-    setPrepForm({ name: ing.name, unit: ing.unit, yieldQty: ing.prepRecipe?.yieldQty ? String(ing.prepRecipe.yieldQty) : '', yieldUnit: ing.prepRecipe?.yieldUnit || ing.unit, minStock: String(ing.minStock), latestPrice: String(ing.latestPrice), shelfLifeDays: ing.prepRecipe?.shelfLifeDays ? String(ing.prepRecipe.shelfLifeDays) : '', instructions: ing.prepRecipe?.instructions ? (ing.prepRecipe.instructions as any[]).map((s: any) => `${s.title}: ${s.description}`).join('\n') : '' });
+    setPrepForm({ name: ing.name, unit: ing.unit, yieldQty: ing.prepRecipe?.yieldQty ? String(ing.prepRecipe.yieldQty) : '', yieldUnit: ing.prepRecipe?.yieldUnit || ing.unit, minStock: String(ing.minStock), latestPrice: String(ing.latestPrice), shelfLifeDays: ing.prepRecipe?.shelfLifeDays ? String(ing.prepRecipe.shelfLifeDays) : '', steps: Array.isArray(ing.prepRecipe?.instructions) ? ing.prepRecipe.instructions as { title: string; description: string }[] : [] });
     setRecipeItems(ing.prepRecipe?.items.map(ri => ({ ingredientId: ri.ingredient.id, quantity: String(ri.quantity) })) || [{ ingredientId: '', quantity: '' }]);
     setPrepSlide(true);
   }
@@ -161,10 +161,7 @@ export default function BahanBakuPage() {
           yieldQty: parseFloat(prepForm.yieldQty) || null,
           yieldUnit: prepForm.yieldUnit || prepForm.unit,
           shelfLifeDays: prepForm.shelfLifeDays ? parseInt(prepForm.shelfLifeDays) : null,
-          instructions: prepForm.instructions ? prepForm.instructions.split('\n').filter(Boolean).map(line => {
-            const [title, ...rest] = line.split(':');
-            return { title: title.trim(), description: rest.join(':').trim() };
-          }) : null,
+          instructions: prepForm.steps.length > 0 ? prepForm.steps.filter(s => s.title || s.description) : null,
           items: validItems.map(ri => ({ ingredientId: ri.ingredientId, quantity: parseFloat(ri.quantity) })),
         } : undefined,
       };
@@ -572,12 +569,31 @@ export default function BahanBakuPage() {
             </div>
           )}
 
-          {/* Cara pembuatan */}
+          {/* Cara pembuatan - structured steps */}
           <div>
-            <label className="label">Cara Pembuatan</label>
-            <p className="text-xs mb-2" style={{ color: 'var(--text-3)' }}>Format per baris: "Judul: Deskripsi langkah"</p>
-            <textarea className="input" rows={5} value={prepForm.instructions} onChange={e => pf('instructions', e.target.value)}
-              placeholder={"Langkah 1: Panaskan susu hingga 65°C\nLangkah 2: Campurkan dengan creamer\nLangkah 3: Aduk rata dan dinginkan"} />
+            <div className="flex items-center justify-between mb-2">
+              <label className="label mb-0">Cara Pembuatan</label>
+              <button onClick={() => setPrepForm(p => ({ ...p, steps: [...p.steps, { title: `Langkah ${p.steps.length + 1}`, description: '' }] }))}
+                className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>+ Tambah Langkah</button>
+            </div>
+            <div className="space-y-2">
+              {prepForm.steps.map((step, i) => (
+                <div key={i} className="flex gap-2 items-start p-3 rounded-xl" style={{ background: 'var(--surface-2)' }}>
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0 mt-1" style={{ background: 'var(--brand)' }}>{i + 1}</div>
+                  <div className="flex-1 space-y-1.5">
+                    <input className="input text-sm" placeholder="Judul langkah" value={step.title}
+                      onChange={e => { const s = [...prepForm.steps]; s[i].title = e.target.value; setPrepForm(p => ({ ...p, steps: s })); }} />
+                    <textarea className="input text-sm" rows={2} placeholder="Deskripsi detail" value={step.description}
+                      onChange={e => { const s = [...prepForm.steps]; s[i].description = e.target.value; setPrepForm(p => ({ ...p, steps: s })); }} />
+                  </div>
+                  <button onClick={() => setPrepForm(p => ({ ...p, steps: p.steps.filter((_, j) => j !== i) }))}
+                    className="p-1.5 text-gray-400 hover:text-red-500 flex-shrink-0">✕</button>
+                </div>
+              ))}
+              {prepForm.steps.length === 0 && (
+                <p className="text-xs" style={{ color: 'var(--text-3)' }}>Belum ada langkah. Klik "+ Tambah Langkah" untuk mulai.</p>
+              )}
+            </div>
           </div>
         </div>
       </SlideOver>

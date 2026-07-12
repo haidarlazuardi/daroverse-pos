@@ -22,7 +22,21 @@ interface Category   { id: string; name: string; color: string }
 interface Ingredient { id: string; name: string; unit: string; latestPrice: number; type?: string }
 
 const emptyOption = (): ModOption => ({ name: '', effect: 'ADJUST', targetIngredientId: '', multiplier: '1', addQty: '', priceDelta: '0', isDefault: false });
-const emptyForm = { name: '', sku: '', categoryId: '', price: '', station: 'DRINK' as 'FOOD'|'DRINK', takeawayCharge: '', packagingIngredientId: '', recipeItems: [] as { ingredientId: string; quantity: string }[], modGroups: [] as ModGroup[] };
+const emptyForm = {
+  name: '', sku: '', categoryId: '', price: '', station: 'DRINK' as 'FOOD'|'DRINK',
+  takeawayCharge: '', packagingIngredientId: '',
+  recipeItems: [] as { ingredientId: string; quantity: string }[],
+  modGroups: [] as ModGroup[],
+  // FnB Standard fields
+  productType: '',       // cth. Coffee, Non Coffee, Food
+  packaging: '',         // cth. Plastik cup 16oz
+  shelfLife: '',         // cth. 1 hari dari tanggal pembuatan
+  qualityStandard: '',   // syarat mutu
+  servingSuggestion: '', // saran penyajian
+  servingTools: '',      // alat penyajian
+  productionTools: '',   // alat produksi
+  steps: [] as { title: string; description: string }[],
+};
 
 export default function ProductsPage() {
   const [products, setProducts]       = useState<Product[]>([]);
@@ -57,6 +71,8 @@ export default function ProductsPage() {
   const closeModal = () => { setShowAdd(false); setEditProduct(null); setForm(emptyForm); setPriceRec(null); };
 
   function openEdit(p: Product) {
+    const inst = (p as any).instructions as any;
+    const meta = inst?.meta || {};
     setForm({
       name: p.name, sku: p.sku||'', categoryId: p.category.id, price: String(p.price),
       station: p.station||'DRINK', takeawayCharge: p.takeawayCharge ? String(p.takeawayCharge) : '',
@@ -66,6 +82,14 @@ export default function ProductsPage() {
         name: g.name, selectionType: g.selectionType,
         options: g.options.map(o => ({ name: o.name, effect: o.effect, targetIngredientId: o.targetIngredientId||'', multiplier: o.multiplier!=null ? String(o.multiplier) : '1', addQty: o.addQty!=null ? String(o.addQty) : '', priceDelta: String(o.priceDelta||0), isDefault: o.isDefault })),
       })),
+      productType: meta.productType || '',
+      packaging: meta.packaging || '',
+      shelfLife: meta.shelfLife || '',
+      qualityStandard: meta.qualityStandard || '',
+      servingSuggestion: meta.servingSuggestion || '',
+      servingTools: meta.servingTools || '',
+      productionTools: meta.productionTools || '',
+      steps: inst?.steps || [],
     });
     setPriceRec(null); setEditProduct(p);
   }
@@ -79,6 +103,18 @@ export default function ProductsPage() {
       name: g.name, selectionType: g.selectionType, sortOrder: gi,
       options: g.options.map((o,oi) => ({ name: o.name, effect: o.effect, targetIngredientId: o.targetIngredientId||null, multiplier: o.effect==='ADJUST' ? o.multiplier : null, addQty: o.effect==='ADD' ? o.addQty : null, priceDelta: o.priceDelta||0, isDefault: o.isDefault, sortOrder: oi })),
     })),
+    instructions: {
+      meta: {
+        productType: form.productType || null,
+        packaging: form.packaging || null,
+        shelfLife: form.shelfLife || null,
+        qualityStandard: form.qualityStandard || null,
+        servingSuggestion: form.servingSuggestion || null,
+        servingTools: form.servingTools || null,
+        productionTools: form.productionTools || null,
+      },
+      steps: form.steps.filter(s => s.title || s.description),
+    },
   });
 
   async function handleSave() {
@@ -444,6 +480,68 @@ export default function ProductsPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* ── Standar Produksi (FnB Standard) ── */}
+          <div className="border-t pt-4" style={{ borderColor: 'var(--border)' }}>
+            <p className="text-sm font-bold mb-3" style={{ color: 'var(--text-1)' }}>📋 Standar Produksi</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="label">Tipe Produk</label>
+                <input className="input" value={form.productType} onChange={e => setForm({...form, productType: e.target.value})} placeholder="cth. Coffee, Non Coffee, Food" />
+              </div>
+              <div>
+                <label className="label">Kemasan</label>
+                <input className="input" value={form.packaging} onChange={e => setForm({...form, packaging: e.target.value})} placeholder="cth. Plastik cup 16oz" />
+              </div>
+              <div>
+                <label className="label">Umur Simpan</label>
+                <input className="input" value={form.shelfLife} onChange={e => setForm({...form, shelfLife: e.target.value})} placeholder="cth. 1 hari dari tanggal pembuatan" />
+              </div>
+              <div className="col-span-2">
+                <label className="label">Syarat Mutu</label>
+                <input className="input" value={form.qualityStandard} onChange={e => setForm({...form, qualityStandard: e.target.value})} placeholder="cth. Kemasan tidak boleh cacat (sobek, bocor, penyok)" />
+              </div>
+              <div className="col-span-2">
+                <label className="label">Saran Penyajian</label>
+                <input className="input" value={form.servingSuggestion} onChange={e => setForm({...form, servingSuggestion: e.target.value})} placeholder="cth. Baiknya langsung diminum dalam kondisi fresh" />
+              </div>
+              <div>
+                <label className="label">Alat Penyajian</label>
+                <input className="input" value={form.servingTools} onChange={e => setForm({...form, servingTools: e.target.value})} placeholder="cth. Sendok, sedotan, paper bag" />
+              </div>
+              <div>
+                <label className="label">Alat Produksi</label>
+                <input className="input" value={form.productionTools} onChange={e => setForm({...form, productionTools: e.target.value})} placeholder="cth. Espresso Machine, Digital Scale" />
+              </div>
+            </div>
+
+            {/* Steps / Cara Pembuatan */}
+            <div className="mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="label mb-0">Cara Pembuatan</label>
+                <button onClick={() => setForm({...form, steps: [...form.steps, { title: `Langkah ${form.steps.length + 1}`, description: '' }]})}
+                  className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>+ Tambah Langkah</button>
+              </div>
+              <div className="space-y-2">
+                {form.steps.map((step, i) => (
+                  <div key={i} className="flex gap-2 items-start p-3 rounded-xl" style={{ background: 'var(--surface-2)' }}>
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0 mt-1" style={{ background: 'var(--brand)' }}>{i + 1}</div>
+                    <div className="flex-1 space-y-1.5">
+                      <input className="input text-sm" placeholder="Judul langkah" value={step.title}
+                        onChange={e => { const s = [...form.steps]; s[i].title = e.target.value; setForm({...form, steps: s}); }} />
+                      <textarea className="input text-sm" rows={2} placeholder="Deskripsi detail" value={step.description}
+                        onChange={e => { const s = [...form.steps]; s[i].description = e.target.value; setForm({...form, steps: s}); }} />
+                    </div>
+                    <button onClick={() => setForm({...form, steps: form.steps.filter((_,j) => j !== i)})}
+                      className="p-1.5 text-gray-400 hover:text-red-500 flex-shrink-0">✕</button>
+                  </div>
+                ))}
+                {form.steps.length === 0 && (
+                  <p className="text-xs" style={{ color: 'var(--text-3)' }}>Belum ada langkah. Klik "+ Tambah Langkah" untuk mulai.</p>
+                )}
+              </div>
             </div>
           </div>
 
