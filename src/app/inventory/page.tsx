@@ -34,6 +34,7 @@ export default function InventoryPage() {
   const [loading, setLoading]   = useState(true);
   const [search, setSearch]     = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [slideOpen, setSlideOpen] = useState(false);
   const [editing, setEditing]   = useState<Ingredient | null>(null);
@@ -268,11 +269,12 @@ export default function InventoryPage() {
 
         <Toolbar
           search={search} onSearch={setSearch} searchPlaceholder="Cari bahan..."
-          filters={[{
-            key: 'type', label: 'Tipe', value: typeFilter,
-            options: [{ value: 'RAW', label: 'Bahan Baku' }, { value: 'PREPPED', label: 'Olahan' }],
-            onChange: setTypeFilter,
-          }]}
+          filters={[
+            { key: 'type', label: 'Tipe', value: typeFilter, onChange: setTypeFilter,
+              options: [{ value: 'RAW', label: 'Bahan Baku' }, { value: 'PREPPED', label: 'Olahan' }] },
+            { key: 'location', label: 'Station', value: locationFilter, onChange: setLocationFilter,
+              options: [{ value: 'GUDANG', label: 'Gudang' }, { value: 'BAR', label: 'Bar' }, { value: 'KITCHEN', label: 'Dapur' }] },
+          ]}
           onExport={handleExport} onDownloadTemplate={handleDownloadTemplate} onImport={handleImport}
           selected={selected}
           bulkActions={
@@ -284,7 +286,7 @@ export default function InventoryPage() {
         />
 
         <DataTable
-          data={tab === 'alerts' ? alertItems : data}
+          data={tab === 'alerts' ? alertItems : (locationFilter ? data.filter(i => i.stockLevels.some((s: any) => s.location === locationFilter && s.quantity > 0)) : data)}
           columns={columns}
           keyField="id"
           loading={loading}

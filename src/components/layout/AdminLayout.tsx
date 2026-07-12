@@ -4,35 +4,39 @@ import { ReactNode, useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store';
 import { ADMIN_ROLES, KITCHEN_ROLES, STOCK_ROLES, SENIOR_ROLES, CASHIER_ALL, ROLE_LABELS, ROLE_HOME, type Role } from '@/lib/auth';
+import { LogbookBar } from '@/components/ui/LogbookBar';
 import clsx from 'clsx';
 
 type NavItem  = { href: string; label: string; icon: string; allow: Role[] | 'all' };
-type NavGroup = { section: string; allow: Role[] | 'all'; items: NavItem[] };
+type NavGroup = { section: string; allow: Role[] | 'all'; items: NavItem[]; defaultOpen?: boolean };
 
 const ALL_ROLES: Role[] = ['SUPER_ADMIN','OWNER','MANAGER','CASHIER','KITCHEN'];
+const CASHIER_KITCHEN: Role[] = ['CASHIER', 'KITCHEN'];
 
 const NAV_GROUPS: NavGroup[] = [
-  { section: 'Operasional', allow: 'all', items: [
+  { section: 'Operasional', allow: 'all', defaultOpen: true, items: [
     { href: '/dashboard', label: 'Dashboard',  allow: ADMIN_ROLES,
       icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
     { href: '/pos',       label: 'POS',         allow: 'all',
       icon: 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z' },
     { href: '/shift',     label: 'Shift',       allow: 'all',
       icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+    { href: '/logbook',   label: 'Logbook',     allow: 'all',
+      icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
     { href: '/staff',     label: 'Staff Hub',   allow: ALL_ROLES,
       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
   ]},
-  { section: 'Kasir', allow: CASHIER_ALL, items: [
-    { href: '/expenses-input', label: 'Input Pengeluaran', allow: CASHIER_ALL,
+  { section: 'Kasir', allow: ['CASHIER', 'KITCHEN'] as Role[], defaultOpen: true, items: [
+    { href: '/expenses-input', label: 'Input Pengeluaran', allow: ['CASHIER', 'KITCHEN'] as Role[],
       icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z' },
   ]},
-  { section: 'Dapur', allow: KITCHEN_ROLES, items: [
+  { section: 'Dapur', allow: KITCHEN_ROLES, defaultOpen: false, items: [
     { href: '/production', label: 'Produksi',     allow: KITCHEN_ROLES,
       icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
     { href: '/menu-view', label: 'Menu & Resep', allow: KITCHEN_ROLES,
       icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
   ]},
-  { section: 'Inventory', allow: STOCK_ROLES, items: [
+  { section: 'Inventory', allow: STOCK_ROLES, defaultOpen: false, items: [
     { href: '/inventory',    label: 'Stok & Bahan',  allow: STOCK_ROLES,
       icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
     { href: '/bahan-baku',   label: 'Bahan Baku',    allow: STOCK_ROLES,
@@ -42,13 +46,13 @@ const NAV_GROUPS: NavGroup[] = [
     { href: '/stock-opname', label: 'Stock Opname',  allow: STOCK_ROLES,
       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
   ]},
-  { section: 'Purchasing', allow: STOCK_ROLES, items: [
+  { section: 'Purchasing', allow: STOCK_ROLES, defaultOpen: false, items: [
     { href: '/purchase-orders', label: 'Purchase Order', allow: STOCK_ROLES,
       icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
     { href: '/suppliers',    label: 'Supplier',        allow: STOCK_ROLES,
       icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
   ]},
-  { section: 'Master Data', allow: ADMIN_ROLES, items: [
+  { section: 'Master Data', allow: ADMIN_ROLES, defaultOpen: false, items: [
     { href: '/categories', label: 'Kategori',       allow: ADMIN_ROLES,
       icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z' },
     { href: '/products',   label: 'Produk & Menu',  allow: ADMIN_ROLES,
@@ -58,7 +62,7 @@ const NAV_GROUPS: NavGroup[] = [
     { href: '/assets',     label: 'Aset',            allow: ADMIN_ROLES,
       icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4' },
   ]},
-  { section: 'Laporan', allow: ADMIN_ROLES, items: [
+  { section: 'Laporan', allow: ADMIN_ROLES, defaultOpen: false, items: [
     { href: '/analytics',  label: 'Analitik',        allow: ADMIN_ROLES,
       icon: 'M3 3v18h18M9 17V9m4 8V5m4 12v-6' },
     { href: '/reports',    label: 'Laporan',          allow: ADMIN_ROLES,
@@ -70,7 +74,7 @@ const NAV_GROUPS: NavGroup[] = [
     { href: '/void',       label: 'Void Order',       allow: ADMIN_ROLES,
       icon: 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636' },
   ]},
-  { section: 'Pengaturan', allow: SENIOR_ROLES, items: [
+  { section: 'Pengaturan', allow: SENIOR_ROLES, defaultOpen: false, items: [
     { href: '/loyalty',     label: 'Loyalty Rewards', allow: SENIOR_ROLES,
       icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' },
     { href: '/users',       label: 'Pengguna',         allow: SENIOR_ROLES,
@@ -140,6 +144,22 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const pageLabel = pathname.split('/').filter(Boolean).pop()?.replace(/-/g, ' ') || 'Dashboard';
 
   function Sidebar({ onNav }: { onNav?: () => void }) {
+    const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+      const init: Record<string, boolean> = {};
+      NAV_GROUPS.forEach(g => { init[g.section] = g.defaultOpen !== false; });
+      // Always open the section containing the current path
+      NAV_GROUPS.forEach(g => {
+        if (g.items.some(i => pathname === i.href || pathname.startsWith(i.href + '/'))) {
+          init[g.section] = true;
+        }
+      });
+      return init;
+    });
+
+    function toggleSection(section: string) {
+      setOpenSections(p => ({ ...p, [section]: !p[section] }));
+    }
+
     return (
       <div className="flex flex-col h-full" style={{ background: 'var(--surface-2)', borderRight: '1px solid var(--border)' }}>
         {/* Logo */}
@@ -159,31 +179,48 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
-          {groups.map(group => (
-            <div key={group.section}>
-              <p className="px-2 mb-1 text-[9px] font-black uppercase tracking-[0.12em]" style={{ color: 'var(--text-3)' }}>
-                {group.section}
-              </p>
-              <div className="space-y-0.5">
-                {group.items.map(item => {
-                  const active = pathname === item.href || pathname.startsWith(item.href + '/');
-                  return (
-                    <button key={item.href}
-                      onClick={() => { router.push(item.href); onNav?.(); }}
-                      className={clsx('nav-item', active ? 'nav-item-active' : 'nav-item-inactive')}>
-                      <NavIcon d={item.icon} />
-                      <span className="truncate text-sm">{item.label}</span>
-                      {active && (
-                        <span className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
-                          style={{ background: 'var(--brand)' }} />
-                      )}
-                    </button>
-                  );
-                })}
+        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
+          {groups.map(group => {
+            const isOpen = !!openSections[group.section];
+            const hasActive = group.items.some(i => pathname === i.href || pathname.startsWith(i.href + '/'));
+            return (
+              <div key={group.section}>
+                {/* Section header — clickable to toggle */}
+                <button onClick={() => toggleSection(group.section)}
+                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors hover:bg-black/5 group">
+                  <p className="text-[9px] font-black uppercase tracking-[0.12em]" style={{ color: hasActive ? 'var(--brand)' : 'var(--text-3)' }}>
+                    {group.section}
+                  </p>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                    className={clsx('transition-transform', isOpen ? 'rotate-180' : '')}
+                    style={{ color: 'var(--text-3)' }}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+
+                {/* Items */}
+                {isOpen && (
+                  <div className="space-y-0.5 mt-0.5 mb-2">
+                    {group.items.map(item => {
+                      const active = pathname === item.href || pathname.startsWith(item.href + '/');
+                      return (
+                        <button key={item.href}
+                          onClick={() => { router.push(item.href); onNav?.(); }}
+                          className={clsx('nav-item', active ? 'nav-item-active' : 'nav-item-inactive')}>
+                          <NavIcon d={item.icon} />
+                          <span className="truncate text-sm">{item.label}</span>
+                          {active && (
+                            <span className="ml-auto w-1.5 h-1.5 rounded-full flex-shrink-0"
+                              style={{ background: 'var(--brand)' }} />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </nav>
 
         {/* Footer */}
@@ -254,6 +291,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
+        <LogbookBar />
         <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-5">
           {children}
         </main>
