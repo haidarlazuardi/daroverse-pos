@@ -188,7 +188,7 @@ export default function POSPage() {
   const [closingCash, setClosingCash] = useState('');
   const [custName, setCustName] = useState('');
   const [custPhone, setCustPhone] = useState('');
-  const [loy, setLoy] = useState<{ name: string; points: number } | null>(null);
+  const [loy, setLoy] = useState<{ name: string; points: number; rewards?: any[] } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { hydrate(); }, [hydrate]);
@@ -365,7 +365,12 @@ export default function POSPage() {
     o.tax > 0 ? `Pajak: ${formatCurrency(o.tax)}` : '',
     o.serviceCharge > 0 ? `Service: ${formatCurrency(o.serviceCharge)}` : '',
     o.takeawayCharge > 0 ? `Take-away: ${formatCurrency(o.takeawayCharge)}` : '',
-    `*Total: ${formatCurrency(o.total)}*`, '', `Bayar: ${o.payment?.method || '-'}`, 'Terima kasih! 🙏',
+    `*Total: ${formatCurrency(o.total)}*`, '', `Bayar: ${o.payment?.method || '-'}`,
+    '',
+    o.pointsEarned > 0 ? `⭐ +${o.pointsEarned} poin didapat` : '',
+    loy && loy.points > 0 ? `💎 Total poin kamu: ${loy.points + (o.pointsEarned || 0)} poin` : '',
+    custPhone ? `Cek poin: ${typeof window !== 'undefined' ? window.location.origin : ''}/cek-poin` : '',
+    '', 'Terima kasih! 🙏',
   ].filter(Boolean);
 
   const sendWhatsApp = () => {
@@ -524,21 +529,74 @@ export default function POSPage() {
             <div className="mb-4 border border-gray-200 rounded-xl p-3">
               <CustomerSearch
                 phone={custPhone} name={custName}
-                onSelect={(c) => { setCustPhone(c.phone || ''); setCustName(c.name); setLoy({ name: c.name, points: c.points }); }}
+                onSelect={async (c) => {
+                  setCustPhone(c.phone || ''); setCustName(c.name);
+                  // Fetch customer points + available rewards
+                  try {
+                    const res = await fetch(`/api/public/check-points?phone=${encodeURIComponent(c.phone || '')}`);
+                    const data = await res.json();
+                    setLoy({ name: c.name, points: c.points, rewards: data.data?.rewards || [] });
+                  } catch {
+                    setLoy({ name: c.name, points: c.points, rewards: [] });
+                  }
+                }}
                 onClear={() => { setCustPhone(''); setCustName(''); setLoy(null); cart.setRedeemPoints(0); }}
                 onNew={(name, phone) => { setCustName(name); setCustPhone(phone); setLoy({ name, points: 0 }); }}
               />
               {loy && loy.points > 0 && (
-                <div className="mt-2 text-sm">
-                  <p className="text-green-700">{loy.name} · <b>{loy.points} poin</b></p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-gray-500">Tukar poin:</span>
-                    <input type="number" min="0" max={loy.points} value={cart.redeemPoints || ''} onChange={(e) => cart.setRedeemPoints(Math.min(loy.points, parseInt(e.target.value) || 0))} className="input text-sm w-24" />
-                    <span className="text-gray-400 text-xs">= -{formatCurrency((cart.redeemPoints || 0) * cart.redeemValue)}</span>
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-green-700">{loy.name}</p>
+                    <span className="text-sm font-black text-amber-600">{loy.points} poin</span>
                   </div>
+                  {/* Reward checkpoints */}
+                  {(loy.rewards || []).length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-gray-400 font-medium">Tukar reward:</p>
+                      {(loy.rewards || []).map((r: any) => {
+                        const canRedeem = loy.points >= r.pointsRequired;
+                        const isActive  = cart.redeemPoints === r.pointsRequired;
+                        return (
+                          <button key={r.id}
+                            disabled={!canRedeem}
+                            onClick={() => {
+                              if (isActive) { cart.setRedeemPoints(0); }
+                              else { cart.setRedeemPoints(r.pointsRequired); }
+                            }}
+                            className="w-full flex items-center justify-between p-2.5 rounded-xl border-2 transition-all text-left"
+                            style={{
+                              borderColor: isActive ? '#48654D' : canRedeem ? '#D1E8D3' : '#E5E7EB',
+                              background:  isActive ? '#F0F7F1' : canRedeem ? '#FAFFF9' : '#F9FAFB',
+                              opacity: canRedeem ? 1 : 0.5,
+                            }}>
+                            <div className="flex items-center gap-2">
+                              <span>{r.rewardType === 'FREE_PRODUCT' ? (r.station === 'FOOD' ? '🍔' : '🥤') : '💰'}</span>
+                              <div>
+                                <p className="text-xs font-semibold" style={{ color: '#111816' }}>{r.name}</p>
+                                {r.maxPrice && <p className="text-xs text-gray-400">max {formatCurrency(r.maxPrice)}</p>}
+                              </div>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <p className="text-xs font-bold" style={{ color: canRedeem ? '#48654D' : '#9CA3AF' }}>{r.pointsRequired} poin</p>
+                              {isActive && <p className="text-xs text-green-600 font-medium">✓ Dipilih</p>}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {(loy.rewards || []).length === 0 && (
+                    <p className="text-xs text-gray-400">Belum ada reward tersedia</p>
+                  )}
+                  {cart.redeemPoints > 0 && (
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-green-50 border border-green-200">
+                      <span className="text-xs text-green-700 font-medium">Diskon tukar poin</span>
+                      <span className="text-xs font-bold text-green-700">-{formatCurrency(cart.redeemPoints * cart.redeemValue)}</span>
+                    </div>
+                  )}
                 </div>
               )}
-              {loy && loy.points === 0 && <p className="mt-2 text-xs text-gray-400">Pelanggan baru / belum punya poin. Nama & HP tetap tersimpan.</p>}
+              {loy && loy.points === 0 && <p className="mt-2 text-xs text-gray-400">Belum punya poin. Akan mendapat poin dari transaksi ini.</p>}
             </div>
 
             <div className="grid grid-cols-3 gap-2 mb-4">
