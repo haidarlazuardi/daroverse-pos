@@ -41,6 +41,120 @@ function defaultModifiers(product: Product): SelectedModifier[] {
   return out;
 }
 
+// ── CustomerSearch — autocomplete dengan nama atau HP ──────────────────────
+function CustomerSearch({ phone, name, onSelect, onClear, onNew }: {
+  phone: string; name: string;
+  onSelect: (c: any) => void;
+  onClear: () => void;
+  onNew: (name: string, phone: string) => void;
+}) {
+  const [q, setQ]             = useState('');
+  const [results, setResults] = useState<any[]>([]);
+  const [showNew, setShowNew] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [searching, setSearching] = useState(false);
+  const hasCustomer = !!phone || !!name;
+
+  useEffect(() => {
+    if (q.length < 2) { setResults([]); return; }
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await api.get<any>(`/api/customers?search=${encodeURIComponent(q)}&limit=5`);
+        setResults(res.customers || res || []);
+      } catch { setResults([]); }
+      finally { setSearching(false); }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  function handleSaveNew() {
+    if (!newName.trim()) return;
+    onNew(newName.trim(), newPhone.trim());
+    setShowNew(false); setQ(''); setResults([]);
+  }
+
+  if (hasCustomer) {
+    return (
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-semibold text-gray-800">{name || 'Pelanggan'}</p>
+          {phone && <p className="text-xs text-gray-400">{phone}</p>}
+        </div>
+        <button onClick={onClear} className="text-xs text-gray-400 hover:text-red-500 px-2 py-1">✕ Ganti</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <input
+        value={q} onChange={e => setQ(e.target.value)}
+        placeholder="Cari pelanggan (nama / HP)..."
+        className="input text-sm w-full"
+      />
+      {searching && <p className="text-xs text-gray-400 mt-1">Mencari...</p>}
+
+      {/* Dropdown results */}
+      {results.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-10 overflow-hidden">
+          {results.map((c: any) => (
+            <button key={c.id} onClick={() => { onSelect(c); setQ(''); setResults([]); }}
+              className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-gray-50 border-b border-gray-50 last:border-0 text-left">
+              <div>
+                <p className="text-sm font-semibold">{c.name}</p>
+                <p className="text-xs text-gray-400">{c.phone || 'No HP'}</p>
+              </div>
+              <span className="text-xs font-bold text-amber-600">{c.points || 0} poin</span>
+            </button>
+          ))}
+          <button onClick={() => { setShowNew(true); setResults([]); }}
+            className="w-full px-3 py-2 text-xs text-center font-medium text-brand-600 hover:bg-brand-50">
+            + Daftarkan pelanggan baru
+          </button>
+        </div>
+      )}
+
+      {/* No results + new button */}
+      {q.length >= 2 && results.length === 0 && !searching && (
+        <div className="mt-1 border border-gray-200 rounded-xl p-2 bg-gray-50">
+          <p className="text-xs text-gray-400 text-center mb-1.5">Tidak ditemukan</p>
+          <button onClick={() => { setShowNew(true); setNewName(q); }}
+            className="w-full py-1.5 text-xs font-semibold rounded-lg text-white" style={{ background: 'var(--brand)' }}>
+            + Daftarkan "{q}" sebagai pelanggan baru
+          </button>
+        </div>
+      )}
+
+      {/* New customer form */}
+      {showNew && (
+        <div className="mt-2 p-3 border border-brand-200 rounded-xl bg-brand-50 space-y-2">
+          <p className="text-xs font-bold text-brand-700">Pelanggan Baru</p>
+          <input value={newName} onChange={e => setNewName(e.target.value)}
+            placeholder="Nama *" className="input text-sm" />
+          <input type="tel" value={newPhone} onChange={e => setNewPhone(e.target.value)}
+            placeholder="No HP (opsional, untuk loyalty)" className="input text-sm" />
+          <div className="flex gap-2">
+            <button onClick={() => setShowNew(false)} className="flex-1 py-1.5 text-xs rounded-lg bg-white border border-gray-200 text-gray-500">Batal</button>
+            <button onClick={handleSaveNew} disabled={!newName.trim()}
+              className="flex-1 py-1.5 text-xs rounded-lg text-white font-semibold disabled:opacity-50" style={{ background: 'var(--brand)' }}>
+              Simpan & Lanjut
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Skip button */}
+      {!showNew && (
+        <button onClick={() => onNew('Guest', '')} className="mt-1.5 w-full text-xs text-gray-400 hover:text-gray-600 py-1">
+          Lewati (transaksi tanpa data pelanggan)
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function POSPage() {
   const router = useRouter();
   const { user, hydrate, logout } = useAuthStore();
@@ -406,12 +520,14 @@ export default function POSPage() {
           <div className="flex-1 flex flex-col px-4 py-4 overflow-y-auto">
             <div className="text-center mb-6"><p className="text-gray-500 text-sm">Total</p><p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">{formatCurrency(cart.total())}</p></div>
 
-            {/* Loyalty */}
+            {/* Customer Search */}
             <div className="mb-4 border border-gray-200 rounded-xl p-3">
-              <div className="flex gap-2">
-                <input type="tel" value={custPhone} onChange={(e) => { setCustPhone(e.target.value); setLoy(null); cart.setRedeemPoints(0); }} placeholder="No HP pelanggan" className="input text-sm flex-1" />
-                <button onClick={lookupCustomer} className="btn btn-sm btn-secondary">Cek</button>
-              </div>
+              <CustomerSearch
+                phone={custPhone} name={custName}
+                onSelect={(c) => { setCustPhone(c.phone || ''); setCustName(c.name); setLoy({ name: c.name, points: c.points }); }}
+                onClear={() => { setCustPhone(''); setCustName(''); setLoy(null); cart.setRedeemPoints(0); }}
+                onNew={(name, phone) => { setCustName(name); setCustPhone(phone); setLoy({ name, points: 0 }); }}
+              />
               {loy && loy.points > 0 && (
                 <div className="mt-2 text-sm">
                   <p className="text-green-700">{loy.name} · <b>{loy.points} poin</b></p>
@@ -423,7 +539,6 @@ export default function POSPage() {
                 </div>
               )}
               {loy && loy.points === 0 && <p className="mt-2 text-xs text-gray-400">Pelanggan baru / belum punya poin. Nama & HP tetap tersimpan.</p>}
-              <input type="text" value={custName} onChange={(e) => setCustName(e.target.value)} placeholder="Nama (opsional)" className="input text-sm mt-2" />
             </div>
 
             <div className="grid grid-cols-3 gap-2 mb-4">
