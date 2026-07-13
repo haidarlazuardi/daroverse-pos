@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soeka House POS — Offline</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #F6EDDB;
+      font-family: -apple-system, sans-serif;
+      color: #374840;
+      text-align: center;
+      padding: 24px;
+    }
+    .icon {
+      width: 80px; height: 80px;
+      background: #48654D;
+      border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 24px;
+      font-size: 40px; font-weight: 900; color: #F6EDDB;
+    }
+    h1 { font-size: 24px; font-weight: 800; color: #2D4A32; margin-bottom: 8px; }
+    p  { font-size: 15px; color: #6B7A6E; line-height: 1.6; margin-bottom: 24px; }
+    button {
+      background: #48654D; color: white;
+      border: none; border-radius: 12px;
+      padding: 14px 28px; font-size: 15px; font-weight: 600;
+      cursor: pointer;
+    }
+    button:active { opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <div class="icon">S</div>
+  <h1>Soeka House POS</h1>
+  <p>Koneksi internet tidak tersedia.<br>Pastikan perangkat terhubung ke WiFi.</p>
+  <button onclick="window.location.reload()">Coba Lagi</button>
+</body>
+</html>
