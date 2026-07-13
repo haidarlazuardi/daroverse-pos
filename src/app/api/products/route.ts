@@ -98,7 +98,7 @@ export const POST = withAuth(async (req) => {
         takeawayCharge: takeawayCharge ? parseFloat(String(takeawayCharge)) : 0,
         packagingIngredientId: packagingIngredientId || null,
         ...(instructions ? { instructions } : {}),
-      },
+      } as any,
     });
 
     if (recipe?.items?.length) {
@@ -185,7 +185,7 @@ export const PUT = withAuth(async (req) => {
     }
 
     const product = await prisma.product.update({
-      where: { id }, data: updateData,
+      where: { id }, data: updateData as any,
       include: { category: true, recipe: { include: { items: { include: { ingredient: true } } } }, modifierGroups: { include: { options: true } } },
     });
 
