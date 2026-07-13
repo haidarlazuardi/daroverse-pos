@@ -61,6 +61,7 @@ export default function BahanBakuPage() {
 
   // PREPPED form
   const [prepSlide, setPrepSlide]   = useState(false);
+  const [viewPrep, setViewPrep] = useState<PrepIngredient | null>(null);
   const [editingPrep, setEditingPrep] = useState<PrepIngredient | null>(null);
   const [prepForm, setPrepForm]     = useState({ ...EMPTY_PREP });
   const [recipeItems, setRecipeItems] = useState<{ ingredientId: string; quantity: string }[]>([]);
@@ -375,25 +376,40 @@ export default function BahanBakuPage() {
                   const recipe = ing.prepRecipe;
                   const totalCost = recipe?.items.reduce((s, ri) => s + ri.ingredient.latestPrice * ri.quantity, 0) || 0;
                   const costPerUnit = recipe?.yieldQty ? totalCost / recipe.yieldQty : 0;
+                  const steps = Array.isArray(recipe?.instructions) ? recipe.instructions as { title: string; description: string }[] : [];
                   return (
-                    <div key={ing.id} className="card p-4">
+                    <div key={ing.id} className="card p-4 flex flex-col">
+                      {/* Header */}
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <p className="font-bold" style={{ color: 'var(--text-1)' }}>{ing.name}</p>
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>
-                            {recipe?.yieldQty ? `Yield: ${formatNumber(recipe.yieldQty)} ${recipe.yieldUnit || ing.unit}` : 'Yield belum diset'}
-                          </p>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            {recipe?.yieldQty && (
+                              <span className="text-xs" style={{ color: 'var(--text-3)' }}>
+                                Yield: {formatNumber(recipe.yieldQty)} {recipe.yieldUnit || ing.unit}
+                              </span>
+                            )}
+                            {recipe?.shelfLifeDays && (
+                              <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700">
+                                {recipe.shelfLifeDays}h shelf life
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <div className="flex gap-1">
-                          <button onClick={() => openEditPrep(ing)} className="p-1.5 rounded-lg hover:bg-brand-50 text-gray-400 hover:text-brand-600">
+                          <button onClick={() => setViewPrep(ing)} className="p-1.5 rounded-lg hover:bg-brand-50 text-gray-400 hover:text-brand-600" title="Lihat Detail">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                          </button>
+                          <button onClick={() => openEditPrep(ing)} className="p-1.5 rounded-lg hover:bg-brand-50 text-gray-400 hover:text-brand-600" title="Edit">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                           </button>
-                          <button onClick={() => setDeleteTarget(ing)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500">
+                          <button onClick={() => setDeleteTarget(ing)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500" title="Hapus">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
                           </button>
                         </div>
                       </div>
 
+                      {/* Bahan */}
                       {recipe?.items?.length ? (
                         <div className="space-y-1 mb-3">
                           {recipe.items.map((ri, i) => (
@@ -407,7 +423,18 @@ export default function BahanBakuPage() {
                         <p className="text-xs mb-3" style={{ color: 'var(--text-3)' }}>Belum ada resep</p>
                       )}
 
-                      <div className="pt-3 border-t flex justify-between" style={{ borderColor: 'var(--border)' }}>
+                      {/* Steps preview */}
+                      {steps.length > 0 && (
+                        <div className="mb-3 p-2 rounded-lg" style={{ background: 'var(--surface-2)' }}>
+                          <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-3)' }}>CARA PEMBUATAN ({steps.length} langkah)</p>
+                          <p className="text-xs" style={{ color: 'var(--text-2)' }}>
+                            {steps[0].title}{steps.length > 1 ? ` + ${steps.length - 1} langkah lagi...` : ''}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Footer cost */}
+                      <div className="pt-3 border-t flex justify-between mt-auto" style={{ borderColor: 'var(--border)' }}>
                         <div>
                           <p className="text-xs" style={{ color: 'var(--text-3)' }}>Total bahan</p>
                           <p className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>{formatCurrency(totalCost)}</p>
@@ -597,6 +624,83 @@ export default function BahanBakuPage() {
           </div>
         </div>
       </SlideOver>
+
+      {/* ── Detail View PREPPED ──────────────────────────────────────────── */}
+      {viewPrep && (
+        <SlideOver open={!!viewPrep} onClose={() => setViewPrep(null)} title={viewPrep.name}
+          footer={
+            <div className="flex gap-3">
+              <Button onClick={() => { setViewPrep(null); openEditPrep(viewPrep); }} variant="secondary">Edit</Button>
+              <button onClick={() => setViewPrep(null)} className="btn btn-secondary btn-md flex-1">Tutup</button>
+            </div>
+          }>
+          {(() => {
+            const recipe = viewPrep.prepRecipe;
+            const totalCost = recipe?.items.reduce((s, ri) => s + ri.ingredient.latestPrice * ri.quantity, 0) || 0;
+            const costPerUnit = recipe?.yieldQty ? totalCost / recipe.yieldQty : 0;
+            const steps = Array.isArray(recipe?.instructions) ? recipe.instructions as { title: string; description: string }[] : [];
+            return (
+              <div className="space-y-5">
+                {/* Info block */}
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'Satuan', value: viewPrep.unit },
+                    { label: 'Yield per Batch', value: recipe?.yieldQty ? `${formatNumber(recipe.yieldQty)} ${recipe.yieldUnit || viewPrep.unit}` : '—' },
+                    { label: 'Shelf Life', value: recipe?.shelfLifeDays ? `${recipe.shelfLifeDays} hari` : '—' },
+                    { label: 'HPP per unit', value: costPerUnit > 0 ? formatCurrency(costPerUnit) : '—' },
+                    { label: 'Total biaya bahan', value: formatCurrency(totalCost) },
+                    { label: 'Min Stok', value: `${formatNumber(viewPrep.minStock)} ${viewPrep.unit}` },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="p-3 rounded-xl" style={{ background: 'var(--surface-2)' }}>
+                      <p className="text-xs" style={{ color: 'var(--text-3)' }}>{label}</p>
+                      <p className="font-semibold text-sm mt-0.5" style={{ color: 'var(--text-1)' }}>{value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Bahan */}
+                {recipe?.items?.length ? (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--text-3)' }}>Bahan Pembuat</p>
+                    <div className="space-y-1.5">
+                      {recipe.items.map((ri, i) => (
+                        <div key={i} className="flex items-center justify-between p-2.5 rounded-lg" style={{ background: 'var(--surface-2)' }}>
+                          <div className="flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: 'var(--brand)' }}>{i + 1}</span>
+                            <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>{ri.ingredient.name}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-bold" style={{ color: 'var(--text-1)' }}>{formatNumber(ri.quantity)}</span>
+                            <span className="text-xs ml-1" style={{ color: 'var(--text-3)' }}>{ri.ingredient.unit}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Cara pembuatan */}
+                {steps.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--text-3)' }}>Cara Pembuatan</p>
+                    <div className="space-y-2">
+                      {steps.map((step, i) => (
+                        <div key={i} className="flex gap-3 p-3 rounded-xl" style={{ background: 'var(--surface-2)' }}>
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0" style={{ background: 'var(--brand)' }}>{i + 1}</div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>{step.title}</p>
+                            {step.description && <p className="text-sm mt-0.5" style={{ color: 'var(--text-2)' }}>{step.description}</p>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </SlideOver>
+      )}
 
       {/* ── Delete Modal ──────────────────────────────────────────────────── */}
       <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Hapus Bahan">

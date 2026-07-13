@@ -5,6 +5,7 @@ import AdminLayout from '@/components/layout/AdminLayout';
 import { Badge, Button, Modal, Input, Select, formatCurrency } from '@/components/ui';
 import { DataTable, Column } from '@/components/ui/DataTable';
 import { Toolbar } from '@/components/ui/Toolbar';
+import { SlideOver } from '@/components/ui/SlideOver';
 import { api } from '@/lib/fetch';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
@@ -49,6 +50,7 @@ export default function ProductsPage() {
   const [selected, setSelected]       = useState<string[]>([]);
   const [showAdd, setShowAdd]         = useState(false);
   const [editProduct, setEditProduct] = useState<Product|null>(null);
+  const [viewProduct, setViewProduct] = useState<Product|null>(null);
   const [form, setForm]               = useState(emptyForm);
   const [priceRec, setPriceRec]       = useState<{ cost: number; recommendations: Record<string,number> }|null>(null);
   const [saving, setSaving]           = useState(false);
@@ -369,6 +371,10 @@ export default function ProductsPage() {
           onRowClick={p => openEdit(p)}
           rowActions={p => (
             <>
+              <button onClick={e => { e.stopPropagation(); setViewProduct(p); }} title="Lihat Detail"
+                className="p-1.5 hover:bg-brand-50 rounded-lg text-gray-400 hover:text-brand-600 transition-colors">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
               <button onClick={e => { e.stopPropagation(); openEdit(p); }} title="Edit"
                 className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 hover:text-gray-600 transition-colors">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -548,6 +554,101 @@ export default function ProductsPage() {
           <Button onClick={handleSave} disabled={saving} className="w-full">{saving ? 'Menyimpan...' : isEditing ? 'Update Produk' : 'Buat Produk'}</Button>
         </div>
       </Modal>
+      {/* ── Detail View Produk ── */}
+      {viewProduct && (() => {
+        const inst = (viewProduct as any).instructions as any;
+        const meta = inst?.meta || {};
+        const steps: { title: string; description: string }[] = inst?.steps || [];
+        const recipe = viewProduct.recipe;
+        return (
+          <SlideOver open={!!viewProduct} onClose={() => setViewProduct(null)} title={viewProduct.name}
+            footer={
+              <div className="flex gap-3">
+                <Button onClick={() => { setViewProduct(null); openEdit(viewProduct); }} variant="secondary">Edit</Button>
+                <button onClick={() => setViewProduct(null)} className="btn btn-secondary btn-md flex-1">Tutup</button>
+              </div>
+            }>
+            <div className="space-y-5">
+              {/* Basic info */}
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Harga Jual', value: formatCurrency(viewProduct.price) },
+                  { label: 'HPP', value: formatCurrency(viewProduct.cost) },
+                  { label: 'Margin', value: viewProduct.price > 0 ? `${(((viewProduct.price - viewProduct.cost) / viewProduct.price) * 100).toFixed(1)}%` : '—' },
+                  { label: 'Station', value: viewProduct.station === 'FOOD' ? '🍳 Dapur' : '☕ Bar' },
+                  { label: 'SKU', value: viewProduct.sku || '—' },
+                  { label: 'Kategori', value: viewProduct.category?.name || '—' },
+                ].map(({ label, value }) => (
+                  <div key={label} className="p-3 rounded-xl" style={{ background: 'var(--surface-2)' }}>
+                    <p className="text-xs" style={{ color: 'var(--text-3)' }}>{label}</p>
+                    <p className="font-semibold text-sm mt-0.5" style={{ color: 'var(--text-1)' }}>{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Standar Produksi */}
+              {Object.values(meta).some(Boolean) && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--text-3)' }}>Standar Produksi</p>
+                  <div className="space-y-2">
+                    {[
+                      { label: 'Tipe Produk', value: meta.productType },
+                      { label: 'Kemasan', value: meta.packaging },
+                      { label: 'Umur Simpan', value: meta.shelfLife },
+                      { label: 'Syarat Mutu', value: meta.qualityStandard },
+                      { label: 'Saran Penyajian', value: meta.servingSuggestion },
+                      { label: 'Alat Penyajian', value: meta.servingTools },
+                      { label: 'Alat Produksi', value: meta.productionTools },
+                    ].filter(i => i.value).map(({ label, value }) => (
+                      <div key={label} className="flex gap-3 p-2.5 rounded-lg" style={{ background: 'var(--surface-2)' }}>
+                        <span className="text-xs font-semibold w-28 flex-shrink-0 pt-0.5" style={{ color: 'var(--text-3)' }}>{label}</span>
+                        <span className="text-sm" style={{ color: 'var(--text-1)' }}>{value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Resep */}
+              {recipe?.items?.length ? (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--text-3)' }}>Resep</p>
+                  <div className="space-y-1.5">
+                    {recipe.items.map((ri, i) => (
+                      <div key={i} className="flex items-center justify-between p-2.5 rounded-lg" style={{ background: 'var(--surface-2)' }}>
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: 'var(--brand)' }}>{i + 1}</span>
+                          <span className="text-sm font-medium" style={{ color: 'var(--text-1)' }}>{ri.ingredient.name}</span>
+                        </div>
+                        <span className="text-sm font-bold" style={{ color: 'var(--text-2)' }}>{ri.quantity} {ri.ingredient.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Cara pembuatan */}
+              {steps.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--text-3)' }}>Cara Pembuatan</p>
+                  <div className="space-y-2">
+                    {steps.map((step, i) => (
+                      <div key={i} className="flex gap-3 p-3 rounded-xl" style={{ background: 'var(--surface-2)' }}>
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0" style={{ background: 'var(--brand)' }}>{i + 1}</div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm" style={{ color: 'var(--text-1)' }}>{step.title}</p>
+                          {step.description && <p className="text-sm mt-0.5" style={{ color: 'var(--text-2)' }}>{step.description}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </SlideOver>
+        );
+      })()}
+
     </AdminLayout>
   );
 }
