@@ -3,13 +3,17 @@ import './globals.css';
 import SWRegister from '@/components/SWRegister';
 
 export const metadata: Metadata = {
-  title: 'Daroverse POS',
-  description: 'Production-ready F&B Point of Sale System',
+  title: 'Soeka House POS',
+  description: 'Point of Sale System — Soeka House Bogor',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Daroverse POS',
+    title: 'Soeka POS',
+  },
+  icons: {
+    apple: '/icon-192.png',
+    icon: '/icon-192.png',
   },
 };
 
@@ -18,12 +22,12 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: '#16a34a',
+  themeColor: '#48654D',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="id">
       <body className="min-h-screen">
         <SWRegister />
         {children}

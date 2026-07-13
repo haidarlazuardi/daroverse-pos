@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#48654D"/>
+  <!-- House icon -->
+  <path d="M256 100 L140 210 L140 380 L220 380 L220 290 L292 290 L292 380 L372 380 L372 210 Z" fill="#F6EDDB" opacity="0.15"/>
+  <!-- S letter -->
+  <text x="256" y="290" font-family="Arial" font-size="200" font-weight="900" fill="#F6EDDB" text-anchor="middle" dominant-baseline="middle">S</text>
+  <!-- Tagline -->
+  <text x="256" y="420" font-family="Arial" font-size="48" font-weight="600" fill="#A8C5A0" text-anchor="middle">SOEKA HOUSE</text>
+</svg>
