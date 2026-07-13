@@ -385,7 +385,35 @@ export default function POSPage() {
     const o = lastOrder;
     const items = (o.items || []).map((i: any) => `<tr><td>${i.product?.name || ''} x${i.quantity}</td><td class="r">${formatCurrency(i.subtotal)}</td></tr>`).join('');
     const row = (l: string, v: number) => v > 0 ? `<tr><td>${l}</td><td class="r">${formatCurrency(v)}</td></tr>` : '';
-    w.document.write(`<html><head><title>Struk</title><style>body{font-family:monospace;font-size:12px;width:280px;margin:0 auto;padding:10px}table{width:100%;border-collapse:collapse}td{padding:2px 0}.line{border-top:1px dashed #000;margin:6px 0}.c{text-align:center}.r{text-align:right}</style></head><body><h3 class="c" style="margin:4px 0">Soeka House</h3><p class="c">${o.orderNumber}<br>${new Date(o.createdAt).toLocaleString('id-ID')}</p><div class="line"></div><table>${items}</table><div class="line"></div><table>${row('Subtotal', o.subtotal)}${row('Diskon', -o.discount)}${row('Pajak', o.tax)}${row('Service', o.serviceCharge)}${row('Take-away', o.takeawayCharge)}<tr><td><b>TOTAL</b></td><td class="r"><b>${formatCurrency(o.total)}</b></td></tr>${o.payment ? `<tr><td>${o.payment.method}</td><td class="r">${formatCurrency(o.payment.received)}</td></tr>${o.payment.change > 0 ? `<tr><td>Kembali</td><td class="r">${formatCurrency(o.payment.change)}</td></tr>` : ''}` : ''}</table><div class="line"></div><p class="c">Terima kasih!</p><script>window.print();</script></body></html>`);
+    const newPoinTotal = loy ? loy.points + (o.pointsEarned || 0) : (o.pointsEarned || 0);
+    const pointsBlock = (custName || o.pointsEarned > 0) ? `
+      <div class="line"></div>
+      ${custName ? `<p class="c" style="font-size:11px">Pelanggan: <b>${custName}</b></p>` : ''}
+      ${o.pointsEarned > 0 ? `<p class="c" style="font-size:11px">+ ${o.pointsEarned} poin didapat</p>` : ''}
+      ${newPoinTotal > 0 ? `<p class="c" style="font-size:13px;font-weight:bold">Total poin: ${newPoinTotal.toLocaleString('id-ID')} &#11088;</p>` : ''}
+      ${custPhone ? '<p class="c" style="font-size:10px;color:#888">Cek poin: daroverse-pos.vercel.app/cek-poin</p>' : ''}
+    ` : '';
+    const html = `<html><head><title>Struk</title><style>body{font-family:monospace;font-size:12px;width:280px;margin:0 auto;padding:10px}table{width:100%;border-collapse:collapse}td{padding:2px 0}.line{border-top:1px dashed #000;margin:6px 0}.c{text-align:center}.r{text-align:right}</style></head><body>
+      <h3 class="c" style="margin:4px 0">Soeka House</h3>
+      <p class="c">${o.orderNumber}<br>${new Date(o.createdAt).toLocaleString('id-ID')}</p>
+      <div class="line"></div>
+      <table>${items}</table>
+      <div class="line"></div>
+      <table>
+        ${row('Subtotal', o.subtotal)}
+        ${o.discount > 0 ? `<tr><td>Diskon</td><td class="r">-${formatCurrency(o.discount)}</td></tr>` : ''}
+        ${row('Pajak', o.tax)}
+        ${row('Service', o.serviceCharge)}
+        ${row('Take-away', o.takeawayCharge)}
+        <tr><td><b>TOTAL</b></td><td class="r"><b>${formatCurrency(o.total)}</b></td></tr>
+        ${o.payment ? `<tr><td>${o.payment.method}</td><td class="r">${formatCurrency(o.payment.received)}</td></tr>${o.payment.change > 0 ? `<tr><td>Kembali</td><td class="r">${formatCurrency(o.payment.change)}</td></tr>` : ''}` : ''}
+      </table>
+      ${pointsBlock}
+      <div class="line"></div>
+      <p class="c">Terima kasih! &#128591;</p>
+      <script>window.print();</script>
+    </body></html>`;
+    w.document.write(html);
     w.document.close();
   };
 
