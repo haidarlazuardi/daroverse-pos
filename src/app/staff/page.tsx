@@ -279,20 +279,221 @@ function Opname({ canApply, busy, setBusy, onDone }: any) {
 }
 
 function MenuView() {
-  const [products, setProducts] = useState<any[]>([]);
-  const [q, setQ] = useState('');
-  useEffect(() => { api.get<any[]>('/api/products?active=true').then(setProducts).catch(() => {}); }, []);
-  const list = products.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()));
+  const [products, setProducts]   = useState<any[]>([]);
+  const [prepped, setPrepped]     = useState<any[]>([]);
+  const [q, setQ]                 = useState('');
+  const [tab, setTab]             = useState<'menu'|'olahan'>('menu');
+  const [viewed, setViewed]       = useState<any | null>(null);
+  const [viewedPrep, setViewedPrep] = useState<any | null>(null);
+
+  useEffect(() => {
+    api.get<any[]>('/api/products?active=true').then(setProducts).catch(() => {});
+    api.get<any[]>('/api/ingredients?type=PREPPED').then(setPrepped).catch(() => {});
+  }, []);
+
+  const list     = products.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
+  const prepList = prepped.filter(p => p.name.toLowerCase().includes(q.toLowerCase()));
+
   return (
     <div className="space-y-3 mt-2">
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari menu..." className="input text-base py-3" />
-      {list.map((p) => (
-        <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-3">
-          <div className="flex justify-between"><span className="font-medium">{p.name}</span><span className="font-bold text-green-600">{formatCurrency(p.price)}</span></div>
-          {p.recipe?.items?.length > 0 && <p className="text-xs text-gray-400 mt-1">{p.recipe.items.map((ri: any) => `${ri.quantity}${ri.ingredient.unit} ${ri.ingredient.name}`).join(' + ')}</p>}
-        </div>
-      ))}
-      {list.length === 0 && <p className="text-center text-gray-400 py-6">Tidak ada menu</p>}
+      <input value={q} onChange={e => setQ(e.target.value)} placeholder="Cari..." className="input text-base py-3" />
+      <div className="flex gap-2">
+        {[['menu','Menu'], ['olahan','Bahan Olahan']].map(([key, label]) => (
+          <button key={key} onClick={() => setTab(key as any)}
+            className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all ${tab === key ? 'text-white border-transparent' : 'bg-white border-gray-200 text-gray-500'}`}
+            style={tab === key ? { background: 'var(--brand)' } : {}}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'menu' ? (
+        <>
+          {list.map(p => {
+            const inst = p.instructions as any;
+            const steps: any[] = inst?.steps || [];
+            const meta = inst?.meta || {};
+            const hasDetail = steps.length > 0 || Object.values(meta).some(Boolean);
+            return (
+              <button key={p.id} onClick={() => setViewed(p)}
+                className="w-full bg-white rounded-xl border border-gray-200 p-3 text-left active:bg-gray-50">
+                <div className="flex justify-between items-start">
+                  <span className="font-semibold">{p.name}</span>
+                  <span className="font-bold text-green-600">{formatCurrency(p.price)}</span>
+                </div>
+                {p.recipe?.items?.length > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {p.recipe.items.slice(0,3).map((ri: any) => `${ri.quantity}${ri.ingredient?.unit} ${ri.ingredient?.name}`).join(' · ')}
+                    {p.recipe.items.length > 3 ? ` +${p.recipe.items.length-3}` : ''}
+                  </p>
+                )}
+                {hasDetail && <p className="text-xs mt-1 font-medium" style={{ color: 'var(--brand)' }}>{steps.length > 0 ? `${steps.length} langkah →` : 'Lihat detail →'}</p>}
+              </button>
+            );
+          })}
+          {list.length === 0 && <p className="text-center text-gray-400 py-6">Tidak ada menu</p>}
+        </>
+      ) : (
+        <>
+          {prepList.map(ing => {
+            const recipe = ing.prepRecipe;
+            const steps: any[] = Array.isArray(recipe?.instructions) ? recipe.instructions : [];
+            return (
+              <button key={ing.id} onClick={() => setViewedPrep(ing)}
+                className="w-full bg-white rounded-xl border border-gray-200 p-3 text-left active:bg-gray-50">
+                <div className="flex justify-between items-start">
+                  <span className="font-semibold">{ing.name}</span>
+                  {recipe?.shelfLifeDays && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">{recipe.shelfLifeDays}h</span>}
+                </div>
+                {recipe?.yieldQty && <p className="text-xs text-gray-400 mt-0.5">Yield: {recipe.yieldQty} {recipe.yieldUnit || ing.unit}</p>}
+                {recipe?.items?.length > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    {recipe.items.slice(0,3).map((ri: any) => `${ri.quantity}${ri.ingredient?.unit} ${ri.ingredient?.name}`).join(' · ')}
+                    {recipe.items.length > 3 ? ` +${recipe.items.length-3}` : ''}
+                  </p>
+                )}
+                {steps.length > 0 && <p className="text-xs mt-1 font-medium" style={{ color: 'var(--brand)' }}>{steps.length} langkah →</p>}
+              </button>
+            );
+          })}
+          {prepList.length === 0 && <p className="text-center text-gray-400 py-6">Tidak ada bahan olahan</p>}
+        </>
+      )}
+
+      {/* Detail Menu - fullscreen */}
+      {viewed && (() => {
+        const inst = viewed.instructions as any;
+        const meta = inst?.meta || {};
+        const steps: any[] = inst?.steps || [];
+        return (
+          <div className="fixed inset-0 z-50 flex flex-col bg-white">
+            <div className="flex items-center gap-3 px-4 py-4 border-b">
+              <button onClick={() => setViewed(null)} className="p-2 -ml-2 rounded-xl active:bg-gray-100">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-base truncate">{viewed.name}</p>
+                <p className="text-xs text-gray-400">{viewed.station === 'FOOD' ? '🍳 Dapur' : '☕ Bar'} · {formatCurrency(viewed.price)}</p>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-5">
+              {Object.values(meta).some(Boolean) && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Standar Produksi</p>
+                  <div className="space-y-2">
+                    {[['Tipe Produk',meta.productType],['Kemasan',meta.packaging],['Umur Simpan',meta.shelfLife],['Syarat Mutu',meta.qualityStandard],['Saran Penyajian',meta.servingSuggestion],['Alat Penyajian',meta.servingTools],['Alat Produksi',meta.productionTools]]
+                      .filter(([,v]) => v).map(([label, value]) => (
+                        <div key={label as string} className="flex gap-3 p-3 rounded-xl bg-gray-50">
+                          <span className="text-xs font-semibold w-28 flex-shrink-0 text-gray-400 pt-0.5">{label}</span>
+                          <span className="text-sm">{value}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+              {viewed.recipe?.items?.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Resep</p>
+                  <div className="space-y-1.5">
+                    {viewed.recipe.items.map((ri: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: 'var(--brand)' }}>{i+1}</span>
+                          <span className="text-sm font-medium">{ri.ingredient?.name}</span>
+                        </div>
+                        <span className="text-sm font-bold text-gray-500">{ri.quantity} {ri.ingredient?.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {steps.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Cara Pembuatan</p>
+                  <div className="space-y-2">
+                    {steps.map((step: any, i: number) => (
+                      <div key={i} className="flex gap-3 p-3 rounded-xl bg-gray-50">
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0" style={{ background: 'var(--brand)' }}>{i+1}</div>
+                        <div>
+                          <p className="font-semibold text-sm">{step.title}</p>
+                          {step.description && <p className="text-sm text-gray-500 mt-0.5">{step.description}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Detail Bahan Olahan - fullscreen */}
+      {viewedPrep && (() => {
+        const recipe = viewedPrep.prepRecipe;
+        const steps: any[] = Array.isArray(recipe?.instructions) ? recipe.instructions : [];
+        const totalCost = recipe?.items?.reduce((s: number, ri: any) => s + ri.ingredient.latestPrice * ri.quantity, 0) || 0;
+        const costPerUnit = recipe?.yieldQty ? totalCost / recipe.yieldQty : 0;
+        return (
+          <div className="fixed inset-0 z-50 flex flex-col bg-white">
+            <div className="flex items-center gap-3 px-4 py-4 border-b">
+              <button onClick={() => setViewedPrep(null)} className="p-2 -ml-2 rounded-xl active:bg-gray-100">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+              </button>
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-base truncate">{viewedPrep.name}</p>
+                <p className="text-xs text-gray-400">
+                  {recipe?.yieldQty ? `Yield: ${recipe.yieldQty} ${recipe.yieldUnit || viewedPrep.unit}` : ''}
+                  {recipe?.shelfLifeDays ? ` · ${recipe.shelfLifeDays}h shelf life` : ''}
+                </p>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-5">
+              <div className="grid grid-cols-2 gap-2">
+                {[['HPP/unit', costPerUnit > 0 ? formatCurrency(costPerUnit) : '—'],['Total biaya',formatCurrency(totalCost)],['Min stok',`${viewedPrep.minStock} ${viewedPrep.unit}`],['Shelf life',recipe?.shelfLifeDays ? `${recipe.shelfLifeDays} hari` : '—']]
+                  .map(([label, value]) => (
+                    <div key={label} className="p-3 rounded-xl bg-gray-50">
+                      <p className="text-xs text-gray-400">{label}</p>
+                      <p className="font-semibold text-sm mt-0.5">{value}</p>
+                    </div>
+                  ))}
+              </div>
+              {recipe?.items?.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Bahan Pembuat</p>
+                  <div className="space-y-1.5">
+                    {recipe.items.map((ri: any, i: number) => (
+                      <div key={i} className="flex items-center justify-between p-2.5 rounded-xl bg-gray-50">
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0" style={{ background: 'var(--brand)' }}>{i+1}</span>
+                          <span className="text-sm font-medium">{ri.ingredient?.name}</span>
+                        </div>
+                        <span className="text-sm font-bold text-gray-500">{ri.quantity} {ri.ingredient?.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {steps.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Cara Pembuatan</p>
+                  <div className="space-y-2">
+                    {steps.map((step: any, i: number) => (
+                      <div key={i} className="flex gap-3 p-3 rounded-xl bg-gray-50">
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black text-white flex-shrink-0" style={{ background: 'var(--brand)' }}>{i+1}</div>
+                        <div>
+                          <p className="font-semibold text-sm">{step.title}</p>
+                          {step.description && <p className="text-sm text-gray-500 mt-0.5">{step.description}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
