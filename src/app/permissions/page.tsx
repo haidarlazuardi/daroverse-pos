@@ -2,87 +2,140 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
-import { Card, Button, Badge, Loader } from '@/components/ui';
 import { api } from '@/lib/fetch';
 import clsx from 'clsx';
 
-interface Feature { label: string; default: boolean; group: string }
+const ROLES = [
+  { key: 'MANAGER', label: 'Manager', color: '#2D6A4F' },
+  { key: 'CASHIER', label: 'Kasir',   color: '#1D3557' },
+  { key: 'KITCHEN', label: 'Dapur',   color: '#7B2D8B' },
+];
 
-const LOCKED_LABELS: Record<string, string> = {
-  manage_users: 'Kelola user', settings: 'Pengaturan sistem', refund: 'Refund / void',
-  view_finance: 'Lihat profit / laporan keuangan', manage_supplier: 'Kelola supplier',
-};
+const SECTIONS = ['Operasional','Dapur & Stok','Purchasing','Manajemen','Laporan'];
 
 export default function PermissionsPage() {
-  const [features, setFeatures] = useState<Record<string, Feature>>({});
-  const [perms, setPerms] = useState<Record<string, boolean>>({});
-  const [locked, setLocked] = useState<string[]>([]);
+  const [perms, setPerms]     = useState<Record<string, Record<string, boolean>>>({});
+  const [features, setFeatures] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saving, setSaving]   = useState<string | null>(null); // "ROLE/href"
+  const [activeRole, setActiveRole] = useState('MANAGER');
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
-      const d = await api.get<any>('/api/permissions');
-      setFeatures(d.features); setPerms(d.permissions); setLocked(d.locked || []);
-    } catch (e) { console.error(e); } finally { setLoading(false); }
+      const [p, f] = await Promise.all([
+        api.get<Record<string, Record<string, boolean>>>('/api/role-permissions'),
+        fetch('/api/role-permissions').then(r => r.json()).then(d => d.data),
+      ]);
+      setPerms(p);
+      // Get feature list from API
+      const res = await fetch('/api/role-permissions/features');
+      if (res.ok) {
+        const data = await res.json();
+        setFeatures(data.features || []);
+      }
+    } catch { /* silent */ }
+    finally { setLoading(false); }
   }, []);
+
   useEffect(() => { load(); }, [load]);
 
-  const toggle = (k: string) => { setPerms({ ...perms, [k]: !perms[k] }); setSaved(false); };
+  async function toggle(role: string, href: string, current: boolean) {
+    const key = `${role}/${href}`;
+    setSaving(key);
+    const newVal = !current;
+    // Optimistic update
+    setPerms(p => ({ ...p, [role]: { ...p[role], [href]: newVal } }));
+    try {
+      await api.patch('/api/role-permissions', { role, feature: href, enabled: newVal });
+    } catch {
+      // Revert
+      setPerms(p => ({ ...p, [role]: { ...p[role], [href]: current } }));
+    }
+    setSaving(null);
+  }
 
-  const save = async () => {
-    setSaving(true);
-    try { await api.put('/api/permissions', { permissions: perms }); setSaved(true); }
-    catch (e: any) { alert(e.message || 'Gagal'); } finally { setSaving(false); }
-  };
+  const grouped = SECTIONS.map(sec => ({
+    section: sec,
+    items: features.filter((f: any) => f.section === sec),
+  })).filter(g => g.items.length > 0);
 
-  // group features
-  const groups: Record<string, string[]> = {};
-  for (const [k, f] of Object.entries(features)) (groups[f.group] ||= []).push(k);
+  const activeRoleData = ROLES.find(r => r.key === activeRole)!;
 
   return (
     <AdminLayout>
-      <div className="space-y-6 max-w-2xl">
+      <div className="max-w-3xl mx-auto">
         <div className="page-header">
-          <div><h2 className="page-title">Hak Akses Kasir</h2><p className="page-subtitle">Atur fitur apa yang bisa dipakai kasir/staff. Berlaku langsung setelah disimpan.</p></div>
+          <div>
+            <h1 className="page-title">Hak Akses</h1>
+            <p className="page-subtitle">Konfigurasi fitur yang bisa diakses per role</p>
+          </div>
         </div>
 
-        {loading ? <Loader /> : (
-          <>
-            {Object.entries(groups).map(([group, keys]) => (
-              <Card key={group}>
-                <h3 className="font-bold text-gray-900 mb-3">{group}</h3>
-                <div className="divide-y divide-gray-100">
-                  {keys.map((k) => (
-                    <div key={k} className="flex items-center justify-between py-3">
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">{features[k].label}</p>
-                        {!features[k].default && <p className="text-xs text-gray-400">Default: nonaktif (sensitif)</p>}
-                      </div>
-                      <button onClick={() => toggle(k)}
-                        className={clsx('relative w-12 h-7 rounded-full transition-colors', perms[k] ? 'bg-green-500' : 'bg-gray-300')}>
-                        <span className={clsx('absolute top-1 w-5 h-5 bg-white rounded-full transition-transform', perms[k] ? 'translate-x-6' : 'translate-x-1')} />
-                      </button>
-                    </div>
-                  ))}
+        <div className="info-box mb-5">
+          <strong>Owner & Super Admin</strong> selalu punya akses penuh ke semua fitur dan tidak bisa dikonfigurasi di sini.
+        </div>
+
+        {/* Role tabs */}
+        <div className="flex gap-2 mb-6">
+          {ROLES.map(r => (
+            <button key={r.key} onClick={() => setActiveRole(r.key)}
+              className={clsx('px-4 py-2 rounded-xl text-sm font-bold border-2 transition-all', activeRole === r.key ? 'text-white' : 'bg-white')}
+              style={activeRole === r.key
+                ? { background: r.color, borderColor: r.color }
+                : { borderColor: 'var(--border-md)', color: 'var(--text-2)' }}>
+              {r.label}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <div className="w-7 h-7 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--brand)', borderTopColor: 'transparent' }} />
+          </div>
+        ) : features.length === 0 ? (
+          <div className="empty-state">
+            <p className="empty-title">Loading fitur...</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {grouped.map(({ section, items }) => (
+              <div key={section} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                <div className="px-4 py-3 border-b border-gray-100" style={{ background: 'var(--surface-2)' }}>
+                  <p className="text-xs font-black uppercase tracking-[0.1em]" style={{ color: 'var(--text-3)' }}>{section}</p>
                 </div>
-              </Card>
-            ))}
-
-            <Card>
-              <h3 className="font-bold text-gray-900 mb-1">Selalu khusus admin</h3>
-              <p className="text-xs text-gray-400 mb-3">Fitur sensitif ini tidak bisa dibuka untuk kasir, demi keamanan.</p>
-              <div className="flex flex-wrap gap-2">
-                {locked.map((k) => <Badge key={k} variant="default">{LOCKED_LABELS[k] || k}</Badge>)}
+                <div className="divide-y divide-gray-50">
+                  {items.map((feature: any) => {
+                    const enabled = perms[activeRole]?.[feature.href] ?? false;
+                    const key = `${activeRole}/${feature.href}`;
+                    const isSaving = saving === key;
+                    return (
+                      <div key={feature.href} className="flex items-center justify-between px-4 py-3">
+                        <div>
+                          <p className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>{feature.label}</p>
+                          <p className="text-xs" style={{ color: 'var(--text-3)' }}>{feature.href}</p>
+                        </div>
+                        <button
+                          onClick={() => toggle(activeRole, feature.href, enabled)}
+                          disabled={isSaving}
+                          className={clsx(
+                            'relative w-11 h-6 rounded-full transition-all duration-200 flex-shrink-0',
+                            isSaving ? 'opacity-50' : '',
+                            enabled ? '' : 'bg-gray-200'
+                          )}
+                          style={enabled ? { background: activeRoleData.color } : {}}>
+                          <span className={clsx(
+                            'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200',
+                            enabled ? 'left-[22px]' : 'left-0.5'
+                          )} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </Card>
-
-            <div className="flex items-center gap-3 sticky bottom-4">
-              <Button onClick={save} disabled={saving}>{saving ? 'Menyimpan...' : 'Simpan perubahan'}</Button>
-              {saved && <span className="text-sm text-green-600">✓ Tersimpan — nav kasir langsung menyesuaikan</span>}
-            </div>
-          </>
+            ))}
+          </div>
         )}
       </div>
     </AdminLayout>

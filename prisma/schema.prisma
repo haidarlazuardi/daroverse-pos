@@ -847,3 +847,19 @@ model LogbookRead {
   @@unique([entryId, userId])
   @@map("logbook_reads")
 }
+
+// ═══════════════════════════════════════════════════════
+//  ROLE PERMISSIONS (feature toggle per role)
+// ═══════════════════════════════════════════════════════
+
+model RolePermission {
+  id        String   @id @default(cuid())
+  role      String   // MANAGER | CASHIER | KITCHEN (OWNER + SUPER_ADMIN always full access)
+  feature   String   // href path e.g. '/inventory', '/reports', '/void'
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  updatedBy String?  // userId of SUPER_ADMIN who changed it
+
+  @@unique([role, feature])
+  @@map("role_permissions")
+}

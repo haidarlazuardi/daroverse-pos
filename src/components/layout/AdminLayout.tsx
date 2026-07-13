@@ -8,12 +8,15 @@ import { LogbookBar } from '@/components/ui/LogbookBar';
 import clsx from 'clsx';
 
 type NavItem  = { href: string; label: string; icon: string; allow: Role[] | 'all' };
-type NavGroup = { section: string; allow: Role[] | 'all'; defaultOpen?: boolean; items: NavItem[] };
+type NavGroup = { section: string; allow: Role[] | 'all'; defaultOpen?: boolean | ((role: Role) => boolean); items: NavItem[] };
 
 const ALL_ROLES: Role[] = ['SUPER_ADMIN','OWNER','MANAGER','CASHIER','KITCHEN'];
 
 const NAV_GROUPS: NavGroup[] = [
-  { section: 'Operasional', allow: 'all', defaultOpen: true, items: [
+  // ── Semua role ──────────────────────────────────────────────────────────
+  { section: 'Operasional', allow: 'all',
+    defaultOpen: () => true, // selalu open untuk semua role
+    items: [
     { href: '/dashboard', label: 'Dashboard', allow: ADMIN_ROLES,
       icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
     { href: '/pos', label: 'POS', allow: 'all',
@@ -25,17 +28,23 @@ const NAV_GROUPS: NavGroup[] = [
     { href: '/staff', label: 'Staff Hub', allow: ALL_ROLES,
       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
   ]},
-  { section: 'Kasir', allow: ['CASHIER','KITCHEN'] as Role[], defaultOpen: true, items: [
+
+  // ── Kasir only ──────────────────────────────────────────────────────────
+  { section: 'Kasir', allow: ['CASHIER','KITCHEN'] as Role[],
+    defaultOpen: () => true,
+    items: [
     { href: '/expenses-input', label: 'Input Pengeluaran', allow: ['CASHIER','KITCHEN'] as Role[],
       icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z' },
   ]},
-  { section: 'Dapur', allow: KITCHEN_ROLES, defaultOpen: false, items: [
+
+  // ── Dapur & Stok (KITCHEN + MANAGER) ───────────────────────────────────
+  { section: 'Dapur & Stok', allow: KITCHEN_ROLES,
+    defaultOpen: (role) => role === 'KITCHEN', // open untuk kitchen, collapsed untuk manager
+    items: [
     { href: '/production', label: 'Produksi', allow: KITCHEN_ROLES,
       icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
     { href: '/menu-view', label: 'Menu & Resep', allow: KITCHEN_ROLES,
       icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
-  ]},
-  { section: 'Inventory', allow: STOCK_ROLES, defaultOpen: false, items: [
     { href: '/inventory', label: 'Stok & Bahan', allow: STOCK_ROLES,
       icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
     { href: '/bahan-baku', label: 'Bahan Baku', allow: STOCK_ROLES,
@@ -45,35 +54,51 @@ const NAV_GROUPS: NavGroup[] = [
     { href: '/stock-opname', label: 'Stock Opname', allow: STOCK_ROLES,
       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
   ]},
-  { section: 'Purchasing', allow: STOCK_ROLES, defaultOpen: false, items: [
+
+  // ── Purchasing ──────────────────────────────────────────────────────────
+  { section: 'Purchasing', allow: STOCK_ROLES,
+    defaultOpen: (role) => false, // collapsed default
+    items: [
     { href: '/purchase-orders', label: 'Purchase Order', allow: STOCK_ROLES,
       icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
     { href: '/suppliers', label: 'Supplier', allow: STOCK_ROLES,
       icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
   ]},
-  { section: 'Master Data', allow: ADMIN_ROLES, defaultOpen: false, items: [
-    { href: '/categories', label: 'Kategori', allow: ADMIN_ROLES,
-      icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z' },
+
+  // ── Manajemen (MANAGER + OWNER) ─────────────────────────────────────────
+  { section: 'Manajemen', allow: ADMIN_ROLES,
+    defaultOpen: (role) => ['SUPER_ADMIN','OWNER','MANAGER'].includes(role),
+    items: [
     { href: '/products', label: 'Produk & Menu', allow: ADMIN_ROLES,
       icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+    { href: '/categories', label: 'Kategori', allow: ADMIN_ROLES,
+      icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z' },
     { href: '/discounts', label: 'Diskon', allow: ADMIN_ROLES,
       icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z' },
-    { href: '/assets', label: 'Aset', allow: ADMIN_ROLES,
-      icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4' },
-  ]},
-  { section: 'Laporan', allow: ADMIN_ROLES, defaultOpen: false, items: [
-    { href: '/analytics', label: 'Analitik', allow: ADMIN_ROLES,
-      icon: 'M3 3v18h18M9 17V9m4 8V5m4 12v-6' },
-    { href: '/reports', label: 'Laporan', allow: ADMIN_ROLES,
-      icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
     { href: '/customers', label: 'Pelanggan', allow: ADMIN_ROLES,
       icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
     { href: '/expenses', label: 'Pengeluaran', allow: ADMIN_ROLES,
       icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z' },
+  ]},
+
+  // ── Laporan ─────────────────────────────────────────────────────────────
+  { section: 'Laporan', allow: ADMIN_ROLES,
+    defaultOpen: (role) => false,
+    items: [
+    { href: '/analytics', label: 'Analitik', allow: ADMIN_ROLES,
+      icon: 'M3 3v18h18M9 17V9m4 8V5m4 12v-6' },
+    { href: '/reports', label: 'Laporan', allow: ADMIN_ROLES,
+      icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
     { href: '/void', label: 'Void Order', allow: ADMIN_ROLES,
       icon: 'M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636' },
+    { href: '/assets', label: 'Aset', allow: ADMIN_ROLES,
+      icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4' },
   ]},
-  { section: 'Pengaturan', allow: SENIOR_ROLES, defaultOpen: false, items: [
+
+  // ── Pengaturan (OWNER only) ─────────────────────────────────────────────
+  { section: 'Pengaturan', allow: SENIOR_ROLES,
+    defaultOpen: (role) => false,
+    items: [
     { href: '/loyalty', label: 'Loyalty Rewards', allow: SENIOR_ROLES,
       icon: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' },
     { href: '/users', label: 'Pengguna', allow: SENIOR_ROLES,
@@ -88,10 +113,21 @@ const NAV_GROUPS: NavGroup[] = [
 function canAccess(allow: Role[] | 'all', role: Role) {
   return allow === 'all' || (allow as Role[]).includes(role);
 }
-function getGroups(role: Role) {
+function getGroups(role: Role, perms: Record<string, boolean>) {
+  const isFullAccess = ['SUPER_ADMIN','OWNER'].includes(role);
   return NAV_GROUPS
     .filter(g => canAccess(g.allow, role))
-    .map(g => ({ ...g, items: g.items.filter(i => canAccess(i.allow, role)) }))
+    .map(g => ({
+      ...g,
+      items: g.items.filter(i => {
+        if (!canAccess(i.allow, role)) return false;
+        // For configurable roles, check DB permissions
+        if (!isFullAccess && Object.keys(perms).length > 0) {
+          return perms[i.href] !== false; // default true if not set
+        }
+        return true;
+      }),
+    }))
     .filter(g => g.items.length > 0);
 }
 
@@ -106,9 +142,22 @@ function NavIcon({ d }: { d: string }) {
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [rolePerms, setRolePerms]   = useState<Record<string, boolean>>({});
   const router   = useRouter();
   const pathname = usePathname();
   const { user, logout, hydrate } = useAuthStore();
+
+  // Fetch role permissions from DB (only for configurable roles)
+  useEffect(() => {
+    if (!user) return;
+    if (['SUPER_ADMIN','OWNER'].includes(user.role)) return; // always full access
+    fetch('/api/role-permissions')
+      .then(r => r.json())
+      .then(d => {
+        if (d.data?.[user.role]) setRolePerms(d.data[user.role]);
+      })
+      .catch(() => {});
+  }, [user]);
 
   useEffect(() => { hydrate(); }, [hydrate]);
 
@@ -128,8 +177,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       if (!allowed.some(p => pathname.startsWith(p))) router.replace('/pos');
     }
     if ((user?.role as string) === 'KITCHEN') {
-      const allowed = ['/pos', '/shift', '/production', '/menu-view', '/staff', '/logbook'];
+      const allowed = ['/pos', '/shift', '/production', '/menu-view', '/staff', '/logbook', '/expenses-input'];
       if (!allowed.some(p => pathname.startsWith(p))) router.replace('/production');
+    }
+    // Enforce DB permissions for configurable roles
+    if (!['SUPER_ADMIN','OWNER'].includes(user?.role || '') && Object.keys(rolePerms).length > 0) {
+      const isDisabled = rolePerms[pathname] === false;
+      if (isDisabled) router.replace(ROLE_HOME[user?.role as Role] ?? '/pos');
     }
   }, [user, router, pathname]);
 
@@ -137,13 +191,17 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   if (!user) return null;
 
   const role   = user.role as Role;
-  const groups = getGroups(role);
+  const groups = getGroups(role, rolePerms);
   const pageLabel = pathname.split('/').filter(Boolean).pop()?.replace(/-/g, ' ') || 'Dashboard';
 
   function Sidebar({ onNav }: { onNav?: () => void }) {
     const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
       const init: Record<string, boolean> = {};
-      NAV_GROUPS.forEach(g => { init[g.section] = g.defaultOpen !== false; });
+      NAV_GROUPS.forEach(g => {
+        const def = g.defaultOpen;
+        init[g.section] = typeof def === 'function' ? def(role) : (def !== false);
+      });
+      // Always open section containing current active path
       NAV_GROUPS.forEach(g => {
         if (g.items.some(i => pathname === i.href || pathname.startsWith(i.href + '/'))) {
           init[g.section] = true;
