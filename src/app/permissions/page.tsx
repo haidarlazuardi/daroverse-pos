@@ -23,17 +23,12 @@ export default function PermissionsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, f] = await Promise.all([
+      const [permsData, featData] = await Promise.all([
         api.get<Record<string, Record<string, boolean>>>('/api/role-permissions'),
-        fetch('/api/role-permissions').then(r => r.json()).then(d => d.data),
+        api.get<{ features: any[] }>('/api/role-permissions/features'),
       ]);
-      setPerms(p);
-      // Get feature list from API
-      const res = await fetch('/api/role-permissions/features');
-      if (res.ok) {
-        const data = await res.json();
-        setFeatures(data.features || []);
-      }
+      setPerms(permsData);
+      setFeatures(featData.features || []);
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, []);
