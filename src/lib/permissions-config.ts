@@ -23,7 +23,7 @@ export const FEATURES = [
   { href: '/assets',          label: 'Aset',              section: 'Laporan' },
 ];
 
-export const CONFIGURABLE_ROLES = ['MANAGER', 'CASHIER', 'KITCHEN'] as const;
+export const CONFIGURABLE_ROLES = ['MANAGER', 'CASHIER', 'STAFF'] as const;
 
 export const ROLE_DEFAULTS: Record<string, Record<string, boolean>> = {
   MANAGER: {
@@ -40,7 +40,7 @@ export const ROLE_DEFAULTS: Record<string, Record<string, boolean>> = {
     '/products': false, '/categories': false, '/discounts': false, '/customers': false,
     '/expenses': false, '/analytics': false, '/reports': false, '/void': false, '/assets': false,
   },
-  KITCHEN: {
+  STAFF: {
     '/pos': true, '/shift': true, '/logbook': true, '/staff': true, '/expenses-input': true,
     '/production': true, '/menu-view': true, '/inventory': false, '/bahan-baku': false,
     '/transfers': false, '/stock-opname': false, '/purchase-orders': false, '/suppliers': false,

@@ -45,7 +45,7 @@ export async function getCashierPermissions(): Promise<Record<string, boolean>> 
 // INVENTORY and KITCHEN also allowed for stock operations.
 export async function ensureCan(user: TokenPayload, feature: string): Promise<string | null> {
   if (ADMIN_ROLES.includes(user.role as any)) return null;
-  if (['INVENTORY', 'KITCHEN'].includes(user.role)) return null; // label roles always have full op access
+  if (user.role === 'STAFF') return null; // label roles always have full op access
   if (LOCKED_FEATURES.includes(feature)) return 'Fitur ini khusus admin.';
   const perms = await getCashierPermissions();
   return perms[feature] ? null : 'Kamu belum diberi akses untuk ini. Minta admin mengaktifkan di Hak Akses.';

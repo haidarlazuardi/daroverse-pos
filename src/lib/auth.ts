@@ -4,36 +4,36 @@ import { NextRequest } from 'next/server';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'daroverse-fallback-secret';
 
-export type Role = 'SUPER_ADMIN' | 'OWNER' | 'MANAGER' | 'CASHIER' | 'KITCHEN';
+export type Role = 'SUPER_ADMIN' | 'OWNER' | 'MANAGER' | 'STAFF' | 'CASHIER';
 
 export const ADMIN_ROLES: Role[]   = ['SUPER_ADMIN', 'OWNER', 'MANAGER'];
 export const SENIOR_ROLES: Role[]  = ['SUPER_ADMIN', 'OWNER'];
-export const ALL_ROLES: Role[]     = ['SUPER_ADMIN', 'OWNER', 'MANAGER', 'CASHIER', 'KITCHEN'];
+export const ALL_ROLES: Role[]     = ['SUPER_ADMIN', 'OWNER', 'MANAGER', 'STAFF', 'CASHIER'];
 export const STOCK_ROLES: Role[]   = ['SUPER_ADMIN', 'OWNER', 'MANAGER'];
-export const KITCHEN_ROLES: Role[] = ['SUPER_ADMIN', 'OWNER', 'MANAGER', 'KITCHEN'];
 export const CASHIER_ALL: Role[]   = ['SUPER_ADMIN', 'OWNER', 'MANAGER', 'CASHIER'];
+export const STAFF_ROLES: Role[]   = ['SUPER_ADMIN', 'OWNER', 'MANAGER', 'STAFF', 'CASHIER'];
 
 export const ROLE_LABELS: Record<Role, string> = {
   SUPER_ADMIN: 'Super Admin',
-  OWNER: 'Owner',
-  MANAGER: 'Manager',
-  CASHIER: 'Kasir',
-  KITCHEN: 'Dapur',
+  OWNER:       'Owner',
+  MANAGER:     'Manager',
+  STAFF:       'Staff',
+  CASHIER:     'Kasir',
 };
 
 export const ROLE_HOME: Record<Role, string> = {
   SUPER_ADMIN: '/dashboard',
-  OWNER: '/dashboard',
-  MANAGER: '/dashboard',
-  CASHIER: '/pos',
-  KITCHEN: '/production',
+  OWNER:       '/dashboard',
+  MANAGER:     '/dashboard',
+  STAFF:       '/staff',
+  CASHIER:     '/pos',
 };
 
 export interface TokenPayload {
   userId: string;
-  email: string;
-  role: Role;
-  name: string;
+  email:  string;
+  role:   Role;
+  name:   string;
 }
 
 export async function hashPassword(password: string): Promise<string> {

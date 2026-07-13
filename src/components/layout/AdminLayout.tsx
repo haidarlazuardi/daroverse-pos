@@ -3,14 +3,14 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store';
-import { ADMIN_ROLES, KITCHEN_ROLES, STOCK_ROLES, SENIOR_ROLES, CASHIER_ALL, ROLE_LABELS, ROLE_HOME, type Role } from '@/lib/auth';
+import { ADMIN_ROLES, STAFF_ROLES, STOCK_ROLES, SENIOR_ROLES, CASHIER_ALL, ROLE_LABELS, ROLE_HOME, type Role } from '@/lib/auth';
 import { LogbookBar } from '@/components/ui/LogbookBar';
 import clsx from 'clsx';
 
 type NavItem  = { href: string; label: string; icon: string; allow: Role[] | 'all' };
 type NavGroup = { section: string; allow: Role[] | 'all'; defaultOpen?: boolean | ((role: Role) => boolean); items: NavItem[] };
 
-const ALL_ROLES: Role[] = ['SUPER_ADMIN','OWNER','MANAGER','CASHIER','KITCHEN'];
+const ALL_ROLES: Role[] = ['SUPER_ADMIN','OWNER','MANAGER','CASHIER','STAFF'];
 
 const NAV_GROUPS: NavGroup[] = [
   // ── Semua role ──────────────────────────────────────────────────────────
@@ -30,20 +30,20 @@ const NAV_GROUPS: NavGroup[] = [
   ]},
 
   // ── Kasir only ──────────────────────────────────────────────────────────
-  { section: 'Kasir', allow: ['CASHIER','KITCHEN'] as Role[],
+  { section: 'Kasir', allow: ['CASHIER','STAFF'] as Role[],
     defaultOpen: () => true,
     items: [
-    { href: '/expenses-input', label: 'Input Pengeluaran', allow: ['CASHIER','KITCHEN'] as Role[],
+    { href: '/expenses-input', label: 'Input Pengeluaran', allow: ['CASHIER','STAFF'] as Role[],
       icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z' },
   ]},
 
   // ── Dapur & Stok (KITCHEN + MANAGER) ───────────────────────────────────
-  { section: 'Dapur & Stok', allow: KITCHEN_ROLES,
-    defaultOpen: (role) => role === 'KITCHEN', // open untuk kitchen, collapsed untuk manager
+  { section: 'Dapur & Stok', allow: STAFF_ROLES,
+    defaultOpen: (role) => role === 'STAFF', // open untuk kitchen, collapsed untuk manager
     items: [
-    { href: '/production', label: 'Produksi', allow: KITCHEN_ROLES,
+    { href: '/production', label: 'Produksi', allow: STAFF_ROLES,
       icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
-    { href: '/menu-view', label: 'Menu & Resep', allow: KITCHEN_ROLES,
+    { href: '/menu-view', label: 'Menu & Resep', allow: STAFF_ROLES,
       icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
     { href: '/inventory', label: 'Stok & Bahan', allow: STOCK_ROLES,
       icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' },
@@ -176,7 +176,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       const allowed = ['/pos', '/shift', '/expenses-input', '/staff', '/logbook'];
       if (!allowed.some(p => pathname.startsWith(p))) router.replace('/pos');
     }
-    if ((user?.role as string) === 'KITCHEN') {
+    if ((user?.role as string) === 'STAFF') {
       const allowed = ['/pos', '/shift', '/production', '/menu-view', '/staff', '/logbook', '/expenses-input'];
       if (!allowed.some(p => pathname.startsWith(p))) router.replace('/production');
     }

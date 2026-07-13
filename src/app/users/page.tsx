@@ -13,7 +13,7 @@ interface User { id: string; name: string; email: string; role: string; active: 
 
 const ROLES = [
   { value:'CASHIER',     label:'Kasir' },
-  { value:'KITCHEN',     label:'Dapur' },
+  { value:'STAFF',    label:'Staff' },
   { value:'INVENTORY',   label:'Inventory' },
   { value:'MANAGER',     label:'Manager' },
   { value:'OWNER',       label:'Owner' },
@@ -157,7 +157,7 @@ export default function UsersPage() {
             </select>
             <p className="text-xs text-gray-400 mt-1">
               {form.role === 'CASHIER' ? 'Hanya bisa akses POS' :
-               form.role === 'KITCHEN' ? 'Akses POS + Produksi' :
+               form.role === 'STAFF' ? 'Akses Staff Hub + Logbook' :
                form.role === 'INVENTORY' ? 'Akses POS + Stok & Transfer' :
                form.role === 'MANAGER' ? 'Semua akses kecuali Settings' :
                'Akses penuh ke semua fitur'}

@@ -8,7 +8,7 @@ import clsx from 'clsx';
 const ROLES = [
   { key: 'MANAGER', label: 'Manager', color: '#2D6A4F' },
   { key: 'CASHIER', label: 'Kasir',   color: '#1D3557' },
-  { key: 'KITCHEN', label: 'Dapur',   color: '#7B2D8B' },
+  { key: 'STAFF', label: 'Staff',   color: '#7B2D8B' },
 ];
 
 const SECTIONS = ['Operasional','Dapur & Stok','Purchasing','Manajemen','Laporan'];

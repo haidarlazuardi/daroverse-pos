@@ -15,8 +15,8 @@ enum Role {
   SUPER_ADMIN
   OWNER
   MANAGER
-  CASHIER
-  KITCHEN
+  STAFF    // Bar/Kitchen — default no POS, configurable via permissions
+  CASHIER  // Kasir — default ada POS
 }
 
 // 3 stock locations within the single business.
