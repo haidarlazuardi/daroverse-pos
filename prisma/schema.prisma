@@ -521,6 +521,9 @@ model Order {
   refundedAt   DateTime?
   refundReason String?
   refundBy     String?
+  // ── Serve tracking ──
+  servedAt     DateTime? // null = belum diserahkan ke customer
+  servedBy     String?   // userId
   // ── Void fields ──
   voidedAt     DateTime?
   voidedBy     String?   // userId

@@ -120,9 +120,10 @@ export async function GET(req: NextRequest) {
 
   const where: any = {};
   if (status) where.status = status as any;
-  // Queue mode: exclude orders already served
+  // Queue mode: COMPLETED orders not yet served to customer
   if (searchParams.get('queue') === 'true') {
-    where.notes = { not: { contains: '[SERVED]' } };
+    where.status = 'COMPLETED';
+    where.servedAt = null;
   }
   if (shiftId) where.shiftId = shiftId;
   if (!ADMIN_ROLES.includes(user.role)) where.userId = user.userId;
@@ -440,11 +441,11 @@ export async function PATCH(req: NextRequest) {
     }
 
     // ── Close an open bill (payment + loyalty; stock already deducted) ──
-    // Mark as served (handed to customer) — for queue management
+    // Mark as served (handed to customer)
     if (action === 'complete_serve') {
-      await prisma.order.update({
+      await (prisma.order as any).update({
         where: { id: order.id },
-        data: { notes: (order.notes ? order.notes + ' ' : '') + '[SERVED]' },
+        data: { servedAt: new Date(), servedBy: user.userId },
       });
       return success({ served: true });
     }

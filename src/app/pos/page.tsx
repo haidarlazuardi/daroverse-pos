@@ -182,7 +182,7 @@ export default function POSPage() {
   useEffect(() => {
     async function loadQueue() {
       try {
-        const res = await api.get<any>('/api/orders?status=OPEN&queue=true&limit=20');
+        const res = await api.get<any>('/api/orders?queue=true&limit=30');
         const orders = res.orders || [];
         setQueueOrders(orders);
         setQueueCount(orders.length);
