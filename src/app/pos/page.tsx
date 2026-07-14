@@ -174,6 +174,24 @@ export default function POSPage() {
   const [submitting, setSubmitting] = useState(false);
   const [lastOrder, setLastOrder] = useState<any>(null);
   const [showCart, setShowCart] = useState(false);
+  const [rightTab, setRightTab] = useState<'cart'|'queue'>('cart');
+  const [queueOrders, setQueueOrders] = useState<any[]>([]);
+  const [queueCount, setQueueCount] = useState(0);
+
+  // Poll active orders for queue
+  useEffect(() => {
+    async function loadQueue() {
+      try {
+        const res = await api.get<any>('/api/orders?status=OPEN&queue=true&limit=20');
+        const orders = res.orders || [];
+        setQueueOrders(orders);
+        setQueueCount(orders.length);
+      } catch { /* silent */ }
+    }
+    loadQueue();
+    const t = setInterval(loadQueue, 30000);
+    return () => clearInterval(t);
+  }, []);
   const [selectedDiscount, setSelectedDiscount] = useState('');
   const [editLine, setEditLine] = useState<CartLine | null>(null);
   const [config, setConfig] = useState<{ product: Product; modifiers: SelectedModifier[] } | null>(null);
@@ -486,20 +504,95 @@ export default function POSPage() {
         </div>
       </div>
 
-      {/* RIGHT: cart */}
+      {/* RIGHT: cart + queue */}
       <div className={clsx('bg-white border-l border-gray-200 flex flex-col h-screen', 'max-lg:fixed max-lg:inset-0 max-lg:z-50 max-lg:transition-transform max-lg:duration-300', showCart ? 'max-lg:translate-x-0' : 'max-lg:translate-x-full')}>
-        <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-          <h2 className="font-bold text-gray-900">{step === 'cart' ? (activeBill ? `Tambah ke: ${activeBill.name}` : 'Pesanan') : step === 'payment' ? 'Pembayaran' : 'Struk'}</h2>
-          <div className="flex items-center gap-2">
-            {step === 'payment' && <button onClick={() => setStep('cart')} className="text-sm text-gray-500 hover:text-gray-700">← Kembali</button>}
-            {activeBill && step === 'cart' && <button onClick={() => { setActiveBill(null); cart.clear(); }} className="text-sm text-gray-500">Batal</button>}
-            <button onClick={() => setShowCart(false)} className="lg:hidden p-1.5 hover:bg-gray-100 rounded-lg">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-            </button>
-          </div>
+        <div className="px-4 py-3 border-b border-gray-200 flex-shrink-0">
+          {/* Tab toggle — only show in cart step */}
+          {step === 'cart' ? (
+            <div className="flex items-center gap-2">
+              <div className="flex flex-1 bg-gray-100 rounded-xl p-1">
+                <button onClick={() => setRightTab('cart')}
+                  className={clsx('flex-1 py-1.5 text-sm font-semibold rounded-lg transition-all', rightTab === 'cart' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
+                  {activeBill ? `Bill: ${activeBill.name}` : 'Pesanan'}
+                </button>
+                <button onClick={() => setRightTab('queue')}
+                  className={clsx('flex-1 py-1.5 text-sm font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5', rightTab === 'queue' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500')}>
+                  Queue
+                  {queueCount > 0 && (
+                    <span className={clsx('min-w-[18px] h-[18px] rounded-full text-xs font-black text-white flex items-center justify-center px-1', rightTab === 'queue' ? 'bg-brand-600' : 'bg-red-500')}>
+                      {queueCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+              <div className="flex items-center gap-1">
+                {activeBill && <button onClick={() => { setActiveBill(null); cart.clear(); }} className="text-sm text-gray-500">Batal</button>}
+                <button onClick={() => setShowCart(false)} className="lg:hidden p-1.5 hover:bg-gray-100 rounded-lg">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <h2 className="font-bold text-gray-900">{step === 'payment' ? 'Pembayaran' : 'Struk'}</h2>
+              <div className="flex items-center gap-2">
+                {step === 'payment' && <button onClick={() => setStep('cart')} className="text-sm text-gray-500 hover:text-gray-700">← Kembali</button>}
+                <button onClick={() => setShowCart(false)} className="lg:hidden p-1.5 hover:bg-gray-100 rounded-lg">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {step === 'cart' && (<>
+        {/* QUEUE TAB */}
+        {step === 'cart' && rightTab === 'queue' && (
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {queueOrders.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center py-16">
+                <p className="text-3xl mb-3">✅</p>
+                <p className="font-semibold text-gray-600">Semua pesanan selesai</p>
+                <p className="text-sm text-gray-400 mt-1">Tidak ada pesanan aktif</p>
+              </div>
+            ) : (
+              queueOrders.map(o => (
+                <div key={o.id} className="bg-white border-2 border-gray-100 rounded-xl p-3 hover:border-brand-200 transition-colors">
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <p className="font-bold text-sm" style={{ color: 'var(--text-1)' }}>{o.orderNumber}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {new Date(o.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                        {o.type === 'TAKEAWAY' && <span className="ml-1.5 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">Take Away</span>}
+                      </p>
+                    </div>
+                    <p className="font-bold text-sm" style={{ color: 'var(--brand)' }}>{formatCurrency(o.total)}</p>
+                  </div>
+                  <div className="space-y-0.5 mb-3">
+                    {(o.items || []).map((item: any, i: number) => (
+                      <p key={i} className="text-xs text-gray-600">
+                        • {item.product?.name} <span className="font-semibold">×{item.quantity}</span>
+                      </p>
+                    ))}
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        await api.patch('/api/orders', { id: o.id, action: 'complete_serve' });
+                        setQueueOrders(p => p.filter(x => x.id !== o.id));
+                        setQueueCount(p => Math.max(0, p - 1));
+                      } catch (e: any) { alert(e.message || 'Gagal'); }
+                    }}
+                    className="w-full py-2 rounded-xl text-sm font-bold text-white transition-all active:scale-95"
+                    style={{ background: 'var(--brand)' }}>
+                    ✓ Pesanan Diserahkan
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {step === 'cart' && rightTab === 'cart' && (<>
           <div className="px-4 pt-3 flex-shrink-0">
             <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
               {(['DINE_IN', 'TAKEAWAY'] as const).map((t) => (

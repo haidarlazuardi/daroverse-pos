@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.daroverse_pos.twa",
+        "sha256_cert_fingerprints": ["D3:53:2F:3F:3F:C6:BF:AC:4D:B5:32:71:B2:99:FE:F5:23:C1:05:65:F6:9B:01:93:A1:EC:6A:DE:42:F6:57:F7"]
+      }
+    }]
