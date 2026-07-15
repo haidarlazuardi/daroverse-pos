@@ -196,34 +196,37 @@ function QueueCard({ order: o, onServed }: { order: any; onServed: () => void })
         onTouchEnd={() => { if (tx >= 80) serve(); else setTx(0); }}>
 
         {/* Header — always visible, tap to expand */}
-        <button onClick={() => setExpanded(p => !p)}
-          className="w-full flex items-center gap-2 px-3 py-2.5 text-left group">
-          <span className="font-black text-xs flex-shrink-0" style={{ color: 'var(--brand)' }}>
-            #{o.orderNumber?.slice(-4)}
-          </span>
-          <span className="text-sm font-medium truncate flex-1" style={{ color: 'var(--text-1)' }}>
-            {name ?? <span className="text-gray-400 italic text-xs">Tanpa nama</span>}
-          </span>
-          <span className="text-xs text-gray-400 flex-shrink-0">{count} item</span>
-          {urgent && <span className="text-xs font-bold text-red-500 flex-shrink-0">⏰{elapsed}m</span>}
-          {o.orderType === 'TAKEAWAY' && (
-            <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold flex-shrink-0">TA</span>
-          )}
-          {/* Desktop: check button on hover */}
-          <button
-            onClick={e => { e.stopPropagation(); serve(); }}
-            disabled={serving}
-            className="hidden group-hover:flex items-center justify-center w-6 h-6 rounded-full text-white flex-shrink-0 transition-all hover:scale-110 disabled:opacity-50"
-            style={{ background: 'var(--brand)' }}
-            title="Selesaikan pesanan">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <div className="w-full flex items-center gap-2 px-3 py-2.5">
+          {/* Expand toggle */}
+          <button onClick={() => setExpanded(p => !p)} className="flex items-center gap-2 flex-1 min-w-0 text-left">
+            <span className="font-black text-xs flex-shrink-0" style={{ color: 'var(--brand)' }}>
+              #{o.orderNumber?.slice(-4)}
+            </span>
+            <span className="text-sm font-medium truncate flex-1" style={{ color: 'var(--text-1)' }}>
+              {name ?? <span className="text-gray-400 italic text-xs">Tanpa nama</span>}
+            </span>
+            <span className="text-xs text-gray-400 flex-shrink-0">{count} item</span>
+            {urgent && <span className="text-xs font-bold text-red-500 flex-shrink-0">⏰{elapsed}m</span>}
+            {o.orderType === 'TAKEAWAY' && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold flex-shrink-0">TA</span>
+            )}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+              className={`flex-shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
+              style={{ color: 'var(--text-3)' }}>
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
           </button>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-            className={`flex-shrink-0 transition-transform group-hover:hidden ${expanded ? 'rotate-180' : ''}`}
-            style={{ color: 'var(--text-3)' }}>
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-        </button>
+          {/* Done button — always visible */}
+          <button onClick={serve} disabled={serving}
+            className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-white transition-all active:scale-95 disabled:opacity-50"
+            style={{ background: 'var(--brand)' }}
+            title="Selesai">
+            {serving
+              ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"/>
+              : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+            }
+          </button>
+        </div>
 
         {/* Expanded items */}
         {expanded && (
