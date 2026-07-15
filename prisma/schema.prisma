@@ -866,3 +866,39 @@ model RolePermission {
   @@unique([role, feature])
   @@map("role_permissions")
 }
+
+// ═══════════════════════════════════════════════════════
+//  MONTHLY TARGET & INVENTORY SNAPSHOT (v4)
+// ═══════════════════════════════════════════════════════
+
+model MonthlyTarget {
+  id                  String   @id @default(cuid())
+  year                Int
+  month               Int      // 1-12
+  revenueTarget       Float    // target revenue bulanan
+  ordersPerDay        Int      // target order per hari
+  grossMarginPct      Float    // target gross margin % (0-100)
+  maxExpense          Float    // batas maks pengeluaran bulanan
+  maxInventoryValue   Float    // batas maks nilai bahan baku
+  notes               String?
+  createdBy           String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([year, month])
+  @@map("monthly_targets")
+}
+
+model InventorySnapshot {
+  id            String   @id @default(cuid())
+  year          Int
+  month         Int      // bulan yang di-snapshot (bukan bulan saat snapshot)
+  snapshotDate  DateTime @default(now())
+  totalValue    Float    // total nilai semua stok
+  items         Json     // [{ingredientId, name, unit, qty, latestPrice, totalValue}]
+  createdBy     String
+  createdAt     DateTime @default(now())
+
+  @@unique([year, month])
+  @@map("inventory_snapshots")
+}

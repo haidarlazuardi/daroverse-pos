@@ -1,702 +1,498 @@
 'use client';
-
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
-import { Badge, Button, Modal, formatCurrency, formatNumber } from '@/components/ui';
 import { api } from '@/lib/fetch';
-import clsx from 'clsx';
-import * as XLSX from 'xlsx';
+import { formatCurrency, Button, Modal } from '@/components/ui';
+import { useAuthStore } from '@/store';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type ReportTab = 'summary' | 'daily' | 'monthly' | 'ytd' | 'category' | 'product' | 'payment' | 'expenses' | 'transactions';
-
-// ─── Tab config ───────────────────────────────────────────────────────────────
-
-const TABS: { key: ReportTab; label: string }[] = [
-  { key: 'summary',      label: 'Ringkasan'   },
-  { key: 'daily',        label: 'Harian'      },
-  { key: 'monthly',      label: 'Bulanan'     },
-  { key: 'ytd',          label: 'Tahunan'     },
-  { key: 'category',     label: 'Kategori'    },
-  { key: 'product',      label: 'Produk'      },
-  { key: 'payment',      label: 'Pembayaran'  },
-  { key: 'expenses',     label: 'Pengeluaran' },
-  { key: 'transactions', label: 'Transaksi'   },
-];
-
-// ─── Date presets ─────────────────────────────────────────────────────────────
-
-const PRESETS = [
-  { label: 'Hari ini',  days: 0  },
-  { label: 'Kemarin',   days: 1  },
-  { label: '7 hari',    days: 7  },
-  { label: 'Bulan ini', days: -1 }, // special case
-  { label: '30 hari',   days: 30 },
-];
-
-function getPreset(days: number): { from: string; to: string } {
-  const today = new Date();
-  const fmt   = (d: Date) => d.toISOString().slice(0, 10);
-  const to    = fmt(today);
-  if (days === 0) return { from: to, to };
-  if (days === 1) { const y = fmt(new Date(today.getTime() - 864e5)); return { from: y, to: y }; }
-  if (days === -1) { // bulan ini
-    const from = fmt(new Date(today.getFullYear(), today.getMonth(), 1));
-    return { from, to };
-  }
-  return { from: fmt(new Date(today.getTime() - days * 864e5)), to };
-}
-
-// ─── Style B — Clean dark accent helpers ─────────────────────────────────────
-
-function SectionHeader({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-xl px-4 py-3 mb-3" style={{background:"var(--brand)",color:"#fff"}}>
-      <h2 className="text-sm font-semibold tracking-wide">{children}</h2>
-    </div>
-  );
-}
-
-function MetricCard({ label, value, sub, highlight = false, variant = 'default' }: {
-  label: string; value: string; sub?: string;
-  highlight?: boolean;
-  variant?: 'default' | 'positive' | 'negative' | 'warning';
-}) {
-  const valueColor = variant === 'positive' ? 'text-emerald-600'
-    : variant === 'negative' ? 'text-red-600'
-    : variant === 'warning'  ? 'text-amber-600'
-    : 'text-gray-900';
-  return (
-    <div className={clsx('rounded-xl border p-4 bg-white', highlight ? 'border-gray-900 shadow-md' : 'border-gray-200 shadow-sm')}>
-      <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">{label}</p>
-      <p className={clsx('text-xl sm:text-2xl font-black mt-1 leading-none', valueColor)}>{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
-    </div>
-  );
-}
-
-function TableWrapper({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">{children}</table>
-      </div>
-    </div>
-  );
-}
-
-function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
-  return (
-    <th className={clsx('px-4 py-3 text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 border-b border-gray-100', right ? 'text-right' : 'text-left')}>
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, right, bold, muted, color }: { children: React.ReactNode; right?: boolean; bold?: boolean; muted?: boolean; color?: string }) {
-  return (
-    <td className={clsx('px-4 py-3 border-b border-gray-100 align-middle', right && 'text-right', bold && 'font-bold', muted && 'text-gray-400', color)}>
-      {children}
-    </td>
-  );
-}
-
-function MarginBadge({ margin }: { margin: number }) {
-  const variant = margin >= 50 ? 'bg-emerald-100 text-emerald-700'
-    : margin >= 30 ? 'bg-amber-100 text-amber-700'
-    : 'bg-red-100 text-red-700';
-  return <span className={clsx('text-xs font-bold px-2 py-0.5 rounded-full', variant)}>{margin.toFixed(0)}%</span>;
-}
-
-// ─── Mini bar chart ───────────────────────────────────────────────────────────
-
-function MiniBar({ value, max, color = 'bg-brand-500' }: { value: number; max: number; color?: string }) {
-  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
-  return (
-    <div className="w-20 bg-gray-100 rounded-full h-1.5 hidden sm:block">
-      <div
-        className="h-1.5 rounded-full transition-all"
-        style={{ background: color, width: `${pct}%` }}
-      />
-    </div>
-  );
-}
-
-// ─── Main page ────────────────────────────────────────────────────────────────
+const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
 export default function ReportsPage() {
+  const { user } = useAuthStore();
   const now = new Date();
-  const [tab, setTab]           = useState<ReportTab>('summary');
-  const [data, setData]         = useState<any>(null);
-  const [loading, setLoading]   = useState(true);
-  const [txData, setTxData]     = useState<any>(null);
-  const [txDetail, setTxDetail] = useState<any>(null);
-  const [fromDate, setFromDate] = useState(() => getPreset(0).from);
-  const [toDate, setToDate]     = useState(() => getPreset(0).to);
-  const [year, setYear]         = useState(String(now.getFullYear()));
-  const cacheRef = useRef<Map<string, any>>(new Map());
+  const [tab, setTab]             = useState<'ringkasan'|'bahan_baku'|'target'>('ringkasan');
+  const [period, setPeriod]       = useState<'weekly'|'monthly'>('monthly');
+  const [selMonth, setSelMonth]   = useState(now.getMonth() + 1);
+  const [selYear, setSelYear]     = useState(now.getFullYear());
+  const [summary, setSummary]     = useState<any>(null);
+  const [bahan, setBahan]         = useState<any>(null);
+  const [target, setTarget]       = useState<any>(null);
+  const [loading, setLoading]     = useState(false);
+  const [targetModal, setTargetModal] = useState(false);
+  const [tutupModal, setTutupModal]   = useState(false);
+  const [snapshotting, setSnapshotting] = useState(false);
+  const [targetForm, setTargetForm] = useState({
+    revenueTarget: '', ordersPerDay: '', grossMarginPct: '', maxExpense: '', maxInventoryValue: '', notes: ''
+  });
 
-  const cacheKey = `${tab}-${fromDate}-${toDate}-${year}`;
+  useEffect(() => {
+    loadData();
+  }, [selMonth, selYear, period]);
 
-  const loadData = useCallback(async () => {
-    // Check cache first for instant render
-    if (cacheRef.current.has(cacheKey)) {
-      setData(cacheRef.current.get(cacheKey));
-      setLoading(false);
-      return;
-    }
+  async function loadData() {
     setLoading(true);
+    const daysInMonth = new Date(selYear, selMonth, 0).getDate();
+    const from = period === 'monthly'
+      ? `${selYear}-${String(selMonth).padStart(2,'0')}-01`
+      : (() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0,10); })();
+    const to = period === 'monthly'
+      ? `${selYear}-${String(selMonth).padStart(2,'0')}-${daysInMonth}`
+      : new Date().toISOString().slice(0,10);
+
     try {
-      if (tab === 'transactions') {
-        const res = await api.get<any>(`/api/orders?from=${fromDate}&to=${toDate}&limit=200`);
-        setTxData(res);
-        setData(null);
-      } else {
-        let params = `type=${tab}`;
-        if (tab === 'ytd' || tab === 'monthly') params += `&year=${year}`;
-        else params += `&from=${fromDate}&to=${toDate}`;
-        const res = await api.get<any>(`/api/reports?${params}`);
-        cacheRef.current.set(cacheKey, res); // cache it
-        setData(res);
-      }
-    } catch (e) { console.error(e); }
+      const [sum, tgt, snap] = await Promise.all([
+        api.get<any>(`/api/analytics?type=summary&from=${from}&to=${to}`),
+        api.get<any>(`/api/monthly-targets?year=${selYear}&month=${selMonth}`),
+        api.get<any>(`/api/inventory-snapshot?year=${selYear}&month=${selMonth}`),
+      ]);
+      setSummary(sum);
+      setTarget(tgt);
+      if (tgt) setTargetForm({
+        revenueTarget: String(tgt.revenueTarget),
+        ordersPerDay: String(tgt.ordersPerDay),
+        grossMarginPct: String(tgt.grossMarginPct),
+        maxExpense: String(tgt.maxExpense),
+        maxInventoryValue: String(tgt.maxInventoryValue),
+        notes: tgt.notes || '',
+      });
+
+      // Bahan baku report
+      const [rawSnap, orders, pos] = await Promise.all([
+        api.get<any[]>('/api/ingredients?active=true'),
+        api.get<any>(`/api/analytics?type=summary&from=${from}&to=${to}`),
+        api.get<any[]>(`/api/purchase-orders?status=COMPLETED&from=${from}&to=${to}`),
+      ]);
+
+      const currentValue = (rawSnap || []).reduce((s: number, ing: any) => {
+        const qty = (ing.stockLevels || []).reduce((q: number, sl: any) => q + sl.quantity, 0);
+        return s + qty * ing.latestPrice;
+      }, 0);
+
+      const purchaseValue = (pos || []).reduce((s: number, p: any) => s + p.totalAmount, 0);
+      const prevSnap = snap;
+
+      setBahan({
+        currentValue: Math.round(currentValue),
+        cogs: sum?.cogs || 0,
+        purchaseValue: Math.round(purchaseValue),
+        prevSnapshotValue: prevSnap?.totalValue || 0,
+        shrinkage: prevSnap ? Math.round((prevSnap.totalValue + purchaseValue - (sum?.cogs || 0)) - currentValue) : null,
+        snapshotDate: prevSnap?.snapshotDate,
+      });
+    } catch { /* silent */ }
     finally { setLoading(false); }
-  }, [tab, fromDate, toDate, year, cacheKey]);
-
-  useEffect(() => { loadData(); }, [loadData]);
-
-  function applyPreset(days: number) {
-    const { from, to } = getPreset(days);
-    setFromDate(from); setToDate(to);
-    cacheRef.current.clear(); // invalidate cache on date change
   }
 
-  function exportToExcel() {
-    if (!data) return;
-    let rows: any[] = [];
-    const sheet = tab;
-    if (tab === 'daily' && data.daily) rows = data.daily;
-    else if (tab === 'category' && data.byCategory) rows = data.byCategory;
-    else if (tab === 'product' && data.products) rows = data.products;
-    else if (tab === 'payment' && data.byPayment) rows = data.byPayment;
-    else if (tab === 'monthly' && data.monthly) rows = data.monthly;
-    else if (tab === 'expenses') rows = [...(data.expenses||[]), ...(data.purchases||[])];
-    if (!rows.length) return;
-    const ws = XLSX.utils.json_to_sheet(rows.map(r => {
-      const clean: any = {};
-      for (const [k, v] of Object.entries(r)) {
-        if (typeof v !== 'object' || v === null) clean[k] = v;
-      }
-      return clean;
-    }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, sheet);
-    XLSX.writeFile(wb, `soeka-${sheet}-${fromDate}.xlsx`);
+  async function saveTarget() {
+    try {
+      await api.post('/api/monthly-targets', {
+        year: selYear, month: selMonth,
+        revenueTarget:     parseFloat(targetForm.revenueTarget),
+        ordersPerDay:      parseInt(targetForm.ordersPerDay),
+        grossMarginPct:    parseFloat(targetForm.grossMarginPct),
+        maxExpense:        parseFloat(targetForm.maxExpense),
+        maxInventoryValue: parseFloat(targetForm.maxInventoryValue),
+        notes: targetForm.notes,
+      });
+      setTargetModal(false);
+      loadData();
+    } catch (e: any) { alert(e.message || 'Gagal'); }
   }
 
-  const s = data?.summary;
+  async function tutupBulan() {
+    setSnapshotting(true);
+    try {
+      await api.post('/api/inventory-snapshot', { year: selYear, month: selMonth });
+      alert('✅ Snapshot stok berhasil disimpan. Generating laporan PDF...');
+      // Generate PDF report
+      generatePDF();
+      setTutupModal(false);
+      loadData();
+    } catch (e: any) { alert(e.message || 'Gagal'); }
+    finally { setSnapshotting(false); }
+  }
+
+  function generatePDF() {
+    const daysInMonth = new Date(selYear, selMonth, 0).getDate();
+    const revenue     = summary?.revenue || 0;
+    const cogs        = summary?.cogs    || 0;
+    const grossProfit = summary?.grossProfit || 0;
+    const grossMargin = summary?.grossMargin || 0;
+    const expense     = summary?.expense || 0;
+    const netProfit   = summary?.netProfit || 0;
+    const orders      = summary?.orders  || 0;
+    const avgOrder    = summary?.avgOrder || 0;
+
+    const revTarget  = target?.revenueTarget || 0;
+    const revAchieve = revTarget > 0 ? Math.round((revenue / revTarget) * 100) : null;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>Laporan ${MONTHS[selMonth-1]} ${selYear} — Soeka House</title>
+    <style>
+      * { margin:0; padding:0; box-sizing:border-box; }
+      body { font-family: Arial, sans-serif; font-size: 11px; color: #111; padding: 32px; }
+      .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 3px solid #48654D; }
+      .logo { font-size: 24px; font-weight: 900; color: #48654D; letter-spacing: -1px; }
+      .logo-sub { font-size: 11px; color: #666; margin-top: 2px; }
+      h2 { font-size: 14px; font-weight: 900; color: #48654D; margin: 20px 0 8px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1.5px solid #48654D; padding-bottom: 4px; }
+      .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+      .kpi { background: #F6EDDB; border-radius: 8px; padding: 10px 12px; }
+      .kpi-label { font-size: 9px; font-weight: 700; text-transform: uppercase; color: #666; margin-bottom: 4px; }
+      .kpi-value { font-size: 16px; font-weight: 900; color: #2D4A32; }
+      .kpi-sub { font-size: 9px; color: #888; margin-top: 2px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+      th { background: #48654D; color: #fff; padding: 6px 8px; text-align: left; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+      td { border: 1px solid #ddd; padding: 6px 8px; font-size: 11px; }
+      td.num { text-align: right; font-weight: 600; }
+      td.label { color: #444; }
+      .total-row td { background: #F6EDDB; font-weight: 700; font-size: 12px; }
+      .achieve { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 9px; font-weight: 700; }
+      .achieve-ok  { background: #dcfce7; color: #16a34a; }
+      .achieve-bad { background: #fee2e2; color: #dc2626; }
+      .section { margin-bottom: 20px; }
+      @media print { body { padding: 16px; } }
+    </style></head><body>
+
+    <div class="header">
+      <div>
+        <div class="logo">SOEKA HOUSE</div>
+        <div class="logo-sub">Laporan Bulanan — ${MONTHS[selMonth-1]} ${selYear}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:#666">Digenerate: ${new Date().toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' })}</div>
+        <div style="font-size:11px;color:#666">Periode: 1–${daysInMonth} ${MONTHS[selMonth-1]} ${selYear}</div>
+      </div>
+    </div>
+
+    <!-- KPI Utama -->
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-label">Revenue</div><div class="kpi-value">${formatCurrency(revenue)}</div>${revAchieve !== null ? `<div class="kpi-sub"><span class="achieve ${revAchieve >= 100 ? 'achieve-ok' : 'achieve-bad'}">${revAchieve}% dari target</span></div>` : ''}</div>
+      <div class="kpi"><div class="kpi-label">Gross Profit</div><div class="kpi-value">${formatCurrency(grossProfit)}</div><div class="kpi-sub">Margin ${grossMargin}%</div></div>
+      <div class="kpi"><div class="kpi-label">Net Profit</div><div class="kpi-value">${formatCurrency(netProfit)}</div></div>
+      <div class="kpi"><div class="kpi-label">Total Order</div><div class="kpi-value">${orders.toLocaleString('id-ID')}</div><div class="kpi-sub">Avg ${formatCurrency(avgOrder)}/order</div></div>
+    </div>
+
+    <h2>Profit & Loss</h2>
+    <table>
+      <thead><tr><th>Keterangan</th><th style="text-align:right">Jumlah</th><th style="text-align:right">% Revenue</th></tr></thead>
+      <tbody>
+        <tr><td class="label">Revenue Penjualan</td><td class="num">${formatCurrency(revenue)}</td><td class="num">100%</td></tr>
+        <tr><td class="label">HPP / COGS</td><td class="num" style="color:#dc2626">(${formatCurrency(cogs)})</td><td class="num">${revenue > 0 ? Math.round((cogs/revenue)*100) : 0}%</td></tr>
+        <tr class="total-row"><td>Gross Profit</td><td class="num">${formatCurrency(grossProfit)}</td><td class="num">${grossMargin}%</td></tr>
+        <tr><td class="label">Pengeluaran Operasional</td><td class="num" style="color:#dc2626">(${formatCurrency(expense)})</td><td class="num">${revenue > 0 ? Math.round((expense/revenue)*100) : 0}%</td></tr>
+        <tr class="total-row"><td>Net Profit</td><td class="num" style="color:${netProfit >= 0 ? '#16a34a' : '#dc2626'}">${formatCurrency(netProfit)}</td><td class="num">${revenue > 0 ? Math.round((netProfit/revenue)*100) : 0}%</td></tr>
+      </tbody>
+    </table>
+
+    ${target ? `
+    <h2>Pencapaian vs Target</h2>
+    <table>
+      <thead><tr><th>KPI</th><th style="text-align:right">Target</th><th style="text-align:right">Aktual</th><th style="text-align:right">Pencapaian</th></tr></thead>
+      <tbody>
+        <tr><td>Revenue Bulanan</td><td class="num">${formatCurrency(target.revenueTarget)}</td><td class="num">${formatCurrency(revenue)}</td><td class="num"><span class="achieve ${revenue >= target.revenueTarget ? 'achieve-ok' : 'achieve-bad'}">${revAchieve}%</span></td></tr>
+        <tr><td>Avg Orders/Hari</td><td class="num">${target.ordersPerDay}</td><td class="num">${Math.round(orders/daysInMonth)}</td><td class="num"><span class="achieve ${orders/daysInMonth >= target.ordersPerDay ? 'achieve-ok' : 'achieve-bad'}">${Math.round((orders/daysInMonth/target.ordersPerDay)*100)}%</span></td></tr>
+        <tr><td>Gross Margin</td><td class="num">${target.grossMarginPct}%</td><td class="num">${grossMargin}%</td><td class="num"><span class="achieve ${grossMargin >= target.grossMarginPct ? 'achieve-ok' : 'achieve-bad'}">${grossMargin >= target.grossMarginPct ? '✓' : '✗'}</span></td></tr>
+        <tr><td>Max Pengeluaran</td><td class="num">${formatCurrency(target.maxExpense)}</td><td class="num">${formatCurrency(expense)}</td><td class="num"><span class="achieve ${expense <= target.maxExpense ? 'achieve-ok' : 'achieve-bad'}">${expense <= target.maxExpense ? '✓ Aman' : '✗ Melebihi'}</span></td></tr>
+      </tbody>
+    </table>` : ''}
+
+    ${bahan ? `
+    <h2>Laporan Bahan Baku</h2>
+    <table>
+      <thead><tr><th>Keterangan</th><th style="text-align:right">Nilai</th></tr></thead>
+      <tbody>
+        ${bahan.prevSnapshotValue > 0 ? `<tr><td>Nilai Stok Awal Bulan</td><td class="num">${formatCurrency(bahan.prevSnapshotValue)}</td></tr>` : ''}
+        <tr><td>Total Pembelian (PO)</td><td class="num">${formatCurrency(bahan.purchaseValue)}</td></tr>
+        <tr><td>COGS Terpakai</td><td class="num" style="color:#dc2626">(${formatCurrency(bahan.cogs)})</td></tr>
+        <tr class="total-row"><td>Nilai Stok Akhir (Aktual)</td><td class="num">${formatCurrency(bahan.currentValue)}</td></tr>
+        ${bahan.shrinkage !== null ? `<tr><td style="color:${bahan.shrinkage > 0 ? '#dc2626' : '#16a34a'}">Selisih / Shrinkage</td><td class="num" style="color:${bahan.shrinkage > 0 ? '#dc2626' : '#16a34a'}">${formatCurrency(Math.abs(bahan.shrinkage))} ${bahan.shrinkage > 0 ? '(kehilangan)' : '(surplus)'}</td></tr>` : ''}
+      </tbody>
+    </table>` : ''}
+
+    <div style="margin-top:32px;padding-top:16px;border-top:1px solid #ddd;display:flex;justify-content:space-between">
+      <div style="text-align:center;width:200px">
+        <div style="border-top:1px solid #000;margin-top:50px;padding-top:6px;font-size:9px">Manager</div>
+      </div>
+      <div style="text-align:center;width:200px">
+        <div style="border-top:1px solid #000;margin-top:50px;padding-top:6px;font-size:9px">Owner</div>
+      </div>
+    </div>
+
+    <script>window.print();</script>
+    </body></html>`;
+
+    const w = window.open('', '_blank');
+    if (w) { w.document.write(html); w.document.close(); }
+  }
+
+  const isSenior = ['SUPER_ADMIN','OWNER'].includes(user?.role || '');
 
   return (
     <AdminLayout>
-      <div className="max-w-5xl mx-auto">
-
-        {/* Page header — Style B */}
-        <div className="flex items-start justify-between gap-4 mb-5 flex-wrap">
+      <div className="max-w-4xl mx-auto space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-xl font-black text-gray-900">Laporan</h1>
-            <p className="text-sm text-gray-400 mt-0.5">Performa penjualan & keuangan Soeka House</p>
+            <h1 className="page-title">Laporan</h1>
+            <p className="page-subtitle">Rekap performa & keuangan Soeka House</p>
           </div>
-          <button
-            onClick={exportToExcel}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-colors"
-            style={{ background: "var(--brand)", color: "#fff" }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
-            Export Excel
-          </button>
-        </div>
-
-        {/* Date filter */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 shadow-sm">
-          <div className="flex gap-2 flex-wrap mb-3">
-            {PRESETS.map(p => (
-              <button key={p.label} onClick={() => applyPreset(p.days)}
-                className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:border-gray-900 hover:text-gray-900 transition-colors font-medium">
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            {(tab === 'ytd' || tab === 'monthly') ? (
-              <input type="number" value={year} min="2020" max="2099"
-                onChange={e => { setYear(e.target.value); cacheRef.current.clear(); }}
-                className="input text-sm w-28" placeholder="Tahun" />
-            ) : (
+          <div className="flex gap-2 flex-wrap">
+            {isSenior && (
               <>
-                <input type="date" value={fromDate} onChange={e => { setFromDate(e.target.value); cacheRef.current.clear(); }} className="input text-sm" />
-                <span className="opacity-80">—</span>
-                <input type="date" value={toDate} onChange={e => { setToDate(e.target.value); cacheRef.current.clear(); }} className="input text-sm" />
+                <Button onClick={() => setTargetModal(true)} variant="secondary">
+                  🎯 Set Target {MONTHS[selMonth-1]}
+                </Button>
+                <Button onClick={() => setTutupModal(true)}>
+                  📦 Tutup Bulan
+                </Button>
               </>
             )}
           </div>
         </div>
 
-        {/* Tabs — scrollable */}
-        <div className="flex gap-1 mb-5 overflow-x-auto pb-1">
-          {TABS.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className={clsx(
-                'px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all flex-shrink-0',
-                tab === t.key ? "tab-active" : 'tab-inactive bg-white border border-gray-200'
-              )}>
-              {t.label}
+        {/* Period selector */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+            {(['monthly','weekly'] as const).map(p => (
+              <button key={p} onClick={() => setPeriod(p)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${period === p ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
+                {p === 'monthly' ? 'Bulanan' : 'Mingguan'}
+              </button>
+            ))}
+          </div>
+          {period === 'monthly' && (
+            <>
+              <select value={selMonth} onChange={e => setSelMonth(parseInt(e.target.value))} className="select">
+                {MONTHS.map((m, i) => <option key={i} value={i+1}>{m}</option>)}
+              </select>
+              <select value={selYear} onChange={e => setSelYear(parseInt(e.target.value))} className="select">
+                {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </>
+          )}
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-1 border-b" style={{ borderColor: 'var(--border)' }}>
+          {[['ringkasan','📊 Ringkasan'],['bahan_baku','🥬 Bahan Baku'],['target','🎯 Target']].map(([key, label]) => (
+            <button key={key} onClick={() => setTab(key as any)}
+              className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${tab === key ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              style={tab === key ? { borderColor: 'var(--brand)', color: 'var(--brand)' } : {}}>
+              {label}
             </button>
           ))}
         </div>
 
-        {/* Content */}
         {loading ? (
-          <div className="flex items-center justify-center py-20 gap-3 text-gray-400">
-            <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin" />
-            <span className="text-sm">Memuat data...</span>
+          <div className="flex justify-center py-16">
+            <div className="w-7 h-7 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--brand)', borderTopColor: 'transparent' }} />
           </div>
         ) : (
-          <div className="space-y-5">
-
-            {/* ── SUMMARY ─────────────────────────────────────────────── */}
-            {tab === 'summary' && s && (
-              <>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <MetricCard label="Total Omzet" value={formatCurrency(s.totalRevenue)} highlight />
-                  <MetricCard label="Total Transaksi" value={formatNumber(s.totalTransactions)} sub="order selesai" />
-                  <MetricCard label="Rata-rata/Order" value={formatCurrency(s.avgOrderValue)} />
-                  <MetricCard label="Laba Kotor" value={formatCurrency(s.grossProfit)}
-                    sub={`Margin ${s.grossMargin?.toFixed(1) || 0}%`}
-                    variant={s.grossMargin >= 40 ? 'positive' : s.grossMargin >= 20 ? 'warning' : 'negative'} />
-                </div>
-
-                {/* P&L mini */}
-                <div>
-                  <SectionHeader>📊 P&L Ringkas</SectionHeader>
-                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm divide-y divide-gray-100">
+          <>
+            {/* Tab Ringkasan */}
+            {tab === 'ringkasan' && summary && (
+              <div className="space-y-4">
+                {/* P&L */}
+                <div className="card overflow-hidden">
+                  <div className="px-4 py-3 font-bold" style={{ background: 'var(--surface-2)', color: 'var(--text-1)' }}>Profit & Loss</div>
+                  <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
                     {[
-                      { label: 'Pendapatan', value: s.totalRevenue, indent: false, bold: false, color: '' },
-                      { label: 'HPP (Cost of Goods)', value: -s.totalCOGS, indent: true, bold: false, color: 'text-red-600' },
-                      { label: 'Laba Kotor', value: s.grossProfit, indent: false, bold: true, color: s.grossProfit >= 0 ? 'text-emerald-600' : 'text-red-600' },
-                      { label: 'Pengeluaran Operasional', value: -(s.totalExpenses||0), indent: true, bold: false, color: 'text-red-600' },
-                      { label: 'Pembelian Bahan (PO)', value: -(s.totalPurchases||0), indent: true, bold: false, color: 'text-red-600' },
-                      { label: 'Laba Operasional', value: s.operatingProfit||s.totalProfit, indent: false, bold: true, color: (s.operatingProfit||s.totalProfit) >= 0 ? 'text-emerald-700' : 'text-red-600' },
-                    ].map((row, i) => (
-                      <div key={i} className={clsx('flex justify-between items-center px-4 py-3', row.bold && 'bg-gray-50')}>
-                        <span className={clsx('text-sm', row.indent && 'pl-4 text-gray-500', row.bold && 'font-bold text-gray-900')}>{row.label}</span>
-                        <span className={clsx('text-sm font-semibold', row.bold && 'font-black text-base', row.color || 'text-gray-900')}>
-                          {row.value < 0 ? `(${formatCurrency(-row.value)})` : formatCurrency(row.value)}
+                      { label: 'Revenue', value: summary.revenue, highlight: false },
+                      { label: 'HPP / COGS', value: -summary.cogs, highlight: false },
+                      { label: 'Gross Profit', value: summary.grossProfit, highlight: true },
+                      { label: 'Pengeluaran Operasional', value: -summary.expense, highlight: false },
+                      { label: 'Net Profit', value: summary.netProfit, highlight: true, big: true },
+                    ].map(({ label, value, highlight, big }) => (
+                      <div key={label} className={`flex justify-between px-4 py-3 ${highlight ? 'font-bold' : ''}`}
+                        style={{ background: highlight ? 'var(--surface-2)' : 'white' }}>
+                        <span style={{ color: 'var(--text-2)', fontSize: big ? 14 : 13 }}>{label}</span>
+                        <span style={{ color: value < 0 ? '#dc2626' : value > 0 && highlight ? '#16a34a' : 'var(--text-1)', fontSize: big ? 16 : 13 }}>
+                          {value < 0 ? `(${formatCurrency(Math.abs(value))})` : formatCurrency(value)}
+                          {label === 'Gross Profit' && ` — ${summary.grossMargin}%`}
                         </span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Hourly */}
-                {data.hourly && (
-                  <div>
-                    <SectionHeader>⏰ Jam Tersibuk</SectionHeader>
-                    <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-2">
-                      {data.hourly.filter((h: any) => h.orders > 0).map((h: any) => {
-                        const maxOrders = Math.max(...data.hourly.map((x: any) => x.orders));
+                {/* vs Target */}
+                {target && (
+                  <div className="card overflow-hidden">
+                    <div className="px-4 py-3 font-bold" style={{ background: 'var(--surface-2)', color: 'var(--text-1)' }}>Pencapaian vs Target</div>
+                    <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+                      {[
+                        { label: 'Revenue', actual: summary.revenue, tgt: target.revenueTarget, fmt: (v: number) => formatCurrency(v) },
+                        { label: 'Gross Margin', actual: summary.grossMargin, tgt: target.grossMarginPct, fmt: (v: number) => `${v}%` },
+                        { label: 'Pengeluaran (max)', actual: summary.expense, tgt: target.maxExpense, fmt: (v: number) => formatCurrency(v), invert: true },
+                      ].map(({ label, actual, tgt: t, fmt: f, invert }) => {
+                        const pct   = t > 0 ? Math.round((actual / t) * 100) : 0;
+                        const ok    = invert ? actual <= t : actual >= t;
                         return (
-                          <div key={h.hour} className="flex items-center gap-3">
-                            <span className="text-xs text-gray-400 w-14 font-mono">{String(h.hour).padStart(2,'0')}:00</span>
-                            <div className="flex-1 bg-gray-100 rounded-full h-2">
-                              <div
-                                className="h-2 rounded-full transition-all"
-                                style={{ background: "var(--brand)", width: `${(h.orders / maxOrders) * 100}%` }}
-                              />
+                          <div key={label} className="px-4 py-3">
+                            <div className="flex justify-between mb-1.5">
+                              <span className="text-sm" style={{ color: 'var(--text-2)' }}>{label}</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-gray-400">Target: {f(t)}</span>
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${ok ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                  {ok ? '✅' : '⚠️'} {f(actual)}
+                                </span>
+                              </div>
                             </div>
-                            <span className="text-xs font-bold text-gray-700 w-16 text-right">{h.orders} order</span>
-                            <span className="text-xs text-gray-400 w-28 text-right hidden sm:block">{formatCurrency(h.revenue)}</span>
+                            <div className="w-full h-1.5 rounded-full bg-gray-100">
+                              <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, background: ok ? '#16a34a' : '#ef4444' }} />
+                            </div>
                           </div>
                         );
                       })}
                     </div>
                   </div>
                 )}
-              </>
-            )}
 
-            {/* ── DAILY ───────────────────────────────────────────────── */}
-            {tab === 'daily' && data?.daily && (
-              <>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <MetricCard label="Total Omzet" value={formatCurrency(s?.totalRevenue||0)} highlight />
-                  <MetricCard label="Transaksi" value={formatNumber(s?.totalTransactions||0)} />
-                  <MetricCard label="Pengeluaran" value={formatCurrency((s?.totalExpenses||0)+(s?.totalPurchases||0))} variant="negative" />
-                  <MetricCard label="Laba Bersih" value={formatCurrency(s?.operatingProfit||0)} variant={s?.operatingProfit >= 0 ? 'positive' : 'negative'} />
-                </div>
-                <TableWrapper>
-                  <thead>
-                    <tr>
-                      <Th>Tanggal</Th>
-                      <Th right>Omzet</Th>
-                      <Th right>Transaksi</Th>
-                      <Th right><span className="hidden md:inline">HPP</span></Th>
-                      <Th right><span className="hidden md:inline">Pengeluaran</span></Th>
-                      <Th right><span className="hidden md:inline">Pembelian</span></Th>
-                      <Th right>Laba Bersih</Th>
-                      <Th right>Margin</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.daily.map((d: any) => {
-                      const margin = d.revenue > 0 ? ((d.netProfit ?? d.profit) / d.revenue * 100) : 0;
-                      return (
-                        <tr key={d.date} className="hover:bg-gray-50/50 transition-colors">
-                          <Td bold>{new Date(d.date).toLocaleDateString('id-ID', { weekday: 'short', day: '2-digit', month: 'short' })}</Td>
-                          <Td right bold>{formatCurrency(d.revenue)}</Td>
-                          <Td right muted>{d.transactions}</Td>
-                          <Td right muted>{formatCurrency(d.cogs)}</Td>
-                          <Td right color="text-amber-600">{d.expenses > 0 ? formatCurrency(d.expenses) : '—'}</Td>
-                          <Td right color="text-orange-600">{d.purchases > 0 ? formatCurrency(d.purchases) : '—'}</Td>
-                          <Td right bold color={margin >= 0 ? 'text-emerald-600' : 'text-red-600'}>{formatCurrency(d.netProfit ?? d.profit)}</Td>
-                          <Td right><MarginBadge margin={margin} /></Td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                  <tfoot>
-                    <tr style={{background:"var(--brand)",color:"#fff"}}>
-                      <td className="px-4 py-3 font-bold text-sm">Total</td>
-                      <td className="px-4 py-3 text-right font-bold text-sm">{formatCurrency(data.daily.reduce((s: number, d: any) => s+d.revenue, 0))}</td>
-                      <td className="px-4 py-3 text-right opacity-80 text-sm">{data.daily.reduce((s: number, d: any) => s+d.transactions, 0)}</td>
-                      <td className="px-4 py-3 text-right opacity-80 text-sm">{formatCurrency(data.daily.reduce((s: number, d: any) => s+d.cogs, 0))}</td>
-                      <td className="px-4 py-3 text-right text-amber-300 text-sm">{formatCurrency(data.daily.reduce((s: number, d: any) => s+(d.expenses||0), 0))}</td>
-                      <td className="px-4 py-3 text-right text-orange-300 text-sm">{formatCurrency(data.daily.reduce((s: number, d: any) => s+(d.purchases||0), 0))}</td>
-                      <td className="px-4 py-3 text-right font-bold text-sm text-emerald-300">{formatCurrency(data.daily.reduce((s: number, d: any) => s+(d.netProfit??d.profit), 0))}</td>
-                      <td className="px-4 py-3"></td>
-                    </tr>
-                  </tfoot>
-                </TableWrapper>
-              </>
-            )}
-
-            {/* ── MONTHLY ─────────────────────────────────────────────── */}
-            {tab === 'monthly' && data?.monthly && (
-              <TableWrapper>
-                <thead>
-                  <tr>
-                    <Th>Bulan</Th>
-                    <Th right>Omzet</Th>
-                    <Th right>Transaksi</Th>
-                    <Th right><span className="hidden md:inline">HPP</span></Th>
-                    <Th right>Laba Kotor</Th>
-                    <Th right>Margin</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.monthly.map((m: any) => {
-                    const margin = m.revenue > 0 ? (m.profit / m.revenue * 100) : 0;
-                    return (
-                      <tr key={m.month} className="hover:bg-gray-50/50">
-                        <Td bold>{new Date(m.month + '-01').toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</Td>
-                        <Td right bold>{formatCurrency(m.revenue)}</Td>
-                        <Td right muted>{m.transactions}</Td>
-                        <Td right muted>{formatCurrency(m.cogs)}</Td>
-                        <Td right bold color={m.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}>{formatCurrency(m.profit)}</Td>
-                        <Td right><MarginBadge margin={margin} /></Td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </TableWrapper>
-            )}
-
-            {/* ── YTD ─────────────────────────────────────────────────── */}
-            {tab === 'ytd' && data && (
-              <>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <MetricCard label="Omzet YTD" value={formatCurrency(data.summary?.totalRevenue||0)} highlight />
-                  <MetricCard label="Transaksi" value={formatNumber(data.summary?.totalTransactions||0)} />
-                  <MetricCard label="Total Laba" value={formatCurrency(data.summary?.totalProfit||0)} variant="positive" />
-                  <MetricCard label="Rata-rata/Bulan" value={formatCurrency((data.summary?.totalRevenue||0)/12)} />
-                </div>
-                {data.monthly && (
-                  <TableWrapper>
-                    <thead><tr><Th>Bulan</Th><Th right>Omzet</Th><Th right>Kumulatif</Th><Th right>Laba</Th><Th right>Margin</Th></tr></thead>
-                    <tbody>
-                      {data.monthly.map((m: any) => {
-                        const margin = m.revenue > 0 ? (m.profit / m.revenue * 100) : 0;
-                        return (
-                          <tr key={m.month} className="hover:bg-gray-50/50">
-                            <Td bold>{new Date(m.month + '-01').toLocaleDateString('id-ID', { month: 'long' })}</Td>
-                            <Td right>{formatCurrency(m.revenue)}</Td>
-                            <Td right muted>{formatCurrency(m.cumulative || 0)}</Td>
-                            <Td right color={m.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}>{formatCurrency(m.profit)}</Td>
-                            <Td right><MarginBadge margin={margin} /></Td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </TableWrapper>
-                )}
-              </>
-            )}
-
-            {/* ── CATEGORY ────────────────────────────────────────────── */}
-            {tab === 'category' && data?.byCategory && (
-              <>
-                <div className="grid grid-cols-2 gap-3 mb-2">
-                  <MetricCard label="Total Omzet" value={formatCurrency(s?.totalRevenue||0)} highlight />
-                  <MetricCard label="Total Transaksi" value={formatNumber(s?.totalTransactions||0)} />
-                </div>
-                <TableWrapper>
-                  <thead><tr><Th>Kategori</Th><Th right>Omzet</Th><Th right>Item Terjual</Th><Th right>Order</Th><Th right>% Omzet</Th></tr></thead>
-                  <tbody>
-                    {data.byCategory.map((c: any, i: number) => {
-                      const pct = s?.totalRevenue > 0 ? (c.revenue / s.totalRevenue * 100) : 0;
-                      return (
-                        <tr key={i} className="hover:bg-gray-50/50">
-                          <Td>
-                            <div className="flex items-center gap-2">
-                              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: c.color }} />
-                              <span className="font-medium text-gray-900">{c.name}</span>
-                            </div>
-                          </Td>
-                          <Td right bold>{formatCurrency(c.revenue)}</Td>
-                          <Td right muted>{formatNumber(c.items)}</Td>
-                          <Td right muted>{c.orders}</Td>
-                          <Td right>
-                            <div className="flex items-center justify-end gap-2">
-                              <MiniBar value={c.revenue} max={s?.totalRevenue||1} color="bg-brand-700" />
-                              <span className="text-sm font-bold text-gray-700 w-10 text-right">{pct.toFixed(1)}%</span>
-                            </div>
-                          </Td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </TableWrapper>
-              </>
-            )}
-
-            {/* ── PRODUCT ─────────────────────────────────────────────── */}
-            {tab === 'product' && data?.products && (
-              <TableWrapper>
-                <thead><tr><Th>Produk</Th><Th>Kategori</Th><Th right>Qty Terjual</Th><Th right>Omzet</Th><Th right><span className="hidden md:inline">HPP</span></Th><Th right>Laba</Th><Th right>Margin</Th></tr></thead>
-                <tbody>
-                  {data.products.map((p: any, i: number) => {
-                    const margin = p.revenue > 0 ? (p.profit / p.revenue * 100) : 0;
-                    return (
-                      <tr key={i} className="hover:bg-gray-50/50">
-                        <Td bold>{p.name}</Td>
-                        <Td>
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.categoryColor }} />
-                            <span className="text-gray-500 text-xs">{p.category}</span>
-                          </div>
-                        </Td>
-                        <Td right muted>{formatNumber(p.quantity)}</Td>
-                        <Td right bold>{formatCurrency(p.revenue)}</Td>
-                        <Td right muted>{formatCurrency(p.cogs)}</Td>
-                        <Td right color={p.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}>{formatCurrency(p.profit)}</Td>
-                        <Td right><MarginBadge margin={margin} /></Td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </TableWrapper>
-            )}
-
-            {/* ── PAYMENT ─────────────────────────────────────────────── */}
-            {tab === 'payment' && data?.byPayment && (
-              <div className="space-y-3">
-                {data.byPayment.map((p: any) => {
-                  const pct = s?.totalRevenue > 0 ? (p.revenue / s.totalRevenue * 100) : 0;
-                  return (
-                    <div key={p.method} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gray-900 rounded-xl flex items-center justify-center text-white text-lg">
-                            {p.method === 'CASH' ? '💵' : p.method === 'QRIS' ? '📱' : '💳'}
-                          </div>
-                          <div>
-                            <p className="font-bold text-gray-900">{p.method}</p>
-                            <p className="text-xs text-gray-400">{p.count} transaksi</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-black text-xl text-gray-900">{formatCurrency(p.revenue)}</p>
-                          <p className="text-xs text-gray-400">{pct.toFixed(1)}% dari omzet</p>
-                        </div>
-                      </div>
-                      <div className="bg-gray-100 rounded-full h-2">
-                        <div
-                          className="h-2 rounded-full transition-all"
-                          style={{ background: "var(--brand)", width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+                <button onClick={generatePDF}
+                  className="w-full py-3 rounded-xl font-bold text-white transition-all active:scale-95"
+                  style={{ background: 'var(--brand)' }}>
+                  🖨️ Export PDF Laporan {MONTHS[selMonth-1]} {selYear}
+                </button>
               </div>
             )}
 
-            {/* ── EXPENSES ────────────────────────────────────────────── */}
-            {tab === 'expenses' && data && (
-              <>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <MetricCard label="Pengeluaran Operasional" value={formatCurrency(s?.totalExpenses||0)} variant="negative" />
-                  <MetricCard label="Pembelian Bahan (PO)" value={formatCurrency(s?.totalPurchases||0)} variant="negative" />
-                  <MetricCard label="Total Pengeluaran" value={formatCurrency((s?.totalExpenses||0)+(s?.totalPurchases||0))} highlight />
+            {/* Tab Bahan Baku */}
+            {tab === 'bahan_baku' && bahan && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: 'Nilai Stok Sekarang', value: formatCurrency(bahan.currentValue), color: 'var(--brand)' },
+                    { label: 'COGS Periode Ini', value: formatCurrency(bahan.cogs), color: '#dc2626' },
+                    { label: 'Total Pembelian (PO)', value: formatCurrency(bahan.purchaseValue), color: 'var(--text-1)' },
+                    { label: 'Shrinkage', value: bahan.shrinkage !== null ? formatCurrency(Math.abs(bahan.shrinkage)) : 'Belum ada snapshot', color: bahan.shrinkage > 0 ? '#dc2626' : '#16a34a' },
+                  ].map(({ label, value, color }) => (
+                    <div key={label} className="card p-4">
+                      <p className="text-xs text-gray-400 mb-1">{label}</p>
+                      <p className="text-xl font-black" style={{ color }}>{value}</p>
+                    </div>
+                  ))}
                 </div>
 
-                {/* Expense by category */}
-                {s?.expenseByCategory && Object.keys(s.expenseByCategory).length > 0 && (
-                  <div>
-                    <SectionHeader>📂 Per Kategori Pengeluaran</SectionHeader>
-                    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm divide-y divide-gray-100">
-                      {Object.entries(s.expenseByCategory as Record<string,number>)
-                        .sort((a, b) => b[1] - a[1])
-                        .map(([cat, amt]) => {
-                          const total = s.totalExpenses || 1;
-                          return (
-                            <div key={cat} className="flex items-center justify-between px-4 py-3">
-                              <div className="flex items-center gap-3">
-                                <span className="text-sm font-medium text-gray-700">{cat}</span>
-                              </div>
-                              <div className="flex items-center gap-3">
-                                <MiniBar value={amt} max={total} color="bg-red-400" />
-                                <span className="font-bold text-gray-900 text-sm">{formatCurrency(amt)}</span>
-                              </div>
-                            </div>
-                          );
-                        })
-                      }
+                {bahan.shrinkage === null && (
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-700">
+                    ⚠️ Belum ada snapshot stok awal bulan untuk periode ini. Klik "Tutup Bulan" di akhir bulan untuk generate snapshot dan menghitung shrinkage.
+                  </div>
+                )}
+
+                {bahan.shrinkage !== null && (
+                  <div className="card overflow-hidden">
+                    <div className="px-4 py-3 font-bold" style={{ background: 'var(--surface-2)' }}>Rekonsiliasi Bahan Baku</div>
+                    <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+                      {[
+                        { label: 'Nilai Stok Awal Bulan', value: bahan.prevSnapshotValue },
+                        { label: '+ Pembelian (PO)', value: bahan.purchaseValue },
+                        { label: '- COGS Terpakai', value: -bahan.cogs },
+                        { label: '= Stok Teoritis', value: bahan.prevSnapshotValue + bahan.purchaseValue - bahan.cogs },
+                        { label: 'Stok Aktual (Snapshot)', value: bahan.currentValue },
+                        { label: 'Selisih / Shrinkage', value: -bahan.shrinkage, highlight: true },
+                      ].map(({ label, value, highlight }) => (
+                        <div key={label} className={`flex justify-between px-4 py-3 ${highlight ? 'font-bold' : ''}`}
+                          style={{ background: highlight ? 'var(--surface-2)' : 'white' }}>
+                          <span className="text-sm" style={{ color: 'var(--text-2)' }}>{label}</span>
+                          <span className="text-sm font-semibold" style={{ color: value < 0 ? '#dc2626' : 'var(--text-1)' }}>
+                            {value < 0 ? `(${formatCurrency(Math.abs(value))})` : formatCurrency(value)}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
-
-                {/* Expense list */}
-                {data.expenses?.length > 0 && (
-                  <div>
-                    <SectionHeader>🧾 Pengeluaran Operasional</SectionHeader>
-                    <TableWrapper>
-                      <thead><tr><Th>Tanggal</Th><Th>Kategori</Th><Th>Keterangan</Th><Th right>Jumlah</Th></tr></thead>
-                      <tbody>
-                        {data.expenses.map((e: any) => (
-                          <tr key={e.id} className="hover:bg-gray-50/50">
-                            <Td muted>{new Date(e.date).toLocaleDateString('id-ID', { day:'2-digit', month:'short' })}</Td>
-                            <Td><Badge variant="default">{e.category}</Badge></Td>
-                            <Td>{e.description}</Td>
-                            <Td right bold color="text-red-600">{formatCurrency(e.amount)}</Td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </TableWrapper>
-                  </div>
-                )}
-
-                {/* PO list */}
-                {data.purchases?.length > 0 && (
-                  <div>
-                    <SectionHeader>📦 Pembelian Bahan (Purchase Order)</SectionHeader>
-                    <TableWrapper>
-                      <thead><tr><Th>Tanggal</Th><Th>No. PO</Th><Th>Supplier</Th><Th right>Jumlah</Th></tr></thead>
-                      <tbody>
-                        {data.purchases.map((po: any) => (
-                          <tr key={po.id} className="hover:bg-gray-50/50">
-                            <Td muted>{new Date(po.date).toLocaleDateString('id-ID', { day:'2-digit', month:'short' })}</Td>
-                            <Td><span className="font-mono text-sm">{po.poNumber}</span></Td>
-                            <Td>{po.supplier}</Td>
-                            <Td right bold color="text-orange-600">{formatCurrency(po.amount)}</Td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </TableWrapper>
-                  </div>
-                )}
-              </>
+              </div>
             )}
 
-            {/* ── TRANSACTIONS ────────────────────────────────────────── */}
-            {tab === 'transactions' && (
-              txData ? (
-                <div>
-                  <div className="mb-3 flex items-center justify-between">
-                    <p className="text-sm text-gray-500">{txData.orders?.length || 0} transaksi</p>
+            {/* Tab Target */}
+            {tab === 'target' && (
+              <div className="space-y-3">
+                {target ? (
+                  <div className="card overflow-hidden">
+                    <div className="px-4 py-3 flex justify-between" style={{ background: 'var(--surface-2)' }}>
+                      <span className="font-bold">Target {MONTHS[selMonth-1]} {selYear}</span>
+                      {isSenior && <button onClick={() => setTargetModal(true)} className="text-xs font-medium" style={{ color: 'var(--brand)' }}>Edit</button>}
+                    </div>
+                    {[
+                      { label: 'Revenue Bulanan', value: formatCurrency(target.revenueTarget) },
+                      { label: 'Orders per Hari', value: `${target.ordersPerDay} order` },
+                      { label: 'Gross Margin', value: `${target.grossMarginPct}%` },
+                      { label: 'Maks Pengeluaran', value: formatCurrency(target.maxExpense) },
+                      { label: 'Maks Nilai Bahan Baku', value: formatCurrency(target.maxInventoryValue) },
+                      ...(target.notes ? [{ label: 'Catatan', value: target.notes }] : []),
+                    ].map(({ label, value }) => (
+                      <div key={label} className="flex justify-between px-4 py-3 border-b last:border-0" style={{ borderColor: 'var(--border)' }}>
+                        <span className="text-sm" style={{ color: 'var(--text-2)' }}>{label}</span>
+                        <span className="text-sm font-semibold" style={{ color: 'var(--text-1)' }}>{value}</span>
+                      </div>
+                    ))}
                   </div>
-                  <TableWrapper>
-                    <thead>
-                      <tr>
-                        <Th>No. Order</Th>
-                        <Th>Waktu</Th>
-                        <Th>Pelanggan</Th>
-                        <Th>Tipe</Th>
-                        <Th right>Total</Th>
-                        <Th right>Laba</Th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(txData.orders||[]).map((o: any) => (
-                        <tr key={o.id} onClick={() => setTxDetail(o)}
-                          className="hover:bg-gray-50/50 cursor-pointer transition-colors">
-                          <Td><span className="font-mono text-sm font-bold">{o.orderNumber}</span></Td>
-                          <Td muted>{new Date(o.createdAt).toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</Td>
-                          <Td muted>{o.customerName || '—'}</Td>
-                          <Td>
-                            <Badge variant={o.orderType === 'TAKEAWAY' ? 'warning' : 'default'}>
-                              {o.orderType === 'TAKEAWAY' ? 'Bawa' : 'Makan'}
-                            </Badge>
-                          </Td>
-                          <Td right bold>{formatCurrency(o.total)}</Td>
-                          <Td right color={o.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}>{formatCurrency(o.profit)}</Td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </TableWrapper>
-                </div>
-              ) : (
-                <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin" /></div>
-              )
+                ) : (
+                  <div className="card p-8 text-center">
+                    <p className="text-3xl mb-3">🎯</p>
+                    <p className="font-semibold mb-2" style={{ color: 'var(--text-1)' }}>Belum ada target untuk {MONTHS[selMonth-1]} {selYear}</p>
+                    {isSenior && <Button onClick={() => setTargetModal(true)}>Set Target Sekarang</Button>}
+                  </div>
+                )}
+              </div>
             )}
-
-          </div>
+          </>
         )}
       </div>
 
-      {/* Transaction detail modal */}
-      {txDetail && (
-        <Modal open={!!txDetail} onClose={() => setTxDetail(null)} title={`Detail — ${txDetail.orderNumber}`}>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><p className="text-gray-400 text-xs mb-0.5">Waktu</p><p className="font-medium">{new Date(txDetail.createdAt).toLocaleString('id-ID')}</p></div>
-              <div><p className="text-gray-400 text-xs mb-0.5">Tipe</p><p className="font-medium">{txDetail.orderType === 'TAKEAWAY' ? 'Bawa pulang' : 'Makan di sini'}</p></div>
-              {txDetail.customerName && <div><p className="text-gray-400 text-xs mb-0.5">Pelanggan</p><p className="font-medium">{txDetail.customerName}</p></div>}
-              <div><p className="text-gray-400 text-xs mb-0.5">Payment</p><p className="font-medium">{txDetail.payment?.method || '—'}</p></div>
+      {/* Target Modal */}
+      <Modal open={targetModal} onClose={() => setTargetModal(false)} title={`Set Target — ${MONTHS[selMonth-1]} ${selYear}`}>
+        <div className="space-y-3">
+          {[
+            { key: 'revenueTarget', label: 'Target Revenue Bulanan (Rp)', placeholder: '90000000' },
+            { key: 'ordersPerDay',  label: 'Target Order per Hari',         placeholder: '50' },
+            { key: 'grossMarginPct',label: 'Target Gross Margin (%)',        placeholder: '65' },
+            { key: 'maxExpense',    label: 'Maks Pengeluaran Bulanan (Rp)', placeholder: '20000000' },
+            { key: 'maxInventoryValue', label: 'Maks Nilai Bahan Baku (Rp)', placeholder: '15000000' },
+          ].map(({ key, label, placeholder }) => (
+            <div key={key}>
+              <label className="label">{label}</label>
+              <input className="input" type="number" placeholder={placeholder}
+                value={targetForm[key as keyof typeof targetForm]}
+                onChange={e => setTargetForm(p => ({ ...p, [key]: e.target.value }))} />
             </div>
-            <div className="border border-gray-100 rounded-xl overflow-hidden">
-              {(txDetail.items||[]).map((item: any, i: number) => (
-                <div key={i} className={clsx('flex justify-between px-4 py-3 text-sm', i > 0 && 'border-t border-gray-100')}>
-                  <div>
-                    <p className="font-medium text-gray-900">{item.product?.name || 'Item'}</p>
-                    {item.modifiers?.length > 0 && (
-                      <p className="text-xs text-gray-400">{item.modifiers.map((m: any) => m.optionName).join(' · ')}</p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{formatCurrency(item.unitPrice * item.quantity)}</p>
-                    <p className="text-xs text-gray-400">{item.quantity}× {formatCurrency(item.unitPrice)}</p>
-                  </div>
-                </div>
-              ))}
-              <div className="border-t-2 border-gray-200 bg-gray-900 text-white px-4 py-3 flex justify-between font-black">
-                <span>Total</span>
-                <span>{formatCurrency(txDetail.total)}</span>
-              </div>
-            </div>
+          ))}
+          <div>
+            <label className="label">Catatan</label>
+            <textarea className="input" rows={2} value={targetForm.notes}
+              onChange={e => setTargetForm(p => ({ ...p, notes: e.target.value }))}
+              placeholder="Catatan strategi bulan ini..." />
           </div>
-        </Modal>
-      )}
+          <div className="flex gap-3 justify-end pt-2">
+            <button onClick={() => setTargetModal(false)} className="btn btn-secondary btn-md">Batal</button>
+            <Button onClick={saveTarget}>Simpan Target</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Tutup Bulan Modal */}
+      <Modal open={tutupModal} onClose={() => setTutupModal(false)} title="Tutup Bulan">
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
+            <p className="text-sm font-semibold text-amber-800 mb-1">⚠️ Yang akan terjadi:</p>
+            <ul className="text-xs text-amber-700 space-y-1 list-disc list-inside">
+              <li>Snapshot nilai stok semua bahan disimpan untuk {MONTHS[selMonth-1]} {selYear}</li>
+              <li>Laporan PDF bulan ini otomatis di-generate</li>
+              <li>Data ini digunakan untuk menghitung shrinkage bulan depan</li>
+            </ul>
+          </div>
+          <p className="text-sm" style={{ color: 'var(--text-2)' }}>
+            Pastikan semua transaksi, pengeluaran, dan penerimaan PO sudah diinput sebelum tutup bulan.
+          </p>
+          <div className="flex gap-3 justify-end">
+            <button onClick={() => setTutupModal(false)} className="btn btn-secondary btn-md">Batal</button>
+            <Button onClick={tutupBulan} disabled={snapshotting}>
+              {snapshotting ? 'Memproses...' : '📦 Tutup Bulan & Export PDF'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </AdminLayout>
   );
 }

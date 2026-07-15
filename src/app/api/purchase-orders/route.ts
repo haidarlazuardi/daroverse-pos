@@ -74,17 +74,32 @@ export const PATCH = withAuth(async (req, user) => {
     if (action === 'complete') {
       await receivePurchaseOrder(id, user.userId);
 
-      // Auto-create expense record for this PO
+      // Auto-create expense + auto-update latestPrice per ingredient
       try {
         const po = await prisma.purchaseOrder.findUnique({
           where: { id },
           include: {
             supplier: { select: { name: true } },
-            items: { select: { quantity: true, unitPrice: true } },
+            items: { include: { ingredient: true } },
           },
         });
         if (po) {
           const totalCost = po.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+
+          // Auto-update latestPrice per ingredient dari harga PO
+          for (const item of po.items) {
+            if (item.ingredient && item.unitPrice > 0) {
+              // unitPrice di PO = harga per purchaseUnit
+              // latestPrice di ingredient = harga per unit dasar
+              const convRate = item.ingredient.conversionRate || 1;
+              const pricePerBaseUnit = item.unitPrice / convRate;
+              await prisma.ingredient.update({
+                where: { id: item.ingredientId },
+                data: { latestPrice: pricePerBaseUnit },
+              });
+            }
+          }
+
           if (totalCost > 0) {
             await prisma.expense.create({
               data: {
@@ -97,8 +112,7 @@ export const PATCH = withAuth(async (req, user) => {
           }
         }
       } catch (expErr) {
-        // Don't fail PO completion if expense creation fails
-        console.error('Failed to create expense for PO:', expErr);
+        console.error('Failed to update after PO complete:', expErr);
       }
 
       return success({ completed: true });
