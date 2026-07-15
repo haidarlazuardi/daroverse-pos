@@ -10,9 +10,17 @@ import { ensureCan } from '@/lib/permissions';
 export const GET = withAuth(async (req, user) => {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status');
+  const from   = searchParams.get('from');
+  const to     = searchParams.get('to');
 
   const where: Record<string, unknown> = {};
   if (status) where.status = status;
+  if (from || to) {
+    where.createdAt = {
+      ...(from ? { gte: new Date(from) } : {}),
+      ...(to   ? { lte: new Date(to + 'T23:59:59') } : {}),
+    };
+  }
 
   const pos = await prisma.purchaseOrder.findMany({
     where,

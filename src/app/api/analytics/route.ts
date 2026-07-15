@@ -139,8 +139,8 @@ export const GET = withAuth(async (req: NextRequest) => {
   if (type === 'summary') {
     const [orders, expenses, poValue] = await Promise.all([
       prisma.order.findMany({ where: baseWhere, select: { total: true, costTotal: true } }),
-      prisma.expense.findMany({ where: { date: { gte: from, lte: to } }, select: { amount: true } }),
-      prisma.purchaseOrder.findMany({ where: { status: 'COMPLETED', createdAt: { gte: from, lte: to } }, select: { totalAmount: true } }),
+      prisma.expense.findMany({ where: { createdAt: { gte: from, lte: to } }, select: { amount: true } }),
+      prisma.purchaseOrder.findMany({ where: { status: 'COMPLETED' as any, createdAt: { gte: from, lte: to } }, select: { totalAmount: true } }),
     ]);
 
     const revenue  = orders.reduce((s, o) => s + o.total, 0);
