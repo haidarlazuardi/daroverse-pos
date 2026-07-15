@@ -197,7 +197,7 @@ function QueueCard({ order: o, onServed }: { order: any; onServed: () => void })
 
         {/* Header — always visible, tap to expand */}
         <button onClick={() => setExpanded(p => !p)}
-          className="w-full flex items-center gap-2 px-3 py-2.5 text-left">
+          className="w-full flex items-center gap-2 px-3 py-2.5 text-left group">
           <span className="font-black text-xs flex-shrink-0" style={{ color: 'var(--brand)' }}>
             #{o.orderNumber?.slice(-4)}
           </span>
@@ -209,8 +209,17 @@ function QueueCard({ order: o, onServed }: { order: any; onServed: () => void })
           {o.orderType === 'TAKEAWAY' && (
             <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold flex-shrink-0">TA</span>
           )}
+          {/* Desktop: check button on hover */}
+          <button
+            onClick={e => { e.stopPropagation(); serve(); }}
+            disabled={serving}
+            className="hidden group-hover:flex items-center justify-center w-6 h-6 rounded-full text-white flex-shrink-0 transition-all hover:scale-110 disabled:opacity-50"
+            style={{ background: 'var(--brand)' }}
+            title="Selesaikan pesanan">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-            className={`flex-shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            className={`flex-shrink-0 transition-transform group-hover:hidden ${expanded ? 'rotate-180' : ''}`}
             style={{ color: 'var(--text-3)' }}>
             <polyline points="6 9 12 15 18 9"/>
           </svg>
