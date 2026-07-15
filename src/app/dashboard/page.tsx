@@ -52,6 +52,7 @@ export default function DashboardPage() {
   const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
+    (async () => {
     const now  = new Date();
     const yest = new Date(now); yest.setDate(yest.getDate() - 1);
     const d7   = new Date(now); d7.setDate(d7.getDate() - 7);
@@ -61,34 +62,49 @@ export default function DashboardPage() {
     const year = now.getFullYear(), month = now.getMonth() + 1;
     const daysInMonth = new Date(year, month, 0).getDate();
 
-    Promise.all([
+    try {
+    const results = await Promise.allSettled([
       api.get<any>(`/api/analytics?type=summary&from=${todayStr}&to=${todayStr}`),
       api.get<any>(`/api/analytics?type=summary&from=${yestStr}&to=${yestStr}`),
       api.get<any>(`/api/monthly-targets?year=${year}&month=${month}`),
       api.get<any[]>(`/api/analytics?type=revenue&from=${d7Str}&to=${todayStr}`),
       api.get<any[]>(`/api/analytics?type=best_seller&from=${todayStr}&to=${todayStr}`),
       api.get<any[]>('/api/ingredients?low=1'),
-      api.get<any>('/api/shifts?active=true'),
+      api.get<any>('/api/shifts?status=OPEN&limit=1'),
       api.get<any>(`/api/analytics?type=retention&from=${todayStr}&to=${todayStr}`),
-    ]).then(([tod, yes, tgt, rev7, menu, low, sh, cust]) => {
-      setToday(tod);
-      setYest(yes);
-      setTarget(tgt);
-      setTrend7(rev7 || []);
-      setTopMenu((menu || []).slice(0, 5));
-      setCustomers(cust);
-      setShift(sh?.shift || sh?.[0] || null);
+    ]);
+
+    const get = (i: number) => results[i].status === 'fulfilled' ? results[i].value : null;
+
+    const tod  = get(0);
+    const yes  = get(1);
+    const tgt  = get(2);
+    const rev7 = get(3);
+    const menu = get(4);
+    const low  = get(5);
+    const sh   = get(6);
+    const cust = get(7);
+
+    setToday(tod);
+    setYest(yes);
+    setTarget(tgt);
+    setTrend7(Array.isArray(rev7) ? rev7 : []);
+    setTopMenu(Array.isArray(menu) ? menu.slice(0, 5) : []);
+    setCustomers(cust);
+    const shiftData = sh?.orders?.[0] || sh?.shift || (Array.isArray(sh) ? sh[0] : null);
+    setShift(shiftData);
 
       // Alerts
       const al: any[] = [];
       if ((low || []).length > 0) al.push({ type: 'warning', msg: `Stok rendah: ${(low || []).slice(0,3).map((i: any) => i.name).join(', ')}${(low||[]).length > 3 ? ` +${(low||[]).length-3} lainnya` : ''}` });
-      if (!sh?.shift && !sh?.[0]) al.push({ type: 'info', msg: 'Shift belum dibuka hari ini' });
+      if (!shiftData) al.push({ type: 'info', msg: 'Shift belum dibuka hari ini' });
       if (tgt && tod) {
         const dailyRev = tgt.revenueTarget / daysInMonth;
         if (tod.revenue < dailyRev * 0.7) al.push({ type: 'danger', msg: `Revenue hari ini ${Math.round((tod.revenue/dailyRev)*100)}% dari target harian` });
       }
       setAlerts(al);
-    }).catch(() => {}).finally(() => setLoading(false));
+    } catch { /* silent */ } finally { setLoading(false); }
+    })();
   }, []);
 
   const now = new Date();
