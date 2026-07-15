@@ -44,6 +44,17 @@ export default function CustomersPage() {
   const [saving, setSaving]     = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Promo
+  const [promoOpen, setPromoOpen]         = useState(false);
+  const [promoTarget, setPromoTarget]     = useState<Customer | null>(null);
+  const [promoTemplates, setPromoTemplates] = useState<any[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<any | null>(null);
+  const [templateModal, setTemplateModal] = useState(false);
+  const [templateForm, setTemplateForm]   = useState({ name: '', headline: '', subline: '', body: '', tnc: '' });
+
+  useEffect(() => {
+    api.get<any[]>('/api/promo-templates').then(setPromoTemplates).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -199,6 +210,12 @@ export default function CustomersPage() {
                   <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
                     <span className="text-xs text-gray-400">Terakhir: {daysSince(c.lastVisitAt)}</span>
                     <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                      {c.phone && (
+                        <button onClick={() => { setPromoTarget(c); setSelectedTemplate(null); setPromoOpen(true); }}
+                          className="p-1.5 rounded-lg hover:bg-green-50 text-gray-300 hover:text-green-600 transition-colors" title="Kirim Promo WA">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+                        </button>
+                      )}
                       <button onClick={() => openEdit(c)} className="p-1.5 rounded-lg hover:bg-brand-50 text-gray-300 hover:text-brand-600 transition-colors">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                       </button>
@@ -308,6 +325,102 @@ export default function CustomersPage() {
           </div>
         </div>
       </Modal>
+      {/* ── Promo Modal ──────────────────────────────────────────────── */}
+      <Modal open={promoOpen} onClose={() => setPromoOpen(false)} title={`Kirim Promo ke ${promoTarget?.name}`}>
+        <div className="space-y-4">
+          <p className="text-sm" style={{ color: 'var(--text-2)' }}>Pilih template promo yang akan dikirim via WhatsApp</p>
+
+          {promoTemplates.length === 0 ? (
+            <div className="text-center py-6">
+              <p className="text-sm text-gray-400 mb-3">Belum ada template promo</p>
+              <Button onClick={() => { setPromoOpen(false); setTemplateModal(true); }}>+ Buat Template</Button>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {promoTemplates.map(t => (
+                <button key={t.id} onClick={() => setSelectedTemplate(t)}
+                  className="w-full text-left p-3 rounded-xl border-2 transition-all"
+                  style={{ borderColor: selectedTemplate?.id === t.id ? 'var(--brand)' : 'var(--border)', background: selectedTemplate?.id === t.id ? 'var(--surface-2)' : 'white' }}>
+                  <p className="font-semibold text-sm">{t.name}</p>
+                  <p className="text-xs text-gray-400 truncate mt-0.5">{t.headline}</p>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {selectedTemplate && (
+            <div className="p-3 rounded-xl bg-gray-50 border text-sm space-y-1">
+              <p className="font-black">{selectedTemplate.headline}</p>
+              {selectedTemplate.subline && <p className="italic text-gray-600">{selectedTemplate.subline}</p>}
+              <p className="whitespace-pre-line">{selectedTemplate.body}</p>
+              {selectedTemplate.tnc && <p className="text-xs text-gray-400 mt-2 whitespace-pre-line">S&K: {selectedTemplate.tnc}</p>}
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button onClick={() => { setPromoOpen(false); setTemplateModal(true); }}
+              className="btn btn-secondary btn-md">+ Template Baru</button>
+            <Button
+              disabled={!selectedTemplate || !promoTarget?.phone}
+              onClick={() => {
+                if (!selectedTemplate || !promoTarget?.phone) return;
+                const phone = promoTarget.phone.replace(/^0/, '62').replace(/[^0-9]/g, '');
+                const msg = [
+                  `*${selectedTemplate.headline}*`,
+                  selectedTemplate.subline ? `_${selectedTemplate.subline}_` : '',
+                  '',
+                  selectedTemplate.body,
+                  selectedTemplate.tnc ? `\n_S&K:_\n${selectedTemplate.tnc}` : '',
+                ].filter(Boolean).join('\n');
+                window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                setPromoOpen(false);
+              }}>
+              📱 Buka WhatsApp
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Template Modal ───────────────────────────────────────────── */}
+      <Modal open={templateModal} onClose={() => setTemplateModal(false)} title="Buat Template Promo">
+        <div className="space-y-3">
+          <div>
+            <label className="label">Nama Template (internal) *</label>
+            <input className="input" value={templateForm.name} onChange={e => setTemplateForm(p => ({...p, name: e.target.value}))} placeholder="cth. Promo Ulang Tahun Juli" />
+          </div>
+          <div>
+            <label className="label">Headline *</label>
+            <input className="input" value={templateForm.headline} onChange={e => setTemplateForm(p => ({...p, headline: e.target.value}))} placeholder="cth. 🎉 PROMO SPESIAL SOEKA HOUSE" />
+          </div>
+          <div>
+            <label className="label">Subline</label>
+            <input className="input" value={templateForm.subline} onChange={e => setTemplateForm(p => ({...p, subline: e.target.value}))} placeholder="cth. Khusus pelanggan setia kami" />
+          </div>
+          <div>
+            <label className="label">Body *</label>
+            <textarea className="input" rows={4} value={templateForm.body} onChange={e => setTemplateForm(p => ({...p, body: e.target.value}))} placeholder="Dapatkan diskon 20% untuk semua minuman! Berlaku 14-21 Juli 2026." />
+          </div>
+          <div>
+            <label className="label">Terms & Conditions</label>
+            <textarea className="input" rows={2} value={templateForm.tnc} onChange={e => setTemplateForm(p => ({...p, tnc: e.target.value}))} placeholder="Tidak berlaku bersamaan dengan promo lain. Maks 1x per customer." />
+          </div>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setTemplateModal(false)} className="btn btn-secondary btn-md">Batal</button>
+            <Button disabled={!templateForm.name || !templateForm.headline || !templateForm.body}
+              onClick={async () => {
+                try {
+                  const t = await api.post<any>('/api/promo-templates', templateForm);
+                  setPromoTemplates(p => [t, ...p]);
+                  setTemplateForm({ name: '', headline: '', subline: '', body: '', tnc: '' });
+                  setTemplateModal(false);
+                } catch (e: any) { alert(e.message || 'Gagal'); }
+              }}>
+              Simpan Template
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
     </AdminLayout>
   );
 }
