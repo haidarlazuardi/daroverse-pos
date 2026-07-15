@@ -85,6 +85,8 @@ const NAV_GROUPS: NavGroup[] = [
   { section: 'Laporan', allow: ADMIN_ROLES,
     defaultOpen: (role) => false,
     items: [
+    { href: '/forms', label: 'Form Operasional', allow: ADMIN_ROLES,
+      icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
     { href: '/analytics', label: 'Analitik', allow: ADMIN_ROLES,
       icon: 'M3 3v18h18M9 17V9m4 8V5m4 12v-6' },
     { href: '/reports', label: 'Laporan', allow: ADMIN_ROLES,
