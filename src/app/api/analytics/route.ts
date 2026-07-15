@@ -12,7 +12,7 @@ export const GET = withAuth(async (req: NextRequest) => {
   to.setHours(23, 59, 59, 999);
 
   const baseWhere = {
-    status: 'COMPLETED',
+    status: 'COMPLETED' as any,
     createdAt: { gte: from, lte: to },
   };
 
