@@ -167,7 +167,7 @@ function QueueCard({ order: o, onServed }: { order: any; onServed: () => void })
     if (serving) return;
     setServing(true);
     try {
-      await api.patch('/api/orders', { id: o.id, action: 'complete_serve' });
+      await api.patch('/api/orders', { orderId: o.id, action: 'complete_serve' });
       setLeaving(true); setTx(500);
       setTimeout(onServed, 300);
     } catch { setServing(false); }
