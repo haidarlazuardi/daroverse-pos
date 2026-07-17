@@ -471,48 +471,42 @@ export default function InventoryPage() {
           ) : movements.length === 0 ? (
             <div className="empty-state"><p className="empty-title">Belum ada riwayat mutasi stok</p></div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b" style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}>
-                    {['Waktu','Bahan','Tipe','Qty','Lokasi','Keterangan'].map(h => (
-                      <th key={h} className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--text-3)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y" style={{ borderColor: 'var(--border)' }}>
-                  {movements.map((m: any) => {
-                    const typeColor: Record<string, string> = {
-                      SALE: '#dc2626', PURCHASE: '#16a34a', ADJUSTMENT: '#f59e0b',
-                      WASTE: '#7c3aed', TRANSFER: '#2563eb', PRODUCTION: '#0891b2',
-                    };
-                    const typeLabel: Record<string, string> = {
-                      SALE: 'Penjualan', PURCHASE: 'Pembelian', ADJUSTMENT: 'Penyesuaian',
-                      WASTE: 'Waste', TRANSFER: 'Transfer', PRODUCTION: 'Produksi',
-                    };
-                    const isDebit = ['SALE','WASTE','TRANSFER','PRODUCTION'].includes(m.type);
-                    return (
-                      <tr key={m.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-2.5 text-xs" style={{ color: 'var(--text-3)' }}>
-                          {new Date(m.createdAt).toLocaleDateString('id-ID', { day:'2-digit', month:'short' })}{' '}
-                          {new Date(m.createdAt).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' })}
-                        </td>
-                        <td className="px-4 py-2.5 font-medium" style={{ color: 'var(--text-1)' }}>{m.ingredient?.name || '-'}</td>
-                        <td className="px-4 py-2.5">
-                          <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: `${typeColor[m.type] || '#6b7280'}18`, color: typeColor[m.type] || '#6b7280' }}>
-                            {typeLabel[m.type] || m.type}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 font-bold" style={{ color: isDebit ? '#dc2626' : '#16a34a' }}>
-                          {isDebit ? '−' : '+'}{m.quantity} {m.ingredient?.unit || ''}
-                        </td>
-                        <td className="px-4 py-2.5 text-xs" style={{ color: 'var(--text-2)' }}>{m.location || '-'}</td>
-                        <td className="px-4 py-2.5 text-xs max-w-xs truncate" style={{ color: 'var(--text-3)' }}>{m.notes || '-'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+              {movements.map((m: any) => {
+                const typeLabel: Record<string, string> = {
+                  SALE: 'Sales', PURCHASE: 'Purchase', ADJUSTMENT: 'Adjustment',
+                  WASTE: 'Waste', TRANSFER: 'Transfer', PRODUCTION: 'Production',
+                };
+                const typeColor: Record<string, string> = {
+                  SALE: '#dc2626', PURCHASE: '#16a34a', ADJUSTMENT: '#f59e0b',
+                  WASTE: '#7c3aed', TRANSFER: '#2563eb', PRODUCTION: '#0891b2',
+                };
+                const isDebit = m.quantity < 0;
+                const absQty = Math.abs(m.quantity);
+                return (
+                  <div key={m.id} className="flex items-center px-4 py-3 gap-4">
+                    {/* Ingredient name */}
+                    <span className="flex-1 text-sm font-medium" style={{ color: 'var(--text-1)' }}>
+                      {m.ingredient?.name || '-'}
+                    </span>
+                    {/* Qty */}
+                    <span className="text-sm font-black w-28 text-right tabular-nums" style={{ color: isDebit ? '#dc2626' : '#16a34a' }}>
+                      {isDebit ? '−' : '+'}{absQty} {m.ingredient?.unit || ''}
+                    </span>
+                    {/* Type badge */}
+                    <span className="text-xs px-2.5 py-1 rounded-full font-semibold w-24 text-center flex-shrink-0"
+                      style={{ background: `${typeColor[m.type] || '#6b7280'}15`, color: typeColor[m.type] || '#6b7280' }}>
+                      {typeLabel[m.type] || m.type}
+                    </span>
+                    {/* Time */}
+                    <span className="text-xs w-20 text-right flex-shrink-0" style={{ color: 'var(--text-3)' }}>
+                      {new Date(m.createdAt).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                      <br/>
+                      {new Date(m.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

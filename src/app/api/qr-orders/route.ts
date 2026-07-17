@@ -91,18 +91,19 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
         });
         if (product?.recipe?.items) {
           for (const ri of product.recipe.items) {
+            const deductQty = ri.quantity * item.quantity;
             await prisma.stockLevel.updateMany({
               where: { ingredientId: ri.ingredientId },
-              data: { quantity: { decrement: ri.quantity * item.quantity } },
+              data: { quantity: { decrement: deductQty } },
             });
-            // Log movement
             await prisma.stockMovement.create({
               data: {
                 ingredientId: ri.ingredientId,
                 type: 'SALE' as any,
-                quantity: ri.quantity * item.quantity,
-                location: 'BAR',
-                notes: `${item.name} ×${item.quantity} — QR Menu #${orderNum}`,
+                quantity: -deductQty,
+                location: product.station === 'FOOD' ? 'KITCHEN' : 'BAR',
+                reference: posOrder.id,
+                notes: `Sales — ${item.name} ×${item.quantity}`,
                 createdBy: user.userId,
               },
             });
