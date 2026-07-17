@@ -302,12 +302,13 @@ export default function POSPage() {
         ]);
         const orders = posRes.orders || posRes || [];
         setQueueOrders(orders);
-        setQueueCount(orders.length);
         const qr = Array.isArray(qrRes) ? qrRes : [];
+        setQueueCount(orders.length + qr.length);
         setQrOrders(prev => {
           if (qr.length > prev.length) {
             setToast(`🔔 Bukti bayar baru dari ${qr[0]?.customerName || 'customer'}`);
             setTimeout(() => setToast(''), 4000);
+            setRightTab('queue'); // auto-switch ke queue tab
           }
           return qr;
         });

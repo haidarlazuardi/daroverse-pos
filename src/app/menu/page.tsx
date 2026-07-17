@@ -355,28 +355,29 @@ function MenuContent() {
         <p className="text-sm text-[#7A9A7E] mt-0.5">Order #{order.orderNumber} · Meja {tableId}</p>
       </div>
 
-      <div className="px-4 pt-2 pb-6 flex flex-col gap-5">
-        {/* Countdown */}
-        <div className="bg-white rounded-3xl p-5 flex flex-col items-center shadow-sm border border-[#F0E8D8]">
-          <p className="text-xs font-black uppercase tracking-widest text-[#9CAF9E] mb-3">Batas Waktu Pembayaran</p>
-          <Countdown expiresAt={order.expiresAt} onExpired={() => { setOrderStatus('CANCELLED'); setStep('status'); }} />
-        </div>
-
-        {/* Total */}
-        <div className="bg-[#48654D] rounded-3xl px-5 py-4 flex justify-between items-center">
-          <span className="text-white/80 text-sm font-medium">Total Bayar</span>
-          <span className="text-white font-black text-2xl">{formatCurrency(order.total)}</span>
+      <div className="px-4 pt-2 pb-6 flex flex-col gap-4">
+        {/* Countdown + Total — combined card */}
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#F0E8D8]">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-widest text-[#9CAF9E]">Total Bayar</p>
+              <p className="text-3xl font-black text-[#48654D] mt-0.5">{formatCurrency(order.total)}</p>
+            </div>
+            <Countdown expiresAt={order.expiresAt} onExpired={() => { setOrderStatus('CANCELLED'); setStep('status'); }} />
+          </div>
+          <div className="bg-[#F6EDDB] rounded-2xl px-3 py-2 text-xs text-[#7A9A7E] font-medium text-center">
+            Scan QRIS di bawah · bayar sebelum waktu habis
+          </div>
         </div>
 
         {/* QRIS */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#F0E8D8]">
-          <p className="text-xs font-black uppercase tracking-widest text-[#9CAF9E] mb-4 text-center">Scan QRIS untuk Bayar</p>
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#F0E8D8] flex flex-col items-center">
           {settings?.qrisImageB64 ? (
-            <img src={settings.qrisImageB64} alt="QRIS" className="w-56 h-56 mx-auto rounded-2xl object-contain" />
+            <img src={settings.qrisImageB64} alt="QRIS" className="w-64 h-64 rounded-2xl object-contain" />
           ) : (
-            <div className="w-56 h-56 mx-auto rounded-2xl bg-[#F6EDDB] border-2 border-dashed border-[#C8D9C9] flex flex-col items-center justify-center gap-2">
-              <span className="text-4xl">📱</span>
-              <p className="text-xs text-center text-[#9CAF9E] font-medium px-4">QR Code QRIS akan ditampilkan di sini</p>
+            <div className="w-64 h-64 rounded-2xl bg-[#F6EDDB] border-2 border-dashed border-[#C8D9C9] flex flex-col items-center justify-center gap-2">
+              <span className="text-5xl">📱</span>
+              <p className="text-xs text-center text-[#9CAF9E] font-medium px-6">QR Code QRIS Soeka House</p>
             </div>
           )}
           {settings?.qrisName && (
@@ -386,8 +387,8 @@ function MenuContent() {
 
         {/* Upload proof */}
         <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#F0E8D8]">
-          <p className="text-xs font-black uppercase tracking-widest text-[#9CAF9E] mb-4">Upload Bukti Pembayaran</p>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment"
+          <p className="text-xs font-black uppercase tracking-widest text-[#9CAF9E] mb-4">Sudah Bayar? Upload Bukti</p>
+          <input ref={fileRef} type="file" accept="image/*"
             className="hidden" onChange={handleProofSelect} />
 
           {proofPreview ? (
@@ -400,15 +401,15 @@ function MenuContent() {
               <button onClick={handleUploadProof} disabled={uploading}
                 className="w-full py-4 rounded-2xl bg-[#48654D] text-white font-black text-base disabled:opacity-60 active:bg-[#3a5040] transition-all"
                 style={{ boxShadow: '0 6px 24px rgba(72,101,77,0.3)' }}>
-                {uploading ? 'Mengirim...' : '✓ Konfirmasi Pembayaran'}
+                {uploading ? 'Mengirim...' : '✓ Kirim Bukti Pembayaran'}
               </button>
             </div>
           ) : (
             <button onClick={() => fileRef.current?.click()}
               className="w-full py-5 rounded-2xl border-2 border-dashed border-[#C8D9C9] bg-[#F6EDDB] flex flex-col items-center gap-2 active:bg-[#EDE5D5] transition-colors">
-              <span className="text-3xl">📷</span>
-              <span className="text-sm font-bold text-[#48654D]">Foto / Upload Bukti Transfer</span>
-              <span className="text-xs text-[#9CAF9E]">JPG atau PNG, maks 5MB</span>
+              <span className="text-3xl">📎</span>
+              <span className="text-sm font-bold text-[#48654D]">Pilih File Bukti Transfer</span>
+              <span className="text-xs text-[#9CAF9E]">Screenshot atau foto dari galeri</span>
             </button>
           )}
         </div>
