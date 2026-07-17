@@ -111,6 +111,7 @@ function MenuContent() {
   const [selCat, setSelCat] = useState('');
   const [search, setSearch] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [payMethod, setPayMethod] = useState<'QRIS'|'BCA'|'CASH'>('QRIS');
   const [proofPreview, setProofPreview] = useState('');
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -194,7 +195,7 @@ function MenuContent() {
       const r = await fetch('/api/public/qr-orders', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: order.id, action: 'upload_proof', proofB64: proofPreview }),
+        body: JSON.stringify({ id: order.id, action: 'upload_proof', proofB64: proofPreview, payMethod }),
       });
       const d = await r.json();
       if (d.data) { setOrderStatus('PAYMENT_UPLOADED'); setStep('status'); }
@@ -473,47 +474,130 @@ function MenuContent() {
           <Countdown expiresAt={order.expiresAt} onExpired={() => { setOrderStatus('CANCELLED'); setStep('status'); }}/>
         </div>
 
-        {/* QRIS */}
-        <div className="rounded-2xl p-5 border" style={{ background: 'white', borderColor: '#EDE5D8' }}>
-          <p className="text-xs tracking-widest uppercase font-semibold mb-4 text-center" style={{ color: muted }}>Scan QRIS untuk Bayar</p>
-          {settings?.qrisImageB64 ? (
-            <img src={settings.qrisImageB64} alt="QRIS" className="w-64 h-64 mx-auto rounded-xl object-contain"/>
-          ) : (
-            <div className="w-64 h-64 mx-auto rounded-xl flex flex-col items-center justify-center gap-3 border-2 border-dashed" style={{ borderColor: '#E8E0D5', background: cream }}>
-              <span className="text-5xl">📱</span>
-              <p className="text-xs text-center px-6 font-medium" style={{ color: muted }}>QR Code QRIS Soeka House</p>
-            </div>
-          )}
-          {settings?.qrisName && <p className="text-center text-sm font-bold mt-3" style={{ color: green }}>{settings.qrisName}</p>}
+        {/* Payment method selector */}
+        <div className="rounded-2xl p-4 border" style={{ background: 'white', borderColor: '#EDE5D8' }}>
+          <p className="text-xs tracking-widest uppercase font-semibold mb-3" style={{ color: muted }}>Metode Bayar</p>
+          <div className="grid grid-cols-3 gap-2">
+            {([
+              { id: 'QRIS', icon: '📱', label: 'QRIS' },
+              { id: 'BCA',  icon: '🏦', label: 'Transfer BCA' },
+              { id: 'CASH', icon: '💵', label: 'Bayar di Kasir' },
+            ] as const).map(m => (
+              <button key={m.id} onClick={() => setPayMethod(m.id)}
+                className="flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 transition-all"
+                style={{
+                  borderColor: payMethod === m.id ? dark : '#E8E0D5',
+                  background: payMethod === m.id ? dark : 'white',
+                }}>
+                <span className="text-xl">{m.icon}</span>
+                <span className="text-xs font-bold leading-tight text-center"
+                  style={{ color: payMethod === m.id ? bg : muted }}>{m.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Upload */}
-        <div className="rounded-2xl p-5 border" style={{ background: 'white', borderColor: '#EDE5D8' }}>
-          <p className="text-xs tracking-widest uppercase font-semibold mb-4" style={{ color: muted }}>Sudah Bayar? Upload Bukti</p>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleProofSelect}/>
-          {proofPreview ? (
-            <div className="space-y-3">
-              <div className="relative">
-                <img src={proofPreview} alt="Bukti" className="w-full rounded-xl object-cover max-h-52"/>
-                <button onClick={() => setProofPreview('')}
-                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-red-400 font-black text-xs">✕</button>
+        {/* QRIS */}
+        {payMethod === 'QRIS' && (
+          <div className="rounded-2xl p-5 border" style={{ background: 'white', borderColor: '#EDE5D8' }}>
+            <p className="text-xs tracking-widest uppercase font-semibold mb-4 text-center" style={{ color: muted }}>Scan QRIS untuk Bayar</p>
+            {settings?.qrisImageB64 ? (
+              <img src={settings.qrisImageB64} alt="QRIS" className="w-64 h-64 mx-auto rounded-xl object-contain"/>
+            ) : (
+              <div className="w-64 h-64 mx-auto rounded-xl flex flex-col items-center justify-center gap-3 border-2 border-dashed" style={{ borderColor: '#E8E0D5', background: cream }}>
+                <span className="text-5xl">📱</span>
+                <p className="text-xs text-center px-6 font-medium" style={{ color: muted }}>QR Code QRIS Soeka House</p>
               </div>
-              <button onClick={handleUploadProof} disabled={uploading}
-                className="w-full py-4 rounded-xl font-black text-base disabled:opacity-50 transition-all"
-                style={{ background: green, color: 'white', ...serif }}>
-                {uploading ? 'Mengirim...' : '✓ Kirim Bukti Pembayaran'}
-              </button>
+            )}
+            {settings?.qrisName && <p className="text-center text-sm font-bold mt-3" style={{ color: green }}>{settings.qrisName}</p>}
+          </div>
+        )}
+
+        {/* BCA Transfer */}
+        {payMethod === 'BCA' && (
+          <div className="rounded-2xl p-5 border" style={{ background: 'white', borderColor: '#EDE5D8' }}>
+            <p className="text-xs tracking-widest uppercase font-semibold mb-4" style={{ color: muted }}>Transfer BCA</p>
+            <div className="rounded-xl p-4 mb-3" style={{ background: cream }}>
+              <p className="text-xs font-semibold mb-1" style={{ color: muted }}>No. Rekening</p>
+              <p className="text-2xl font-black tracking-widest" style={{ color: dark, ...serif }}>
+                {settings?.bcaAccount || '1234567890'}
+              </p>
+              <p className="text-sm font-semibold mt-1" style={{ color: green }}>
+                a/n {settings?.bcaName || 'Soeka House'}
+              </p>
             </div>
-          ) : (
-            <button onClick={() => fileRef.current?.click()}
-              className="w-full py-6 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 transition-all"
-              style={{ borderColor: '#D8D0C5', background: cream }}>
-              <span className="text-3xl">📎</span>
-              <span className="text-sm font-bold" style={{ color: dark }}>Pilih File Bukti Transfer</span>
-              <span className="text-xs" style={{ color: muted }}>Screenshot atau foto dari galeri</span>
-            </button>
-          )}
-        </div>
+            <div className="rounded-xl p-3 flex items-center gap-2" style={{ background: '#FEF9C3', borderColor: '#FDE047' }}>
+              <span className="text-lg">⚠️</span>
+              <p className="text-xs font-medium" style={{ color: '#854D0E' }}>
+                Transfer tepat <strong>{formatCurrency(order.total)}</strong> untuk memudahkan verifikasi
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Cash - langsung ke kasir */}
+        {payMethod === 'CASH' && (
+          <div className="rounded-2xl p-5 border text-center" style={{ background: 'white', borderColor: '#EDE5D8' }}>
+            <span className="text-5xl">🧾</span>
+            <p className="text-lg font-black mt-3 mb-1" style={{ ...serif, color: dark }}>Bayar di Kasir</p>
+            <p className="text-sm" style={{ color: muted }}>Tunjukkan halaman ini ke kasir dan bayar langsung di counter</p>
+            <div className="mt-4 rounded-xl p-3" style={{ background: cream }}>
+              <p className="text-xs font-semibold" style={{ color: muted }}>Kode Order</p>
+              <p className="text-xl font-black font-mono mt-1" style={{ color: dark }}>#{order.orderNumber}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Upload bukti — untuk QRIS dan BCA */}
+        {payMethod !== 'CASH' && (
+          <div className="rounded-2xl p-5 border" style={{ background: 'white', borderColor: '#EDE5D8' }}>
+            <p className="text-xs tracking-widest uppercase font-semibold mb-4" style={{ color: muted }}>Sudah Bayar? Upload Bukti</p>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleProofSelect}/>
+            {proofPreview ? (
+              <div className="space-y-3">
+                <div className="relative">
+                  <img src={proofPreview} alt="Bukti" className="w-full rounded-xl object-cover max-h-52"/>
+                  <button onClick={() => setProofPreview('')}
+                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-red-400 font-black text-xs">✕</button>
+                </div>
+                <button onClick={handleUploadProof} disabled={uploading}
+                  className="w-full py-4 rounded-xl font-black text-base disabled:opacity-50 transition-all"
+                  style={{ background: green, color: 'white', ...serif }}>
+                  {uploading ? 'Mengirim...' : '✓ Kirim Bukti Pembayaran'}
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => fileRef.current?.click()}
+                className="w-full py-6 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 transition-all"
+                style={{ borderColor: '#D8D0C5', background: cream }}>
+                <span className="text-3xl">📎</span>
+                <span className="text-sm font-bold" style={{ color: dark }}>Pilih File Bukti Transfer</span>
+                <span className="text-xs" style={{ color: muted }}>Screenshot atau foto dari galeri</span>
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Cash — tombol konfirmasi langsung */}
+        {payMethod === 'CASH' && (
+          <button onClick={async () => {
+            setUploading(true);
+            try {
+              const r = await fetch('/api/public/qr-orders', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: order.id, action: 'upload_proof', proofB64: null, payMethod: 'CASH' }),
+              });
+              const d = await r.json();
+              if (d.data) { setOrderStatus('PAYMENT_UPLOADED'); setStep('status'); }
+            } catch { alert('Gagal, coba lagi'); }
+            finally { setUploading(false); }
+          }} disabled={uploading}
+            className="w-full py-4 rounded-2xl font-black text-base disabled:opacity-50"
+            style={{ background: dark, color: bg, ...serif }}>
+            {uploading ? 'Memproses...' : '✓ Saya Akan Bayar di Kasir'}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -546,8 +630,16 @@ function MenuContent() {
             </div>
           )}
 
+          {orderStatus === 'CONFIRMED' && (
+            <button onClick={() => { clearSession(); setStepRaw('menu'); setCartRaw([]); setOrderRaw(null); setOrderStatusRaw(''); setNameRaw(''); setPhoneRaw(''); }}
+              className="w-full py-4 rounded-2xl font-black text-base mt-2"
+              style={{ background: dark, color: bg, ...serif }}>
+              Pesan Lagi →
+            </button>
+          )}
+
           {orderStatus === 'CANCELLED' && (
-            <button onClick={() => { clearSession(); setStep('menu'); setCartRaw([]); setOrderRaw(null); setOrderStatusRaw(''); }}
+            <button onClick={() => { clearSession(); setStepRaw('menu'); setCartRaw([]); setOrderRaw(null); setOrderStatusRaw(''); setNameRaw(''); setPhoneRaw(''); }}
               className="w-full py-4 rounded-2xl font-black text-base" style={{ background: dark, color: bg, ...serif }}>
               Pesan Ulang →
             </button>

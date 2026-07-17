@@ -45,15 +45,16 @@ export async function POST(req: NextRequest) {
 // PATCH — upload proof or get status
 export async function PATCH(req: NextRequest) {
   try {
-    const { id, action, proofB64 } = await req.json();
+    const body = await req.json();
+    const { id, action, proofB64 } = body;
     if (!id || !action) return error('id dan action wajib', 400);
 
     const order = await (prisma as any).qROrder.findUnique({ where: { id } });
     if (!order) return error('Order tidak ditemukan', 404);
 
     if (action === 'upload_proof') {
-      if (!proofB64) return error('Bukti bayar wajib', 400);
-      // Check expired
+      const isCash = body.payMethod === 'CASH';
+      if (!isCash && !proofB64) return error('Bukti bayar wajib', 400);
       if (new Date() > new Date(order.expiresAt)) {
         await (prisma as any).qROrder.update({ where: { id }, data: { status: 'CANCELLED' } });
         return error('Order sudah expired', 400);
@@ -61,7 +62,12 @@ export async function PATCH(req: NextRequest) {
       const proofExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
       const updated = await (prisma as any).qROrder.update({
         where: { id },
-        data: { status: 'PAYMENT_UPLOADED', paymentProof: proofB64, proofExpiresAt },
+        data: {
+          status: 'PAYMENT_UPLOADED',
+          paymentProof: isCash ? null : proofB64,
+          proofExpiresAt: isCash ? null : proofExpiresAt,
+          notes: body.payMethod ? `[${body.payMethod}]` : null,
+        },
       });
       return success(updated);
     }
