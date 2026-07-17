@@ -155,7 +155,78 @@ function CustomerSearch({ phone, name, onSelect, onClear, onNew }: {
   );
 }
 
-// ── QueueCard ─────────────────────────────────────────────────────────────
+// ── QROrderCard — bukti bayar bisa di-tap full screen ─────────────────────
+function QROrderCard({ qr, onConfirm, onCancel }: { qr: any; onConfirm: () => void; onCancel: () => void }) {
+  const [proofOpen, setProofOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const items: any[] = qr.items || [];
+
+  return (
+    <>
+      <div className="mb-2 border-2 border-amber-200 bg-amber-50 rounded-xl p-3">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <p className="font-bold text-sm text-amber-900">{qr.customerName}</p>
+            <p className="text-xs text-amber-700">#{qr.orderNumber} · Meja {qr.tableId}</p>
+          </div>
+          <p className="font-black text-sm text-amber-800">{formatCurrency(qr.total)}</p>
+        </div>
+
+        {/* Items preview */}
+        <div className="mb-2 space-y-0.5">
+          {items.slice(0,3).map((i: any, idx: number) => (
+            <p key={idx} className="text-xs text-amber-700">• {i.name} ×{i.quantity}</p>
+          ))}
+          {items.length > 3 && <p className="text-xs text-amber-500">+{items.length-3} item lainnya</p>}
+        </div>
+
+        {/* Proof thumbnail — tap to expand */}
+        {qr.paymentProof && (
+          <button onClick={() => setProofOpen(true)}
+            className="w-full mb-2 rounded-lg overflow-hidden border border-amber-200 relative group">
+            <img src={qr.paymentProof} alt="Bukti" className="w-full h-24 object-cover"/>
+            <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <span className="text-white text-xs font-bold bg-black/50 px-2 py-1 rounded-full">🔍 Lihat</span>
+            </div>
+          </button>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-2">
+          <button
+            disabled={confirming}
+            onClick={async () => { setConfirming(true); await onConfirm(); }}
+            className="flex-1 py-2 rounded-xl text-xs font-bold text-white disabled:opacity-60 transition-all"
+            style={{ background: '#48654D' }}>
+            {confirming ? '⏳ Konfirmasi...' : '✓ Konfirmasi & Proses'}
+          </button>
+          <button onClick={onCancel}
+            className="px-3 py-2 rounded-xl text-xs font-bold text-red-500 bg-red-50 border border-red-200">
+            Tolak
+          </button>
+        </div>
+      </div>
+
+      {/* Full screen proof viewer */}
+      {proofOpen && qr.paymentProof && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center"
+          onClick={() => setProofOpen(false)}>
+          <div className="absolute top-4 right-4">
+            <button className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-white font-bold">✕</button>
+          </div>
+          <p className="text-white text-xs mb-3 opacity-60">Tap untuk tutup</p>
+          <img src={qr.paymentProof} alt="Bukti bayar"
+            className="max-w-full max-h-[80vh] rounded-xl object-contain"
+            onClick={e => e.stopPropagation()}/>
+          <p className="text-white text-xs mt-3 opacity-60">{qr.customerName} · {formatCurrency(qr.total)}</p>
+        </div>
+      )}
+    </>
+  );
+}
+
+
 function QueueCard({ order: o, onServed }: { order: any; onServed: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const [tx, setTx]             = useState(0);
@@ -663,36 +734,22 @@ export default function POSPage() {
                   ⏳ Menunggu Konfirmasi ({qrOrders.length})
                 </p>
                 {qrOrders.map(qr => (
-                  <div key={qr.id} className="mb-2 border-2 border-amber-200 bg-amber-50 rounded-xl p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <p className="font-bold text-sm text-amber-900">{qr.customerName}</p>
-                        <p className="text-xs text-amber-700">#{qr.orderNumber} · Meja {qr.tableId}</p>
-                      </div>
-                      <p className="font-black text-sm text-amber-800">{formatCurrency(qr.total)}</p>
-                    </div>
-                    {qr.paymentProof && (
-                      <img src={qr.paymentProof} alt="Bukti" className="w-full h-28 object-contain rounded-lg bg-white mb-2 border border-amber-200" />
-                    )}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={async () => {
-                          await api.patch('/api/qr-orders', { id: qr.id, action: 'confirm' });
-                          setQrOrders(p => p.filter(x => x.id !== qr.id));
-                        }}
-                        className="flex-1 py-2 rounded-xl text-xs font-bold text-white bg-[#48654D] active:bg-[#3a5040]">
-                        ✓ Konfirmasi
-                      </button>
-                      <button
-                        onClick={async () => {
-                          await api.patch('/api/qr-orders', { id: qr.id, action: 'cancel' });
-                          setQrOrders(p => p.filter(x => x.id !== qr.id));
-                        }}
-                        className="px-3 py-2 rounded-xl text-xs font-bold text-red-500 bg-red-50 border border-red-200">
-                        Tolak
-                      </button>
-                    </div>
-                  </div>
+                  <QROrderCard key={qr.id} qr={qr}
+                    onConfirm={async () => {
+                      await api.patch('/api/qr-orders', { id: qr.id, action: 'confirm' });
+                      setQrOrders(p => p.filter(x => x.id !== qr.id));
+                      // Refresh queue so new POS order appears
+                      const res = await api.get<any>('/api/orders?queue=true&limit=50');
+                      const orders = res.orders || res || [];
+                      setQueueOrders(orders);
+                      setQueueCount(orders.length);
+                    }}
+                    onCancel={async () => {
+                      await api.patch('/api/qr-orders', { id: qr.id, action: 'cancel' });
+                      setQrOrders(p => p.filter(x => x.id !== qr.id));
+                      setQueueCount(p => Math.max(0, p - 1));
+                    }}
+                  />
                 ))}
               </div>
             )}

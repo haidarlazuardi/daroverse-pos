@@ -41,7 +41,9 @@ export default function InventoryPage() {
   const [form, setForm]         = useState(emptyForm);
   const [saving, setSaving]     = useState(false);
   const [formError, setFormError] = useState('');
-  const [tab, setTab]           = useState<'stock'|'alerts'>('stock');
+  const [tab, setTab]           = useState<'stock'|'alerts'|'movement'>('stock');
+  const [movements, setMovements] = useState<any[]>([]);
+  const [movLoading, setMovLoading] = useState(false);
 
   const [allRaw, setAllRaw] = useState<Ingredient[]>([]);
 
@@ -84,6 +86,16 @@ export default function InventoryPage() {
   }, [search, typeFilter]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Fetch movements when tab is active
+  useEffect(() => {
+    if (tab !== 'movement') return;
+    setMovLoading(true);
+    api.get<any[]>('/api/stock-movements?limit=100')
+      .then(setMovements)
+      .catch(() => {})
+      .finally(() => setMovLoading(false));
+  }, [tab]);
 
   function openAdd() {
     setEditing(null); setForm(emptyForm); setFormError(''); setSlideOpen(true);
@@ -288,11 +300,11 @@ export default function InventoryPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-4 bg-gray-100 p-1 rounded-xl w-fit">
-          {(['stock','alerts'] as const).map(t => (
+          {(['stock','alerts','movement'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={clsx('px-4 py-1.5 rounded-lg text-sm font-medium transition-all',
                 tab === t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700')}>
-              {t === 'stock' ? 'Semua Stok' : `Reorder Alert (${alertItems.length})`}
+              {t === 'stock' ? 'Semua Stok' : t === 'alerts' ? `Reorder Alert (${alertItems.length})` : 'Riwayat Mutasi'}
             </button>
           ))}
         </div>
@@ -449,6 +461,63 @@ export default function InventoryPage() {
           </div>
         )}
       </SlideOver>
+      {/* ── Movement Tab ──────────────────────────────────────────────────── */}
+      {tab === 'movement' && (
+        <div className="card overflow-hidden">
+          {movLoading ? (
+            <div className="flex justify-center py-10">
+              <div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--brand)', borderTopColor: 'transparent' }}/>
+            </div>
+          ) : movements.length === 0 ? (
+            <div className="empty-state"><p className="empty-title">Belum ada riwayat mutasi stok</p></div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b" style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}>
+                    {['Waktu','Bahan','Tipe','Qty','Lokasi','Keterangan'].map(h => (
+                      <th key={h} className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--text-3)' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y" style={{ borderColor: 'var(--border)' }}>
+                  {movements.map((m: any) => {
+                    const typeColor: Record<string, string> = {
+                      SALE: '#dc2626', PURCHASE: '#16a34a', ADJUSTMENT: '#f59e0b',
+                      WASTE: '#7c3aed', TRANSFER: '#2563eb', PRODUCTION: '#0891b2',
+                    };
+                    const typeLabel: Record<string, string> = {
+                      SALE: 'Penjualan', PURCHASE: 'Pembelian', ADJUSTMENT: 'Penyesuaian',
+                      WASTE: 'Waste', TRANSFER: 'Transfer', PRODUCTION: 'Produksi',
+                    };
+                    const isDebit = ['SALE','WASTE','TRANSFER','PRODUCTION'].includes(m.type);
+                    return (
+                      <tr key={m.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-2.5 text-xs" style={{ color: 'var(--text-3)' }}>
+                          {new Date(m.createdAt).toLocaleDateString('id-ID', { day:'2-digit', month:'short' })}{' '}
+                          {new Date(m.createdAt).toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit' })}
+                        </td>
+                        <td className="px-4 py-2.5 font-medium" style={{ color: 'var(--text-1)' }}>{m.ingredient?.name || '-'}</td>
+                        <td className="px-4 py-2.5">
+                          <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: `${typeColor[m.type] || '#6b7280'}18`, color: typeColor[m.type] || '#6b7280' }}>
+                            {typeLabel[m.type] || m.type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 font-bold" style={{ color: isDebit ? '#dc2626' : '#16a34a' }}>
+                          {isDebit ? '−' : '+'}{m.quantity} {m.ingredient?.unit || ''}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs" style={{ color: 'var(--text-2)' }}>{m.location || '-'}</td>
+                        <td className="px-4 py-2.5 text-xs max-w-xs truncate" style={{ color: 'var(--text-3)' }}>{m.notes || '-'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
     </AdminLayout>
   );
 }
