@@ -270,6 +270,8 @@ export default function POSPage() {
   const [showCart, setShowCart] = useState(false);
   const [rightTab, setRightTab] = useState<'cart'|'queue'>('cart');
   const [queueOrders, setQueueOrders] = useState<any[]>([]);
+  const [qrOrders, setQrOrders]       = useState<any[]>([]);
+  const [toast, setToast]             = useState<string>('');
   const [queueCount, setQueueCount]   = useState(0);
   const [selectedDiscount, setSelectedDiscount] = useState('');
   const [editLine, setEditLine] = useState<CartLine | null>(null);
@@ -294,14 +296,25 @@ export default function POSPage() {
   useEffect(() => {
     async function loadQueue() {
       try {
-        const res = await api.get<any>('/api/orders?queue=true&limit=50');
-        const orders = res.orders || res || [];
+        const [posRes, qrRes] = await Promise.all([
+          api.get<any>('/api/orders?queue=true&limit=50'),
+          api.get<any[]>('/api/qr-orders?status=PAYMENT_UPLOADED'),
+        ]);
+        const orders = posRes.orders || posRes || [];
         setQueueOrders(orders);
         setQueueCount(orders.length);
+        const qr = Array.isArray(qrRes) ? qrRes : [];
+        setQrOrders(prev => {
+          if (qr.length > prev.length) {
+            setToast(`🔔 Bukti bayar baru dari ${qr[0]?.customerName || 'customer'}`);
+            setTimeout(() => setToast(''), 4000);
+          }
+          return qr;
+        });
       } catch { /* silent */ }
     }
     loadQueue();
-    const t = setInterval(loadQueue, 30000);
+    const t = setInterval(loadQueue, 15000); // poll tiap 15s untuk QR
     return () => clearInterval(t);
   }, []);
   useEffect(() => {
@@ -632,20 +645,82 @@ export default function POSPage() {
           )}
         </div>
 
+        {/* Toast notification */}
+        {toast && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-gray-900 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg animate-in">
+            {toast}
+          </div>
+        )}
+
         {/* QUEUE TAB */}
         {step === 'cart' && rightTab === 'queue' && (
           <div className="flex-1 overflow-y-auto p-3">
-            {queueOrders.length === 0 ? (
+            {/* QR Orders pending payment */}
+            {qrOrders.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs font-black uppercase tracking-wide mb-2 px-1" style={{ color: '#F59E0B' }}>
+                  ⏳ Menunggu Konfirmasi ({qrOrders.length})
+                </p>
+                {qrOrders.map(qr => (
+                  <div key={qr.id} className="mb-2 border-2 border-amber-200 bg-amber-50 rounded-xl p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <p className="font-bold text-sm text-amber-900">{qr.customerName}</p>
+                        <p className="text-xs text-amber-700">#{qr.orderNumber} · Meja {qr.tableId}</p>
+                      </div>
+                      <p className="font-black text-sm text-amber-800">{formatCurrency(qr.total)}</p>
+                    </div>
+                    {qr.paymentProof && (
+                      <img src={qr.paymentProof} alt="Bukti" className="w-full h-28 object-contain rounded-lg bg-white mb-2 border border-amber-200" />
+                    )}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          await api.patch('/api/qr-orders', { id: qr.id, action: 'confirm' });
+                          setQrOrders(p => p.filter(x => x.id !== qr.id));
+                        }}
+                        className="flex-1 py-2 rounded-xl text-xs font-bold text-white bg-[#48654D] active:bg-[#3a5040]">
+                        ✓ Konfirmasi
+                      </button>
+                      <button
+                        onClick={async () => {
+                          await api.patch('/api/qr-orders', { id: qr.id, action: 'cancel' });
+                          setQrOrders(p => p.filter(x => x.id !== qr.id));
+                        }}
+                        className="px-3 py-2 rounded-xl text-xs font-bold text-red-500 bg-red-50 border border-red-200">
+                        Tolak
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Regular queue */}
+            {queueOrders.length === 0 && qrOrders.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full py-16 text-center">
                 <p className="text-3xl mb-3">✅</p>
                 <p className="font-semibold text-gray-500">Tidak ada pesanan aktif</p>
               </div>
-            ) : queueOrders.map(o => (
-              <QueueCard key={o.id} order={o} onServed={() => {
-                setQueueOrders(p => p.filter(x => x.id !== o.id));
-                setQueueCount(p => Math.max(0, p - 1));
-              }} />
-            ))}
+            ) : (
+              <>
+                {queueOrders.length > 0 && (
+                  <div>
+                    {qrOrders.length > 0 && (
+                      <p className="text-xs font-black uppercase tracking-wide mb-2 px-1" style={{ color: 'var(--text-3)' }}>
+                        Dalam Proses ({queueOrders.length})
+                      </p>
+                    )}
+                    {queueOrders.map(o => (
+                      <QueueCard key={o.id} order={o} onServed={() => {
+                        setQueueOrders(p => p.filter(x => x.id !== o.id));
+                        setQueueCount(p => Math.max(0, p - 1));
+                      }} />
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 

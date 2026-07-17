@@ -921,3 +921,49 @@ model PromoTemplate {
 
   @@map("promo_templates")
 }
+
+// ═══════════════════════════════════════════════════════
+//  QR MENU — Customer Self Order
+// ═══════════════════════════════════════════════════════
+
+enum QROrderStatus {
+  PENDING_PAYMENT  // customer sudah order, belum bayar
+  PAYMENT_UPLOADED // bukti sudah diupload, menunggu konfirmasi kasir
+  CONFIRMED        // kasir konfirmasi, masuk queue produksi
+  CANCELLED        // expired atau dibatalkan
+}
+
+model QROrder {
+  id             String        @id @default(cuid())
+  orderNumber    String        @unique
+  tableId        String?       // nomor meja
+  customerName   String
+  customerPhone  String?
+  status         QROrderStatus @default(PENDING_PAYMENT)
+  items          Json          // [{productId, name, price, quantity, subtotal}]
+  subtotal       Float
+  total          Float
+  paymentProof   String?       // base64 compressed image
+  proofExpiresAt DateTime?     // 24 jam dari upload
+  expiresAt      DateTime      // 10 menit dari created (countdown)
+  confirmedAt    DateTime?
+  confirmedBy    String?
+  posOrderId     String?       // link ke Order setelah confirmed
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([status])
+  @@index([expiresAt])
+  @@map("qr_orders")
+}
+
+model QRMenuSettings {
+  id          String   @id @default(cuid())
+  qrisImageB64 String? // QRIS image stored as base64
+  qrisName    String?  // nama rekening/merchant
+  tableCount  Int      @default(10)
+  welcomeMsg  String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("qr_menu_settings")
+}
