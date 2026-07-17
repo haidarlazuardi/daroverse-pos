@@ -47,6 +47,9 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
         orderNumber: orderNum,
         status: 'COMPLETED' as any,
         orderType: 'DINE_IN' as any,
+        userId: user.userId,
+        customerId,
+        billName: qrOrder.customerName,
         subtotal,
         discount: 0,
         tax: 0,
@@ -56,8 +59,6 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
         costTotal: 0,
         taxEnabled: false,
         serviceEnabled: false,
-        customerName: qrOrder.customerName,
-        customerId,
         notes: `[QR Menu] Meja ${qrOrder.tableId}`,
         items: {
           create: items.map((item: any) => ({
@@ -81,7 +82,7 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
       } as any,
     });
 
-    // Deduct stock
+    // Deduct stock + log movement
     for (const item of items) {
       try {
         const product = await prisma.product.findUnique({
@@ -93,6 +94,17 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
             await prisma.stockLevel.updateMany({
               where: { ingredientId: ri.ingredientId },
               data: { quantity: { decrement: ri.quantity * item.quantity } },
+            });
+            // Log movement
+            await prisma.stockMovement.create({
+              data: {
+                ingredientId: ri.ingredientId,
+                type: 'SALE' as any,
+                quantity: ri.quantity * item.quantity,
+                location: 'BAR',
+                notes: `${item.name} ×${item.quantity} — QR Menu #${orderNum}`,
+                createdBy: user.userId,
+              },
             });
           }
         }
