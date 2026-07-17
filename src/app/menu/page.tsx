@@ -189,16 +189,17 @@ function MenuContent() {
   }
 
   async function handleUploadProof() {
-    if (!proofPreview || !order) return;
+    if (!order) return;
+    if (payMethod !== 'CASH' && !proofPreview) return;
     setUploading(true);
     try {
       const r = await fetch('/api/public/qr-orders', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: order.id, action: 'upload_proof', proofB64: proofPreview, payMethod }),
+        body: JSON.stringify({ id: order.id, action: 'upload_proof', proofB64: proofPreview || null, payMethod }),
       });
       const d = await r.json();
-      if (d.data) { setOrderStatus('PAYMENT_UPLOADED'); setStep('status'); }
+      if (r.ok) { setOrderStatus('PAYMENT_UPLOADED'); setStep('status'); }
       else alert(d.error || 'Gagal upload');
     } catch { alert('Gagal, coba lagi'); }
     finally { setUploading(false); }
@@ -580,19 +581,7 @@ function MenuContent() {
 
         {/* Cash — tombol konfirmasi langsung */}
         {payMethod === 'CASH' && (
-          <button onClick={async () => {
-            setUploading(true);
-            try {
-              const r = await fetch('/api/public/qr-orders', {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: order.id, action: 'upload_proof', proofB64: null, payMethod: 'CASH' }),
-              });
-              const d = await r.json();
-              if (d.data) { setOrderStatus('PAYMENT_UPLOADED'); setStep('status'); }
-            } catch { alert('Gagal, coba lagi'); }
-            finally { setUploading(false); }
-          }} disabled={uploading}
+          <button onClick={handleUploadProof} disabled={uploading}
             className="w-full py-4 rounded-2xl font-black text-base disabled:opacity-50"
             style={{ background: dark, color: bg, ...serif }}>
             {uploading ? 'Memproses...' : '✓ Saya Akan Bayar di Kasir'}
