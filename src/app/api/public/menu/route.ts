@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
       include: { category: { select: { id: true, name: true, color: true } } },
       orderBy: { name: 'asc' },
     }),
-    prisma.category.findMany({ where: { active: true }, orderBy: { name: 'asc' } }),
+    prisma.category.findMany({ orderBy: { name: 'asc' } }),
     (prisma as any).qRMenuSettings.findFirst(),
   ]);
 
