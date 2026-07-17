@@ -1,15 +1,15 @@
 'use client';
-import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 function formatCurrency(n: number) {
-  return 'Rp ' + n.toLocaleString('id-ID');
+  return 'Rp\u00A0' + n.toLocaleString('id-ID');
 }
 
 type Product = { id: string; name: string; price: number; category: { id: string; name: string; color: string }; station: string };
 type CartItem = { productId: string; name: string; price: number; quantity: number };
 
-// ── Countdown ─────────────────────────────────────────────────────────────────
+// ── Countdown ────────────────────────────────────────────────────────────────
 function Countdown({ expiresAt, onExpired }: { expiresAt: string; onExpired: () => void }) {
   const [secs, setSecs] = useState(0);
   useEffect(() => {
@@ -22,72 +22,73 @@ function Countdown({ expiresAt, onExpired }: { expiresAt: string; onExpired: () 
     const t = setInterval(update, 1000);
     return () => clearInterval(t);
   }, [expiresAt, onExpired]);
-
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  const pct = Math.min(100, (secs / 600) * 100);
+  const m = Math.floor(secs / 60), s = secs % 60;
+  const pct = (secs / 600) * 100;
   const urgent = secs < 120;
-
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="relative w-28 h-28">
-        <svg className="w-28 h-28 -rotate-90" viewBox="0 0 112 112">
-          <circle cx="56" cy="56" r="48" fill="none" stroke="#E5E7EB" strokeWidth="8" />
-          <circle cx="56" cy="56" r="48" fill="none"
-            stroke={urgent ? '#EF4444' : '#48654D'} strokeWidth="8"
-            strokeLinecap="round"
-            strokeDasharray={`${2 * Math.PI * 48}`}
-            strokeDashoffset={`${2 * Math.PI * 48 * (1 - pct / 100)}`}
-            style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s' }} />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-black tabular-nums" style={{ color: urgent ? '#EF4444' : '#111' }}>
-            {String(m).padStart(2,'0')}:{String(s).padStart(2,'0')}
-          </span>
-          <span className="text-xs text-gray-400 font-medium">tersisa</span>
-        </div>
+    <div className="relative w-24 h-24 flex-shrink-0">
+      <svg className="w-24 h-24 -rotate-90" viewBox="0 0 96 96">
+        <circle cx="48" cy="48" r="40" fill="none" stroke="#E8DDD0" strokeWidth="5"/>
+        <circle cx="48" cy="48" r="40" fill="none"
+          stroke={urgent ? '#C0392B' : '#48654D'} strokeWidth="5" strokeLinecap="round"
+          strokeDasharray={`${2*Math.PI*40}`}
+          strokeDashoffset={`${2*Math.PI*40*(1-pct/100)}`}
+          style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s' }}/>
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-xl font-black tabular-nums" style={{ color: urgent ? '#C0392B' : '#1A1A1A', fontFamily: 'Georgia, serif' }}>
+          {String(m).padStart(2,'0')}:{String(s).padStart(2,'0')}
+        </span>
+        <span className="text-[9px] tracking-widest text-[#999] uppercase font-medium">menit</span>
       </div>
-      {urgent && secs > 0 && (
-        <p className="text-xs text-red-500 font-semibold animate-pulse text-center">
-          Segera upload bukti pembayaran!
-        </p>
-      )}
     </div>
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── FONT LOADER ──────────────────────────────────────────────────────────────
+function FontLoader() {
+  useEffect(() => {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=Inter:wght@400;500;600;700&display=swap';
+    document.head.appendChild(link);
+  }, []);
+  return null;
+}
+
+// ── MAIN ─────────────────────────────────────────────────────────────────────
 function MenuContent() {
   const searchParams = useSearchParams();
-  const tableId = searchParams.get('table') || '1';
+  const urlTable = searchParams.get('table') || '';
 
-  const [step, setStep] = useState<'menu'|'info'|'payment'|'status'>('menu');
+  const [step, setStep] = useState<'landing'|'menu'|'info'|'payment'|'status'>(urlTable ? 'menu' : 'landing');
+  const [tableId, setTableId] = useState(urlTable || '');
+  const [tableInput, setTableInput] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selCat, setSelCat] = useState('');
   const [search, setSearch] = useState('');
-  const [showCart, setShowCart] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [order, setOrder] = useState<any>(null);
-  const [proofFile, setProofFile] = useState<File | null>(null);
-  const [proofPreview, setProofPreview] = useState<string>('');
+  const [proofPreview, setProofPreview] = useState('');
   const [uploading, setUploading] = useState(false);
   const [orderStatus, setOrderStatus] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (!tableId) return;
+    setLoading(true);
     fetch(`/api/public/menu?table=${tableId}`)
       .then(r => r.json())
       .then(d => { setProducts(d.data?.products || []); setCategories(d.data?.categories || []); setSettings(d.data?.settings); })
       .finally(() => setLoading(false));
   }, [tableId]);
 
-  // Poll order status
   useEffect(() => {
     if (!order || step !== 'status') return;
     const poll = setInterval(async () => {
@@ -102,30 +103,26 @@ function MenuContent() {
     (!selCat || p.category.id === selCat) &&
     (!search || p.name.toLowerCase().includes(search.toLowerCase()))
   );
-  const grouped = categories
-    .map(c => ({ ...c, items: filtered.filter(p => p.category.id === c.id) }))
-    .filter(c => c.items.length > 0);
-
+  const grouped = categories.map(c => ({ ...c, items: filtered.filter(p => p.category.id === c.id) })).filter(c => c.items.length > 0);
   const totalItems = cart.reduce((s, i) => s + i.quantity, 0);
   const totalPrice = cart.reduce((s, i) => s + i.price * i.quantity, 0);
 
   function addToCart(p: Product) {
     setCart(prev => {
       const ex = prev.find(i => i.productId === p.id);
-      if (ex) return prev.map(i => i.productId === p.id ? { ...i, quantity: i.quantity + 1 } : i);
-      return [...prev, { productId: p.id, name: p.name, price: p.price, quantity: 1 }];
+      return ex ? prev.map(i => i.productId === p.id ? {...i, quantity: i.quantity+1} : i) : [...prev, {productId: p.id, name: p.name, price: p.price, quantity: 1}];
     });
   }
   function removeFromCart(id: string) {
-    setCart(prev => prev.map(i => i.productId === id ? { ...i, quantity: i.quantity - 1 } : i).filter(i => i.quantity > 0));
+    setCart(prev => prev.map(i => i.productId===id ? {...i, quantity: i.quantity-1} : i).filter(i => i.quantity > 0));
   }
-  function getQty(id: string) { return cart.find(i => i.productId === id)?.quantity || 0; }
+  function getQty(id: string) { return cart.find(i => i.productId===id)?.quantity || 0; }
 
   async function handleOrder() {
     if (!name.trim()) return;
     setSubmitting(true);
     try {
-      const items = cart.map(i => ({ productId: i.productId, name: i.name, price: i.price, quantity: i.quantity, subtotal: i.price * i.quantity }));
+      const items = cart.map(i => ({ productId: i.productId, name: i.name, price: i.price, quantity: i.quantity, subtotal: i.price*i.quantity }));
       const r = await fetch('/api/public/qr-orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -141,19 +138,15 @@ function MenuContent() {
   function handleProofSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    // Compress image
     const canvas = document.createElement('canvas');
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
-      const MAX = 800;
-      let w = img.width, h = img.height;
-      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+      const MAX = 900; let w = img.width, h = img.height;
+      if (w > MAX) { h = Math.round(h*MAX/w); w = MAX; }
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-      const b64 = canvas.toDataURL('image/jpeg', 0.7);
-      setProofPreview(b64);
-      setProofFile(file);
+      setProofPreview(canvas.toDataURL('image/jpeg', 0.75));
       URL.revokeObjectURL(url);
     };
     img.src = url;
@@ -175,84 +168,159 @@ function MenuContent() {
     finally { setUploading(false); }
   }
 
-  // ── MENU SCREEN ────────────────────────────────────────────────────────────
-  if (step === 'menu') return (
-    <div className="min-h-screen bg-[#F6EDDB]">
+  const serif = { fontFamily: "'Playfair Display', Georgia, serif" };
+  const sans  = { fontFamily: "'Inter', system-ui, sans-serif" };
+  const bg    = '#FAF7F2';
+  const cream = '#F2EBE0';
+  const dark  = '#1C1C1C';
+  const green = '#48654D';
+  const muted = '#8A8278';
+
+  // ── LANDING ──────────────────────────────────────────────────────────────
+  if (step === 'landing') return (
+    <div className="min-h-screen flex flex-col" style={{ background: bg, ...sans }}>
+      <FontLoader />
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-[#F6EDDB]/95 backdrop-blur-sm pb-2">
-        <div className="px-4 pt-5 pb-3">
-          <div className="flex items-center justify-between mb-1">
-            <div>
-              <h1 className="text-xl font-black tracking-tight text-[#2D4A32]">Soeka House</h1>
-              <p className="text-xs text-[#7A9A7E]">Meja {tableId} · Scan & Order</p>
-            </div>
-            <div className="w-10 h-10 rounded-2xl bg-[#48654D] flex items-center justify-center">
-              <span className="text-white font-black text-base">S</span>
-            </div>
-          </div>
-          {/* Search */}
-          <div className="relative mt-3">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#9CAF9E]" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Cari menu..."
-              className="w-full pl-9 pr-4 py-2.5 rounded-2xl bg-white/80 text-sm outline-none border border-[#E8DFD0] focus:border-[#48654D] transition-colors placeholder:text-[#BDBDBD]" />
-          </div>
-          {/* Category tabs */}
-          <div className="flex gap-2 mt-3 overflow-x-auto scrollbar-none pb-1">
-            <button onClick={() => setSelCat('')}
-              className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 ${!selCat ? 'bg-[#48654D] text-white shadow-sm' : 'bg-white/80 text-[#48654D] border border-[#E8DFD0]'}`}>
-              Semua
-            </button>
-            {categories.map(c => (
-              <button key={c.id} onClick={() => setSelCat(selCat === c.id ? '' : c.id)}
-                className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 ${selCat === c.id ? 'text-white shadow-sm' : 'bg-white/80 text-gray-600 border border-[#E8DFD0]'}`}
-                style={selCat === c.id ? { background: c.color || '#48654D' } : {}}>
-                {c.name}
-              </button>
-            ))}
+      <div className="px-6 pt-10 pb-6 flex items-start justify-between">
+        <div>
+          <p className="text-xs tracking-[0.2em] uppercase font-semibold mb-1" style={{ color: muted }}>Selamat Datang di</p>
+          <h1 className="text-4xl font-black leading-none tracking-tight" style={{ ...serif, color: dark }}>
+            Soeka<br /><em>House</em>
+          </h1>
+        </div>
+        <div className="w-11 h-11 rounded-full flex items-center justify-center mt-1" style={{ background: green }}>
+          <span className="text-white font-black text-lg" style={serif}>S</span>
+        </div>
+      </div>
+
+      {/* Hero strip */}
+      <div className="mx-6 rounded-2xl overflow-hidden mb-8" style={{ background: green, minHeight: 160 }}>
+        <div className="p-6 h-full flex flex-col justify-between" style={{ minHeight: 160 }}>
+          <p className="text-xs tracking-widest uppercase font-semibold" style={{ color: 'rgba(246,237,219,0.7)' }}>Scan & Order</p>
+          <div>
+            <p className="text-2xl font-black leading-tight" style={{ ...serif, color: '#F6EDDB' }}>
+              Pesan langsung<br /><em>dari mejamu.</em>
+            </p>
+            <p className="text-sm mt-2" style={{ color: 'rgba(246,237,219,0.7)', ...sans }}>Tanpa antri. Tanpa ribet.</p>
           </div>
         </div>
       </div>
 
+      {/* Table input */}
+      <div className="px-6 flex-1">
+        <p className="text-xs tracking-[0.15em] uppercase font-semibold mb-3" style={{ color: muted }}>Nomor Meja Kamu</p>
+        <div className="relative">
+          <input
+            type="number" value={tableInput}
+            onChange={e => setTableInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && tableInput && (setTableId(tableInput), setStep('menu'))}
+            placeholder="Contoh: 3"
+            className="w-full px-5 py-4 rounded-2xl text-2xl font-black outline-none border-2 transition-all"
+            style={{ background: 'white', borderColor: tableInput ? green : '#E8E0D5', color: dark, ...serif }}
+          />
+        </div>
+        <p className="text-xs mt-2" style={{ color: muted, ...sans }}>Lihat nomor meja di atas meja kamu</p>
+      </div>
+
+      <div className="px-6 pb-10 pt-6">
+        <button
+          onClick={() => { if (tableInput) { setTableId(tableInput); setStep('menu'); } }}
+          disabled={!tableInput}
+          className="w-full py-4 rounded-2xl font-black text-base transition-all disabled:opacity-40"
+          style={{ background: dark, color: bg, ...serif, letterSpacing: '-0.01em' }}>
+          Lihat Menu →
+        </button>
+      </div>
+    </div>
+  );
+
+  // ── MENU ─────────────────────────────────────────────────────────────────
+  if (step === 'menu') return (
+    <div className="min-h-screen" style={{ background: bg, ...sans }}>
+      <FontLoader />
+      {/* Sticky header */}
+      <div className="sticky top-0 z-30 px-5 pt-4 pb-3" style={{ background: `${bg}F0`, backdropFilter: 'blur(12px)' }}>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h1 className="text-xl font-black" style={{ ...serif, color: dark }}>Soeka House</h1>
+            <p className="text-xs" style={{ color: muted }}>Meja {tableId}</p>
+          </div>
+          {cart.length > 0 && (
+            <button onClick={() => setStep('info')}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full font-semibold text-sm"
+              style={{ background: dark, color: bg, ...sans }}>
+              <span className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-black" style={{ background: green }}>{totalItems}</span>
+              {formatCurrency(totalPrice)}
+            </button>
+          )}
+        </div>
+
+        {/* Search */}
+        <div className="relative mb-2.5">
+          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" fill="none" stroke={muted} strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Cari menu..."
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm outline-none border"
+            style={{ background: 'white', borderColor: '#E8E0D5', color: dark }}/>
+        </div>
+
+        {/* Category chips */}
+        <div className="flex gap-2 overflow-x-auto scrollbar-none">
+          {[{ id: '', name: 'Semua' }, ...categories].map(c => (
+            <button key={c.id} onClick={() => setSelCat(c.id)}
+              className="px-3.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 border transition-all"
+              style={selCat === c.id
+                ? { background: dark, color: bg, borderColor: dark }
+                : { background: 'white', color: muted, borderColor: '#E8E0D5' }}>
+              {c.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Products */}
-      <div className="px-4 pb-40">
+      <div className="px-5 pb-32">
         {loading ? (
           <div className="flex justify-center py-20">
-            <div className="w-8 h-8 border-3 border-[#48654D] border-t-transparent rounded-full animate-spin" />
+            <div className="w-7 h-7 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: green, borderTopColor: 'transparent' }}/>
           </div>
         ) : grouped.map(cat => (
-          <div key={cat.id} className="mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-2 h-2 rounded-full" style={{ background: cat.color || '#48654D' }} />
-              <h2 className="text-sm font-black uppercase tracking-widest text-[#48654D]">{cat.name}</h2>
+          <div key={cat.id} className="mb-8">
+            {/* Category header */}
+            <div className="flex items-baseline gap-3 mb-4 pt-2">
+              <h2 className="text-2xl font-black" style={{ ...serif, color: dark }}>{cat.name}</h2>
+              <div className="flex-1 h-px" style={{ background: '#E8E0D5' }}/>
+              <span className="text-xs" style={{ color: muted }}>{cat.items.length} menu</span>
             </div>
+
+            {/* Grid */}
             <div className="grid grid-cols-2 gap-3">
               {cat.items.map((p: Product) => {
                 const qty = getQty(p.id);
                 return (
-                  <div key={p.id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-[#F0E8D8] active:scale-[0.97] transition-transform">
-                    {/* Image placeholder */}
-                    <div className="h-28 flex items-center justify-center text-4xl"
-                      style={{ background: `${cat.color || '#48654D'}18` }}>
-                      {p.station === 'FOOD' ? '🍔' : '☕'}
+                  <div key={p.id} className="rounded-2xl overflow-hidden border" style={{ background: 'white', borderColor: '#EDE5D8' }}>
+                    {/* Thumbnail */}
+                    <div className="h-32 flex items-center justify-center" style={{ background: `${cat.color || green}12` }}>
+                      <span className="text-5xl">{p.station === 'FOOD' ? '🍔' : '☕'}</span>
                     </div>
+                    {/* Info */}
                     <div className="p-3">
-                      <p className="text-sm font-bold text-[#1A1A1A] leading-tight mb-1">{p.name}</p>
-                      <p className="text-xs font-black text-[#48654D] mb-2.5">{formatCurrency(p.price)}</p>
+                      <p className="text-sm font-bold leading-snug mb-0.5" style={{ color: dark }}>{p.name}</p>
+                      <p className="text-xs font-black mb-3" style={{ color: green }}>{formatCurrency(p.price)}</p>
                       {qty === 0 ? (
                         <button onClick={() => addToCart(p)}
-                          className="w-full py-2 rounded-xl bg-[#48654D] text-white text-xs font-bold active:bg-[#3a5040] transition-colors">
+                          className="w-full py-2 rounded-xl text-xs font-bold border-2 transition-all"
+                          style={{ borderColor: dark, color: dark, background: 'transparent' }}>
                           + Tambah
                         </button>
                       ) : (
-                        <div className="flex items-center justify-between bg-[#F0F7F1] rounded-xl px-2 py-1.5">
+                        <div className="flex items-center justify-between rounded-xl px-2 py-1" style={{ background: cream }}>
                           <button onClick={() => removeFromCart(p.id)}
-                            className="w-7 h-7 rounded-full bg-white shadow-sm flex items-center justify-center text-[#48654D] font-black text-base active:bg-gray-100">
+                            className="w-7 h-7 rounded-full flex items-center justify-center font-black text-base" style={{ background: 'white', color: dark }}>
                             −
                           </button>
-                          <span className="font-black text-[#48654D] text-base">{qty}</span>
+                          <span className="font-black text-base" style={{ color: dark }}>{qty}</span>
                           <button onClick={() => addToCart(p)}
-                            className="w-7 h-7 rounded-full bg-[#48654D] shadow-sm flex items-center justify-center text-white font-black text-base active:bg-[#3a5040]">
+                            className="w-7 h-7 rounded-full flex items-center justify-center font-black text-base text-white" style={{ background: dark }}>
                             +
                           </button>
                         </div>
@@ -264,152 +332,150 @@ function MenuContent() {
             </div>
           </div>
         ))}
+
+        {grouped.length === 0 && !loading && (
+          <div className="text-center py-20">
+            <p className="text-3xl mb-3">☕</p>
+            <p className="font-semibold" style={{ color: muted }}>Menu sedang disiapkan</p>
+          </div>
+        )}
       </div>
 
       {/* Cart FAB */}
       {totalItems > 0 && (
-        <div className="fixed bottom-6 left-4 right-4 z-40">
+        <div className="fixed bottom-6 left-5 right-5 z-40">
           <button onClick={() => setStep('info')}
-            className="w-full bg-[#48654D] text-white rounded-2xl py-4 px-5 flex items-center justify-between shadow-xl active:bg-[#3a5040] transition-colors"
-            style={{ boxShadow: '0 8px 32px rgba(72,101,77,0.4)' }}>
+            className="w-full py-4 px-5 rounded-2xl flex items-center justify-between font-bold shadow-2xl"
+            style={{ background: dark, color: bg, boxShadow: '0 8px 40px rgba(28,28,28,0.35)' }}>
             <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-xl bg-white/20 flex items-center justify-center">
-                <span className="font-black text-sm">{totalItems}</span>
-              </div>
-              <span className="font-bold text-sm">Lihat Pesanan</span>
+              <span className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-black" style={{ background: green }}>{totalItems}</span>
+              <span style={{ ...serif }}>Lihat Pesanan</span>
             </div>
-            <span className="font-black">{formatCurrency(totalPrice)}</span>
+            <span className="font-black" style={serif}>{formatCurrency(totalPrice)}</span>
           </button>
         </div>
       )}
     </div>
   );
 
-  // ── INFO SCREEN ────────────────────────────────────────────────────────────
+  // ── INFO ──────────────────────────────────────────────────────────────────
   if (step === 'info') return (
-    <div className="min-h-screen bg-[#F6EDDB] flex flex-col">
-      <div className="px-4 pt-6 pb-4 flex items-center gap-3">
-        <button onClick={() => setStep('menu')} className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center active:bg-gray-100">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#48654D" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+    <div className="min-h-screen flex flex-col" style={{ background: bg, ...sans }}>
+      <FontLoader />
+      <div className="px-5 pt-6 pb-4 flex items-center gap-3">
+        <button onClick={() => setStep('menu')} className="w-9 h-9 rounded-full border flex items-center justify-center" style={{ borderColor: '#E8E0D5', background: 'white' }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={dark} strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
-        <h1 className="text-lg font-black text-[#2D4A32]">Detail Pesanan</h1>
+        <h1 className="text-2xl font-black" style={{ ...serif, color: dark }}>Pesanan Kamu</h1>
       </div>
 
       {/* Cart items */}
-      <div className="px-4 mb-6 space-y-2">
+      <div className="px-5 space-y-2 mb-4">
         {cart.map(item => (
-          <div key={item.productId} className="bg-white rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm">
+          <div key={item.productId} className="flex items-center gap-3 py-3 border-b" style={{ borderColor: '#EDE5D8' }}>
             <div className="flex-1">
-              <p className="text-sm font-bold text-[#1A1A1A]">{item.name}</p>
-              <p className="text-xs font-semibold text-[#48654D]">{formatCurrency(item.price)}</p>
+              <p className="font-semibold text-sm" style={{ color: dark }}>{item.name}</p>
+              <p className="text-xs mt-0.5 font-bold" style={{ color: green }}>{formatCurrency(item.price)}</p>
             </div>
             <div className="flex items-center gap-2">
               <button onClick={() => removeFromCart(item.productId)}
-                className="w-7 h-7 rounded-full bg-[#F0F7F1] flex items-center justify-center text-[#48654D] font-black">−</button>
-              <span className="w-6 text-center font-black text-[#1A1A1A]">{item.quantity}</span>
+                className="w-7 h-7 rounded-full border flex items-center justify-center font-black" style={{ borderColor: '#E8E0D5' }}>−</button>
+              <span className="w-5 text-center font-black text-sm" style={{ color: dark }}>{item.quantity}</span>
               <button onClick={() => addToCart({ id: item.productId, name: item.name, price: item.price, category: { id: '', name: '', color: '' }, station: '' })}
-                className="w-7 h-7 rounded-full bg-[#48654D] flex items-center justify-center text-white font-black">+</button>
+                className="w-7 h-7 rounded-full flex items-center justify-center font-black text-white" style={{ background: dark }}>+</button>
             </div>
-            <p className="text-sm font-black text-[#48654D] w-20 text-right">{formatCurrency(item.price * item.quantity)}</p>
+            <p className="w-20 text-right font-black text-sm" style={{ color: dark }}>{formatCurrency(item.price * item.quantity)}</p>
           </div>
         ))}
-        <div className="bg-[#48654D] rounded-2xl px-4 py-3 flex justify-between items-center">
-          <span className="text-white font-bold">Total</span>
-          <span className="text-white font-black text-lg">{formatCurrency(totalPrice)}</span>
+        <div className="flex justify-between items-center pt-2">
+          <span className="font-bold" style={{ color: muted }}>Total</span>
+          <span className="text-2xl font-black" style={{ ...serif, color: dark }}>{formatCurrency(totalPrice)}</span>
         </div>
       </div>
+
+      {/* Divider */}
+      <div className="mx-5 my-2 h-px" style={{ background: '#EDE5D8' }} />
 
       {/* Customer info */}
-      <div className="px-4 space-y-3">
-        <p className="text-sm font-black text-[#2D4A32] uppercase tracking-wide">Data Kamu</p>
-        <div>
-          <input value={name} onChange={e => setName(e.target.value)}
-            placeholder="Nama *"
-            className="w-full px-4 py-3.5 rounded-2xl bg-white border border-[#E8DFD0] text-sm font-medium outline-none focus:border-[#48654D] transition-colors placeholder:text-[#BDBDBD]" />
-        </div>
-        <div>
-          <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
-            placeholder="No HP (opsional · untuk loyalty poin)"
-            className="w-full px-4 py-3.5 rounded-2xl bg-white border border-[#E8DFD0] text-sm font-medium outline-none focus:border-[#48654D] transition-colors placeholder:text-[#BDBDBD]" />
-        </div>
-        <p className="text-xs text-[#9CAF9E]">No HP dipakai untuk program loyalty Soeka House</p>
+      <div className="px-5 pt-4 space-y-3">
+        <p className="text-xs tracking-[0.15em] uppercase font-semibold" style={{ color: muted }}>Data Kamu</p>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="Nama *"
+          className="w-full px-4 py-3.5 rounded-xl border-2 outline-none text-sm font-medium transition-all"
+          style={{ borderColor: name ? dark : '#E8E0D5', background: 'white', color: dark }}/>
+        <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="No HP (opsional · untuk poin loyalty)"
+          className="w-full px-4 py-3.5 rounded-xl border outline-none text-sm font-medium transition-all"
+          style={{ borderColor: '#E8E0D5', background: 'white', color: dark }}/>
+        <p className="text-xs" style={{ color: muted }}>No HP untuk mendapat poin loyalty Soeka House ⭐</p>
       </div>
 
-      <div className="flex-1" />
-
-      <div className="px-4 pb-8 pt-4">
+      <div className="flex-1"/>
+      <div className="px-5 pb-8 pt-4">
         <button onClick={handleOrder} disabled={!name.trim() || submitting}
-          className="w-full bg-[#48654D] text-white rounded-2xl py-4 font-black text-base disabled:opacity-50 active:bg-[#3a5040] transition-all"
-          style={{ boxShadow: '0 8px 32px rgba(72,101,77,0.35)' }}>
+          className="w-full py-4 rounded-2xl font-black text-base transition-all disabled:opacity-40"
+          style={{ background: dark, color: bg, ...serif }}>
           {submitting ? 'Memproses...' : 'Lanjut ke Pembayaran →'}
         </button>
       </div>
     </div>
   );
 
-  // ── PAYMENT SCREEN ────────────────────────────────────────────────────────
+  // ── PAYMENT ───────────────────────────────────────────────────────────────
   if (step === 'payment' && order) return (
-    <div className="min-h-screen bg-[#F6EDDB] flex flex-col">
-      <div className="px-4 pt-6 pb-2">
-        <h1 className="text-xl font-black text-[#2D4A32]">Bayar Sekarang</h1>
-        <p className="text-sm text-[#7A9A7E] mt-0.5">Order #{order.orderNumber} · Meja {tableId}</p>
+    <div className="min-h-screen" style={{ background: bg, ...sans }}>
+      <FontLoader />
+      <div className="px-5 pt-6 pb-4">
+        <p className="text-xs tracking-widest uppercase font-semibold mb-1" style={{ color: muted }}>Meja {tableId} · #{order.orderNumber}</p>
+        <h1 className="text-3xl font-black" style={{ ...serif, color: dark }}>Bayar<br /><em>Sekarang.</em></h1>
       </div>
 
-      <div className="px-4 pt-2 pb-6 flex flex-col gap-4">
-        {/* Countdown + Total — combined card */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#F0E8D8]">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="text-xs font-black uppercase tracking-widest text-[#9CAF9E]">Total Bayar</p>
-              <p className="text-3xl font-black text-[#48654D] mt-0.5">{formatCurrency(order.total)}</p>
-            </div>
-            <Countdown expiresAt={order.expiresAt} onExpired={() => { setOrderStatus('CANCELLED'); setStep('status'); }} />
+      <div className="px-5 space-y-4 pb-10">
+        {/* Total + Countdown */}
+        <div className="rounded-2xl p-5 flex items-center justify-between" style={{ background: dark }}>
+          <div>
+            <p className="text-xs tracking-widest uppercase font-semibold mb-1" style={{ color: 'rgba(250,247,242,0.5)' }}>Total Bayar</p>
+            <p className="text-3xl font-black" style={{ ...serif, color: bg }}>{formatCurrency(order.total)}</p>
           </div>
-          <div className="bg-[#F6EDDB] rounded-2xl px-3 py-2 text-xs text-[#7A9A7E] font-medium text-center">
-            Scan QRIS di bawah · bayar sebelum waktu habis
-          </div>
+          <Countdown expiresAt={order.expiresAt} onExpired={() => { setOrderStatus('CANCELLED'); setStep('status'); }}/>
         </div>
 
         {/* QRIS */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#F0E8D8] flex flex-col items-center">
+        <div className="rounded-2xl p-5 border" style={{ background: 'white', borderColor: '#EDE5D8' }}>
+          <p className="text-xs tracking-widest uppercase font-semibold mb-4 text-center" style={{ color: muted }}>Scan QRIS untuk Bayar</p>
           {settings?.qrisImageB64 ? (
-            <img src={settings.qrisImageB64} alt="QRIS" className="w-64 h-64 rounded-2xl object-contain" />
+            <img src={settings.qrisImageB64} alt="QRIS" className="w-64 h-64 mx-auto rounded-xl object-contain"/>
           ) : (
-            <div className="w-64 h-64 rounded-2xl bg-[#F6EDDB] border-2 border-dashed border-[#C8D9C9] flex flex-col items-center justify-center gap-2">
+            <div className="w-64 h-64 mx-auto rounded-xl flex flex-col items-center justify-center gap-3 border-2 border-dashed" style={{ borderColor: '#E8E0D5', background: cream }}>
               <span className="text-5xl">📱</span>
-              <p className="text-xs text-center text-[#9CAF9E] font-medium px-6">QR Code QRIS Soeka House</p>
+              <p className="text-xs text-center px-6 font-medium" style={{ color: muted }}>QR Code QRIS Soeka House</p>
             </div>
           )}
-          {settings?.qrisName && (
-            <p className="text-center text-xs text-[#48654D] font-semibold mt-3">{settings.qrisName}</p>
-          )}
+          {settings?.qrisName && <p className="text-center text-sm font-bold mt-3" style={{ color: green }}>{settings.qrisName}</p>}
         </div>
 
-        {/* Upload proof */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#F0E8D8]">
-          <p className="text-xs font-black uppercase tracking-widest text-[#9CAF9E] mb-4">Sudah Bayar? Upload Bukti</p>
-          <input ref={fileRef} type="file" accept="image/*"
-            className="hidden" onChange={handleProofSelect} />
-
+        {/* Upload */}
+        <div className="rounded-2xl p-5 border" style={{ background: 'white', borderColor: '#EDE5D8' }}>
+          <p className="text-xs tracking-widest uppercase font-semibold mb-4" style={{ color: muted }}>Sudah Bayar? Upload Bukti</p>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleProofSelect}/>
           {proofPreview ? (
             <div className="space-y-3">
               <div className="relative">
-                <img src={proofPreview} alt="Bukti" className="w-full rounded-2xl object-cover max-h-48" />
-                <button onClick={() => { setProofPreview(''); setProofFile(null); }}
-                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white shadow flex items-center justify-center text-red-400 font-black text-sm">✕</button>
+                <img src={proofPreview} alt="Bukti" className="w-full rounded-xl object-cover max-h-52"/>
+                <button onClick={() => setProofPreview('')}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-red-400 font-black text-xs">✕</button>
               </div>
               <button onClick={handleUploadProof} disabled={uploading}
-                className="w-full py-4 rounded-2xl bg-[#48654D] text-white font-black text-base disabled:opacity-60 active:bg-[#3a5040] transition-all"
-                style={{ boxShadow: '0 6px 24px rgba(72,101,77,0.3)' }}>
+                className="w-full py-4 rounded-xl font-black text-base disabled:opacity-50 transition-all"
+                style={{ background: green, color: 'white', ...serif }}>
                 {uploading ? 'Mengirim...' : '✓ Kirim Bukti Pembayaran'}
               </button>
             </div>
           ) : (
             <button onClick={() => fileRef.current?.click()}
-              className="w-full py-5 rounded-2xl border-2 border-dashed border-[#C8D9C9] bg-[#F6EDDB] flex flex-col items-center gap-2 active:bg-[#EDE5D5] transition-colors">
+              className="w-full py-6 rounded-xl border-2 border-dashed flex flex-col items-center gap-2 transition-all"
+              style={{ borderColor: '#D8D0C5', background: cream }}>
               <span className="text-3xl">📎</span>
-              <span className="text-sm font-bold text-[#48654D]">Pilih File Bukti Transfer</span>
-              <span className="text-xs text-[#9CAF9E]">Screenshot atau foto dari galeri</span>
+              <span className="text-sm font-bold" style={{ color: dark }}>Pilih File Bukti Transfer</span>
+              <span className="text-xs" style={{ color: muted }}>Screenshot atau foto dari galeri</span>
             </button>
           )}
         </div>
@@ -417,47 +483,48 @@ function MenuContent() {
     </div>
   );
 
-  // ── STATUS SCREEN ─────────────────────────────────────────────────────────
+  // ── STATUS ────────────────────────────────────────────────────────────────
   if (step === 'status') {
-    const statusConfig: Record<string, { icon: string; title: string; sub: string; color: string }> = {
-      PAYMENT_UPLOADED: { icon: '⏳', title: 'Menunggu Konfirmasi', sub: 'Kasir sedang memverifikasi pembayaran kamu', color: '#F59E0B' },
-      CONFIRMED: { icon: '✅', title: 'Pesanan Dikonfirmasi!', sub: 'Pesanan kamu sedang diproses. Ditunggu ya!', color: '#48654D' },
-      CANCELLED: { icon: '❌', title: 'Order Dibatalkan', sub: 'Waktu pembayaran habis atau order dibatalkan', color: '#EF4444' },
+    const statusMap: Record<string, { icon: string; headline: string; sub: string }> = {
+      PAYMENT_UPLOADED: { icon: '⏳', headline: 'Menunggu\nKonfirmasi.', sub: 'Kasir sedang memverifikasi pembayaran kamu.' },
+      CONFIRMED:        { icon: '✅', headline: 'Pesanan\nDikonfirmasi!', sub: 'Pesanan kamu sedang diproses. Ditunggu ya!' },
+      CANCELLED:        { icon: '❌', headline: 'Order\nDibatalkan.', sub: 'Waktu habis atau order dibatalkan.' },
     };
-    const cfg = statusConfig[orderStatus] || statusConfig['PAYMENT_UPLOADED'];
-
+    const cfg = statusMap[orderStatus] || statusMap['PAYMENT_UPLOADED'];
     return (
-      <div className="min-h-screen bg-[#F6EDDB] flex flex-col items-center justify-center px-6 text-center">
-        <div className="text-7xl mb-6">{cfg.icon}</div>
-        <h1 className="text-2xl font-black text-[#2D4A32] mb-2">{cfg.title}</h1>
-        <p className="text-[#7A9A7E] text-sm mb-2">{cfg.sub}</p>
-        {order && <p className="text-xs text-[#9CAF9E] font-mono mb-8">#{order.orderNumber}</p>}
+      <div className="min-h-screen flex flex-col px-6" style={{ background: bg, ...sans }}>
+        <FontLoader />
+        <div className="flex-1 flex flex-col justify-center">
+          <span className="text-6xl mb-6">{cfg.icon}</span>
+          <h1 className="text-4xl font-black leading-tight mb-3 whitespace-pre-line" style={{ ...serif, color: dark }}>{cfg.headline}</h1>
+          <p className="text-base mb-2" style={{ color: muted }}>{cfg.sub}</p>
+          {order && <p className="text-xs font-mono mt-1 mb-8" style={{ color: muted }}>#{order.orderNumber} · Meja {tableId}</p>}
 
-        {orderStatus === 'CONFIRMED' && (
-          <div className="bg-white rounded-3xl p-5 w-full max-w-sm shadow-sm border border-[#F0E8D8] mb-6">
-            <p className="text-xs font-black uppercase tracking-widest text-[#9CAF9E] mb-3">Pesanan Kamu</p>
-            {cart.map(i => (
-              <div key={i.productId} className="flex justify-between py-1.5 border-b border-[#F0E8D8] last:border-0">
-                <span className="text-sm text-[#1A1A1A]">{i.quantity}× {i.name}</span>
-                <span className="text-sm font-bold text-[#48654D]">{formatCurrency(i.price * i.quantity)}</span>
-              </div>
-            ))}
-          </div>
-        )}
+          {orderStatus === 'CONFIRMED' && (
+            <div className="rounded-2xl p-4 border mb-6" style={{ background: 'white', borderColor: '#EDE5D8' }}>
+              {cart.map(i => (
+                <div key={i.productId} className="flex justify-between py-2 border-b last:border-0 text-sm" style={{ borderColor: '#EDE5D8' }}>
+                  <span style={{ color: dark }}>{i.quantity}× {i.name}</span>
+                  <span className="font-bold" style={{ color: green }}>{formatCurrency(i.price*i.quantity)}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
-        {orderStatus === 'CANCELLED' && (
-          <button onClick={() => { setStep('menu'); setCart([]); setOrder(null); setOrderStatus(''); }}
-            className="w-full max-w-sm py-4 rounded-2xl bg-[#48654D] text-white font-black">
-            Pesan Ulang
-          </button>
-        )}
+          {orderStatus === 'CANCELLED' && (
+            <button onClick={() => { setStep('menu'); setCart([]); setOrder(null); setOrderStatus(''); }}
+              className="w-full py-4 rounded-2xl font-black text-base" style={{ background: dark, color: bg, ...serif }}>
+              Pesan Ulang →
+            </button>
+          )}
 
-        {orderStatus === 'PAYMENT_UPLOADED' && (
-          <div className="flex gap-2 items-center bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3">
-            <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            <p className="text-xs text-amber-700 font-medium">Halaman ini otomatis update saat dikonfirmasi</p>
-          </div>
-        )}
+          {orderStatus === 'PAYMENT_UPLOADED' && (
+            <div className="flex items-center gap-2.5 rounded-xl px-4 py-3 border" style={{ borderColor: '#F5D98B', background: '#FFFBEB' }}>
+              <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse flex-shrink-0"/>
+              <p className="text-xs font-medium" style={{ color: '#92620A' }}>Halaman otomatis update saat dikonfirmasi kasir</p>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -468,8 +535,8 @@ function MenuContent() {
 export default function MenuPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#F6EDDB] flex items-center justify-center">
-        <div className="w-8 h-8 border-3 border-[#48654D] border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAF7F2' }}>
+        <div className="w-8 h-8 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: '#48654D', borderTopColor: 'transparent' }}/>
       </div>
     }>
       <MenuContent />
