@@ -82,7 +82,7 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
           payment: {
             create: {
               method: 'QRIS' as any,
-              status: 'COMPLETED' as any,
+              status: 'PAID' as any,
               amount: subtotal,
               received: subtotal,
               change: 0,
@@ -92,8 +92,7 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
       });
       posOrderId = posOrder.id;
     } catch (e: any) {
-      console.error('Failed to create POS order from QR:', e.message);
-      // Still confirm the QR order even if POS order fails
+      return error(`Order creation failed: ${e.message}`, 500);
     }
 
     // 3. Update QR order status
