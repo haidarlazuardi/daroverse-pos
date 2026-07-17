@@ -14,7 +14,9 @@ function generateOrderNumber() {
 export async function POST(req: NextRequest) {
   try {
     const { tableId, customerName, customerPhone, items } = await req.json();
-    if (!customerName?.trim() || !items?.length) return error('Nama dan item wajib diisi', 400);
+    if (!customerName?.trim() || !customerPhone?.trim() || !items?.length) {
+      return error('Nama, No HP, dan item wajib diisi', 400);
+    }
 
     const subtotal = items.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 menit

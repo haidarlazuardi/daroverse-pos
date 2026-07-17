@@ -437,15 +437,15 @@ function MenuContent() {
         <input value={name} onChange={e => setName(e.target.value)} placeholder="Nama *"
           className="w-full px-4 py-3.5 rounded-xl border-2 outline-none text-sm font-medium transition-all"
           style={{ borderColor: name ? dark : '#E8E0D5', background: 'white', color: dark }}/>
-        <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="No HP (opsional · untuk poin loyalty)"
-          className="w-full px-4 py-3.5 rounded-xl border outline-none text-sm font-medium transition-all"
-          style={{ borderColor: '#E8E0D5', background: 'white', color: dark }}/>
-        <p className="text-xs" style={{ color: muted }}>No HP untuk mendapat poin loyalty Soeka House ⭐</p>
+        <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="No HP *"
+          className="w-full px-4 py-3.5 rounded-xl border-2 outline-none text-sm font-medium transition-all"
+          style={{ borderColor: phone ? dark : '#E8E0D5', background: 'white', color: dark }}/>
+        <p className="text-xs" style={{ color: muted }}>Nama & No HP wajib diisi untuk melanjutkan pesanan</p>
       </div>
 
       <div className="flex-1"/>
       <div className="px-5 pb-8 pt-4">
-        <button onClick={handleOrder} disabled={!name.trim() || submitting}
+        <button onClick={handleOrder} disabled={!name.trim() || !phone.trim() || submitting}
           className="w-full py-4 rounded-2xl font-black text-base transition-all disabled:opacity-40"
           style={{ background: dark, color: bg, ...serif }}>
           {submitting ? 'Memproses...' : 'Lanjut ke Pembayaran →'}
