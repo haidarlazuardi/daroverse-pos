@@ -1,13 +1,12 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { success, error, withAuth, generateOrderNumber } from '@/lib/api-helpers';
+import { success, error, withAuth } from '@/lib/api-helpers';
 import { ALL_ROLES } from '@/lib/auth';
 
 export const GET = withAuth(async (req: NextRequest) => {
   const { searchParams } = new URL(req.url);
   const status = searchParams.get('status') || 'PAYMENT_UPLOADED';
-
   const orders = await (prisma as any).qROrder.findMany({
     where: { status },
     orderBy: { createdAt: 'desc' },
@@ -26,63 +25,26 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
   if (action === 'confirm') {
     const items = qrOrder.items as any[];
 
-    // Upsert customer
-    let customerId: string | null = null;
+    // Upsert customer by phone
     if (qrOrder.customerPhone) {
-      const customer = await prisma.customer.upsert({
+      await prisma.customer.upsert({
         where: { phone: qrOrder.customerPhone },
         create: { name: qrOrder.customerName, phone: qrOrder.customerPhone },
         update: { name: qrOrder.customerName },
       });
-      customerId = customer.id;
     }
 
-    // Create real POS Order so it appears in queue
-    const subtotal = items.reduce((s: number, i: any) => s + i.price * i.quantity, 0);
-    const now = new Date();
-    const orderNum = `ORD-${now.getFullYear().toString().slice(2)}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${Math.random().toString(36).slice(2,6).toUpperCase()}`;
-
-    const posOrder = await prisma.order.create({
+    // Update QR order status
+    await (prisma as any).qROrder.update({
+      where: { id },
       data: {
-        orderNumber: orderNum,
-        status: 'COMPLETED' as any,
-        orderType: 'DINE_IN' as any,
-        userId: user.userId,
-        customerId,
-        billName: qrOrder.customerName,
-        subtotal,
-        discount: 0,
-        tax: 0,
-        serviceCharge: 0,
-        takeawayCharge: 0,
-        total: subtotal,
-        costTotal: 0,
-        taxEnabled: false,
-        serviceEnabled: false,
-        notes: `[QR Menu] Meja ${qrOrder.tableId}`,
-        items: {
-          create: items.map((item: any) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            unitPrice: item.price,
-            subtotal: item.price * item.quantity,
-            price: item.price,
-            cost: 0,
-          })),
-        },
-        payment: {
-          create: {
-            method: 'QRIS' as any,
-            amount: subtotal,
-            received: subtotal,
-            change: 0,
-            status: 'COMPLETED' as any,
-          },
-        },
-      } as any,
+        status: 'CONFIRMED',
+        confirmedAt: new Date(),
+        confirmedBy: user.userId,
+      },
     });
 
-    // Deduct stock + log movement
+    // Deduct stock + log movement (best effort)
     for (const item of items) {
       try {
         const product = await prisma.product.findUnique({
@@ -102,7 +64,6 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
                 type: 'SALE' as any,
                 quantity: -deductQty,
                 location: product.station === 'FOOD' ? 'KITCHEN' : 'BAR',
-                reference: posOrder.id,
                 notes: `Sales — ${item.name} ×${item.quantity}`,
                 createdBy: user.userId,
               },
@@ -112,17 +73,14 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
       } catch { /* silent */ }
     }
 
-    // Update QR order — link to POS order
-    await (prisma as any).qROrder.update({
-      where: { id },
-      data: { status: 'CONFIRMED', confirmedAt: new Date(), confirmedBy: user.userId, posOrderId: posOrder.id },
-    });
-
-    return success({ confirmed: true, posOrderId: posOrder.id });
+    return success({ confirmed: true });
   }
 
   if (action === 'cancel') {
-    await (prisma as any).qROrder.update({ where: { id }, data: { status: 'CANCELLED' } });
+    await (prisma as any).qROrder.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+    });
     return success({ cancelled: true });
   }
 
