@@ -66,7 +66,6 @@ export async function PATCH(req: NextRequest) {
           status: 'PAYMENT_UPLOADED',
           paymentProof: isCash ? null : proofB64,
           proofExpiresAt: isCash ? null : proofExpiresAt,
-          notes: body.payMethod ? `[${body.payMethod}]` : null,
         },
       });
       return success(updated);
