@@ -594,9 +594,11 @@ function MenuContent() {
   // ── STATUS ────────────────────────────────────────────────────────────────
   if (step === 'status') {
     const statusMap: Record<string, { icon: string; headline: string; sub: string }> = {
-      PAYMENT_UPLOADED: { icon: '⏳', headline: 'Menunggu\nKonfirmasi.', sub: 'Kasir sedang memverifikasi pembayaran kamu.' },
-      CONFIRMED:        { icon: '✅', headline: 'Pesanan\nDikonfirmasi!', sub: 'Pesanan kamu sedang diproses. Ditunggu ya!' },
-      CANCELLED:        { icon: '❌', headline: 'Order\nDibatalkan.', sub: 'Waktu habis atau order dibatalkan.' },
+      PAYMENT_UPLOADED: payMethod === 'CASH'
+        ? { icon: '🧾', headline: 'Menunggu\nPembayaran Tunai.', sub: 'Tunjukkan halaman ini ke kasir dan bayar di counter.' }
+        : { icon: '⏳', headline: 'Menunggu\nKonfirmasi.', sub: 'Kasir sedang memverifikasi pembayaran kamu.' },
+      CONFIRMED: { icon: '✅', headline: 'Pesanan\nDikonfirmasi!', sub: 'Pesanan kamu sedang diproses. Ditunggu ya!' },
+      CANCELLED: { icon: '❌', headline: 'Order\nDibatalkan.', sub: 'Waktu habis atau order dibatalkan.' },
     };
     const cfg = statusMap[orderStatus] || statusMap['PAYMENT_UPLOADED'];
     return (
@@ -731,7 +733,21 @@ function MenuContent() {
             </div>
           )}
 
-          {orderStatus === 'PAYMENT_UPLOADED' && (
+          {orderStatus === 'PAYMENT_UPLOADED' && payMethod === 'CASH' && (
+            <div className="space-y-3">
+              <div className="rounded-2xl p-4 text-center border" style={{ background: 'white', borderColor: '#EDE5D8' }}>
+                <p className="text-xs font-semibold mb-2" style={{ color: muted }}>Tunjukkan kode ini ke kasir</p>
+                <p className="text-3xl font-black font-mono" style={{ color: dark }}>#{order?.orderNumber}</p>
+                <p className="text-xl font-black mt-1" style={{ color: green, ...serif }}>{formatCurrency(totalPrice)}</p>
+              </div>
+              <div className="flex items-center gap-2.5 rounded-xl px-4 py-3 border" style={{ borderColor: '#F5D98B', background: '#FFFBEB' }}>
+                <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse flex-shrink-0"/>
+                <p className="text-xs font-medium" style={{ color: '#92620A' }}>Bayar tunai di counter, kasir akan konfirmasi pesanan</p>
+              </div>
+            </div>
+          )}
+
+          {orderStatus === 'PAYMENT_UPLOADED' && payMethod !== 'CASH' && (
             <div className="flex items-center gap-2.5 rounded-xl px-4 py-3 border" style={{ borderColor: '#F5D98B', background: '#FFFBEB' }}>
               <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse flex-shrink-0"/>
               <p className="text-xs font-medium" style={{ color: '#92620A' }}>Halaman otomatis update saat dikonfirmasi kasir</p>

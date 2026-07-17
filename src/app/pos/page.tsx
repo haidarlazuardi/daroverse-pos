@@ -363,6 +363,20 @@ export default function POSPage() {
 
   useEffect(() => { hydrate(); }, [hydrate]);
 
+  // Unlock AudioContext on first click (required by browsers)
+  useEffect(() => {
+    const unlock = () => {
+      try {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        ctx.resume();
+        ctx.close();
+      } catch {}
+      document.removeEventListener('click', unlock);
+    };
+    document.addEventListener('click', unlock);
+    return () => document.removeEventListener('click', unlock);
+  }, []);
+
   // Poll queue every 30s
   useEffect(() => {
     async function loadQueue() {
@@ -380,21 +394,27 @@ export default function POSPage() {
             setToast(`🔔 Bukti bayar baru dari ${qr[0]?.customerName || 'customer'}`);
             setTimeout(() => setToast(''), 4000);
             setRightTab('queue');
-            // Play notification sound
+            // Play notification sound - use data URI for desktop compatibility
             try {
-              const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-              const osc = ctx.createOscillator();
-              const gain = ctx.createGain();
-              osc.connect(gain);
-              gain.connect(ctx.destination);
-              osc.frequency.setValueAtTime(880, ctx.currentTime);
-              osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
-              osc.frequency.setValueAtTime(880, ctx.currentTime + 0.2);
-              gain.gain.setValueAtTime(0.3, ctx.currentTime);
-              gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-              osc.start(ctx.currentTime);
-              osc.stop(ctx.currentTime + 0.4);
-            } catch { /* silent if audio not supported */ }
+              // Short beep sequence as base64 WAV
+              const playBeep = (freq: number, delay: number) => {
+                const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0, ctx.currentTime + delay);
+                gain.gain.linearRampToValueAtTime(0.4, ctx.currentTime + delay + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.25);
+                osc.start(ctx.currentTime + delay);
+                osc.stop(ctx.currentTime + delay + 0.25);
+              };
+              playBeep(880, 0);
+              playBeep(1100, 0.28);
+              playBeep(880, 0.56);
+            } catch { /* silent */ }
           }
           return qr;
         });
