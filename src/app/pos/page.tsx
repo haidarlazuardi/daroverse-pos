@@ -421,8 +421,23 @@ export default function POSPage() {
       } catch { /* silent */ }
     }
     loadQueue();
-    const t = setInterval(loadQueue, 15000); // poll tiap 15s untuk QR
-    return () => clearInterval(t);
+
+    // Smart polling: 10s saat tab aktif, 60s saat background
+    let t: ReturnType<typeof setInterval>;
+    function startPoll() {
+      clearInterval(t);
+      const interval = document.hidden ? 60000 : 10000;
+      t = setInterval(loadQueue, interval);
+    }
+    startPoll();
+    document.addEventListener('visibilitychange', () => {
+      startPoll();
+      if (!document.hidden) loadQueue(); // immediate refresh saat tab aktif lagi
+    });
+    return () => {
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', startPoll);
+    };
   }, []);
   useEffect(() => {
     if (!user) { const t = setTimeout(() => { if (!useAuthStore.getState().user) router.replace('/login'); }, 500); return () => clearTimeout(t); }
