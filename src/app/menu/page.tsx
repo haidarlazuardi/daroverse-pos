@@ -61,23 +61,58 @@ function MenuContent() {
   const searchParams = useSearchParams();
   const urlTable = searchParams.get('table') || '';
 
-  const [step, setStep] = useState<'landing'|'menu'|'info'|'payment'|'status'>(urlTable ? 'menu' : 'landing');
-  const [tableId, setTableId] = useState(urlTable || '');
+  // ── Restore from sessionStorage on mount ──────────────────────────────────
+  const [step, setStepRaw] = useState<'landing'|'menu'|'info'|'payment'|'status'>(() => {
+    try {
+      const saved = sessionStorage.getItem('soeka_menu_step');
+      if (saved) return saved as any;
+    } catch {}
+    return urlTable ? 'menu' : 'landing';
+  });
+  const [tableId, setTableIdRaw] = useState(() => {
+    try { return sessionStorage.getItem('soeka_menu_table') || urlTable || ''; } catch { return urlTable || ''; }
+  });
+  const [cart, setCartRaw] = useState<CartItem[]>(() => {
+    try { const s = sessionStorage.getItem('soeka_menu_cart'); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+  const [name, setNameRaw] = useState(() => { try { return sessionStorage.getItem('soeka_menu_name') || ''; } catch { return ''; } });
+  const [phone, setPhoneRaw] = useState(() => { try { return sessionStorage.getItem('soeka_menu_phone') || ''; } catch { return ''; } });
+  const [order, setOrderRaw] = useState<any>(() => {
+    try { const s = sessionStorage.getItem('soeka_menu_order'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
+  const [orderStatus, setOrderStatusRaw] = useState(() => { try { return sessionStorage.getItem('soeka_menu_status') || ''; } catch { return ''; } });
+
+  // Wrapped setters that also persist
+  function setStep(v: typeof step)        { setStepRaw(v);        try { sessionStorage.setItem('soeka_menu_step', v); } catch {} }
+  function setTableId(v: string)          { setTableIdRaw(v);     try { sessionStorage.setItem('soeka_menu_table', v); } catch {} }
+  function setCart(fn: CartItem[] | ((p: CartItem[]) => CartItem[])) {
+    setCartRaw(prev => {
+      const next = typeof fn === 'function' ? fn(prev) : fn;
+      try { sessionStorage.setItem('soeka_menu_cart', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
+  function setName(v: string)             { setNameRaw(v);        try { sessionStorage.setItem('soeka_menu_name', v); } catch {} }
+  function setPhone(v: string)            { setPhoneRaw(v);       try { sessionStorage.setItem('soeka_menu_phone', v); } catch {} }
+  function setOrder(v: any)               { setOrderRaw(v);       try { sessionStorage.setItem('soeka_menu_order', JSON.stringify(v)); } catch {} }
+  function setOrderStatus(v: string)      { setOrderStatusRaw(v); try { sessionStorage.setItem('soeka_menu_status', v); } catch {} }
+
+  function clearSession() {
+    ['soeka_menu_step','soeka_menu_table','soeka_menu_cart','soeka_menu_name','soeka_menu_phone','soeka_menu_order','soeka_menu_status']
+      .forEach(k => { try { sessionStorage.removeItem(k); } catch {} });
+  }
+
+  // Non-persisted state (re-fetched on mount)
   const [tableInput, setTableInput] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [cart, setCart] = useState<CartItem[]>([]);
   const [selCat, setSelCat] = useState('');
   const [search, setSearch] = useState('');
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [order, setOrder] = useState<any>(null);
   const [proofPreview, setProofPreview] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [orderStatus, setOrderStatus] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -512,10 +547,107 @@ function MenuContent() {
           )}
 
           {orderStatus === 'CANCELLED' && (
-            <button onClick={() => { setStep('menu'); setCart([]); setOrder(null); setOrderStatus(''); }}
+            <button onClick={() => { clearSession(); setStep('menu'); setCartRaw([]); setOrderRaw(null); setOrderStatusRaw(''); }}
               className="w-full py-4 rounded-2xl font-black text-base" style={{ background: dark, color: bg, ...serif }}>
               Pesan Ulang →
             </button>
+          )}
+
+          {orderStatus === 'CONFIRMED' && (
+            <div className="rounded-2xl border overflow-hidden mb-4" style={{ background: 'white', borderColor: '#EDE5D8' }}>
+              {/* Receipt header */}
+              <div className="px-5 py-4" style={{ background: dark }}>
+                <p className="text-xs tracking-widest uppercase font-semibold mb-1" style={{ color: 'rgba(250,247,242,0.5)' }}>Soeka House</p>
+                <p className="text-xl font-black" style={{ ...serif, color: bg }}>Struk Pesanan</p>
+                <p className="text-xs mt-0.5" style={{ color: 'rgba(250,247,242,0.5)' }}>#{order?.orderNumber} · Meja {tableId}</p>
+              </div>
+              {/* Items */}
+              <div className="px-5 py-4 space-y-2">
+                {cart.map(i => (
+                  <div key={i.productId} className="flex justify-between text-sm border-b pb-2 last:border-0" style={{ borderColor: '#EDE5D8' }}>
+                    <span style={{ color: dark }}>{i.quantity}× {i.name}</span>
+                    <span className="font-bold" style={{ color: green }}>{formatCurrency(i.price*i.quantity)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between items-center pt-1">
+                  <span className="font-bold" style={{ color: muted }}>Total</span>
+                  <span className="text-xl font-black" style={{ ...serif, color: dark }}>{formatCurrency(totalPrice)}</span>
+                </div>
+                {name && <p className="text-xs pt-1" style={{ color: muted }}>Pelanggan: {name}</p>}
+              </div>
+              {/* Download button */}
+              <div className="px-5 pb-5">
+                <button
+                  onClick={() => {
+                    // Generate receipt as canvas and download
+                    const canvas = document.createElement('canvas');
+                    const dpr = 2;
+                    canvas.width = 375 * dpr;
+                    canvas.height = (280 + cart.length * 40) * dpr;
+                    const ctx = canvas.getContext('2d')!;
+                    ctx.scale(dpr, dpr);
+                    const W = 375, pad = 24;
+
+                    // Background
+                    ctx.fillStyle = '#FAF7F2';
+                    ctx.fillRect(0, 0, W, canvas.height/dpr);
+
+                    // Header bg
+                    ctx.fillStyle = '#1C1C1C';
+                    ctx.roundRect(pad, pad, W-pad*2, 90, 16);
+                    ctx.fill();
+
+                    // Header text
+                    ctx.fillStyle = 'rgba(250,247,242,0.5)';
+                    ctx.font = '500 10px Inter, sans-serif';
+                    ctx.fillText('SOEKA HOUSE', pad+16, pad+22);
+                    ctx.fillStyle = '#FAF7F2';
+                    ctx.font = 'bold 22px Georgia, serif';
+                    ctx.fillText('Struk Pesanan', pad+16, pad+50);
+                    ctx.fillStyle = 'rgba(250,247,242,0.5)';
+                    ctx.font = '500 10px Inter, sans-serif';
+                    ctx.fillText(`#${order?.orderNumber} · Meja ${tableId}`, pad+16, pad+70);
+
+                    // Items
+                    let y = pad + 110;
+                    cart.forEach(i => {
+                      ctx.fillStyle = '#1C1C1C';
+                      ctx.font = '500 13px Inter, sans-serif';
+                      ctx.fillText(`${i.quantity}× ${i.name}`, pad, y);
+                      ctx.fillStyle = '#48654D';
+                      ctx.font = 'bold 13px Inter, sans-serif';
+                      const priceW = ctx.measureText(formatCurrency(i.price*i.quantity)).width;
+                      ctx.fillText(formatCurrency(i.price*i.quantity), W-pad-priceW, y);
+                      ctx.strokeStyle = '#EDE5D8';
+                      ctx.beginPath(); ctx.moveTo(pad, y+8); ctx.lineTo(W-pad, y+8); ctx.stroke();
+                      y += 36;
+                    });
+
+                    // Total
+                    ctx.fillStyle = '#8A8278';
+                    ctx.font = '600 12px Inter, sans-serif';
+                    ctx.fillText('Total', pad, y+20);
+                    ctx.fillStyle = '#1C1C1C';
+                    ctx.font = 'bold 20px Georgia, serif';
+                    const totalW = ctx.measureText(formatCurrency(totalPrice)).width;
+                    ctx.fillText(formatCurrency(totalPrice), W-pad-totalW, y+20);
+
+                    // Footer
+                    ctx.fillStyle = '#8A8278';
+                    ctx.font = '500 10px Inter, sans-serif';
+                    ctx.fillText('Terima kasih sudah mampir ke Soeka House ☕', pad, y+50);
+
+                    const link = document.createElement('a');
+                    link.download = `struk-soeka-${order?.orderNumber || 'order'}.jpg`;
+                    link.href = canvas.toDataURL('image/jpeg', 0.9);
+                    link.click();
+                  }}
+                  className="w-full py-3 rounded-xl border-2 font-bold text-sm transition-all"
+                  style={{ borderColor: dark, color: dark, background: 'transparent' }}>
+                  ↓ Download Struk (.jpg)
+                </button>
+              </div>
+            </div>
           )}
 
           {orderStatus === 'PAYMENT_UPLOADED' && (
