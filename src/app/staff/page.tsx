@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store';
 import { api } from '@/lib/fetch';
 import { formatCurrency } from '@/components/ui';
 import { getSavedPrinter, isConnected, pairAndConnect, printData } from '@/lib/bluetooth-printer';
+import { buildReceipt } from '@/lib/escpos';
 
 interface StockLevel { location: 'GUDANG' | 'BAR' | 'KITCHEN'; quantity: number }
 interface Ingredient {
@@ -539,15 +540,23 @@ function PrinterSetup({ onBack }: { onBack: () => void }) {
   async function testPrint() {
     setBusy(true); setStatus('Mencetak...');
     try {
-      const ESC=0x1B,GS=0x1D,LF=0x0A;
-      const enc=(s: string)=>Array.from(s).map(c=>c.charCodeAt(0));
-      const cmds=[
-        ESC,0x40,ESC,0x61,0x01,GS,0x21,0x11,ESC,0x45,1,...enc('SOEKA HOUSE'),LF,
-        GS,0x21,0x00,ESC,0x45,0,...enc('Test print berhasil!'),LF,
-        ...enc(new Date().toLocaleString('id-ID')),LF,LF,LF,GS,0x56,0x41,0x00,
-      ];
-      await printData(new Uint8Array(cmds));
-      setStatus('✅ Test print berhasil!');
+      const data = buildReceipt({
+        orderNumber: 'TEST-001',
+        date: new Date().toLocaleString('id-ID'),
+        tableInfo: '1',
+        customerName: 'Test Customer',
+        customerPoints: 120,
+        pointsEarned: 7,
+        items: [
+          { name: 'Es Kopi Susu', qty: 2, price: 25000, subtotal: 50000 },
+          { name: 'Croissant', qty: 1, price: 18000, subtotal: 18000 },
+        ],
+        subtotal: 68000,
+        total: 68000,
+        payMethod: 'QRIS',
+      });
+      await printData(data);
+      setStatus('✅ Test print berhasil! (2 copy)');
     } catch(e: any) {
       setStatus(`❌ ${e.message}`);
       setConnected(false);

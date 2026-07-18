@@ -4,12 +4,13 @@ const ESC = 0x1B;
 const GS  = 0x1D;
 const LF  = 0x0A;
 
-export function buildReceipt(data: {
-  storeName: string;
+export interface ReceiptData {
   orderNumber: string;
   date: string;
   tableInfo?: string;
   customerName?: string;
+  customerPoints?: number;
+  pointsEarned?: number;
   items: { name: string; qty: number; price: number; subtotal: number }[];
   subtotal: number;
   discount?: number;
@@ -19,101 +20,106 @@ export function buildReceipt(data: {
   payMethod: string;
   received?: number;
   change?: number;
-  pointsEarned?: number;
-  totalPoints?: number;
-  checkUrl?: string;
-}): Uint8Array {
+}
+
+const W = 32; // chars for 58mm paper
+
+function buildSingleReceipt(data: ReceiptData, copy: 'BAR' | 'CUSTOMER'): number[] {
   const cmds: number[] = [];
 
-  const push = (...bytes: number[]) => cmds.push(...bytes);
-  const text = (str: string) => {
-    for (let i = 0; i < str.length; i++) cmds.push(str.charCodeAt(i));
-  };
-  const line = (str: string) => { text(str); push(LF); };
-  const feed = (n = 1) => { for (let i = 0; i < n; i++) push(LF); };
-
-  const center  = () => push(ESC, 0x61, 0x01);
-  const left    = () => push(ESC, 0x61, 0x00);
-  const bold    = (on: boolean) => push(ESC, 0x45, on ? 1 : 0);
-  const dblSize = (on: boolean) => push(GS, 0x21, on ? 0x11 : 0x00);
+  const push  = (...b: number[]) => cmds.push(...b);
+  const enc   = (s: string) => Array.from(s).map(c => c.charCodeAt(0));
+  const line  = (s: string) => { cmds.push(...enc(s), LF); };
+  const feed  = (n = 1)    => { for (let i = 0; i < n; i++) push(LF); };
+  const center = () => push(ESC, 0x61, 0x01);
+  const left   = () => push(ESC, 0x61, 0x00);
+  const bold   = (on: boolean) => push(ESC, 0x45, on ? 1 : 0);
+  const dbl    = (on: boolean) => push(GS, 0x21, on ? 0x11 : 0x00);
   const divider = () => line('--------------------------------');
 
-  // ── Init ──
-  push(ESC, 0x40); // reset
-  push(ESC, 0x74, 0x00); // charset PC437
+  const row = (a: string, b: string) => {
+    const sp = W - a.length - b.length;
+    line(a + ' '.repeat(Math.max(1, sp)) + b);
+  };
 
-  // ── Header ──
+  const rp = (n: number) => `Rp${n.toLocaleString('id-ID')}`;
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  push(ESC, 0x40);
+  push(ESC, 0x74, 0x00);
+
+  // ── Logo text (simulate logo with big bold text) ───────────────────────
   center();
-  dblSize(true);
-  bold(true);
-  line(data.storeName.toUpperCase());
-  dblSize(false);
-  bold(false);
-  if (data.tableInfo) line(data.tableInfo);
+  dbl(true); bold(true);
+  line('SOEKA');
+  line('HOUSE');
+  dbl(false); bold(false);
   feed(1);
+
+  // ── Copy label ────────────────────────────────────────────────────────────
+  center();
+  line(`[ ${copy === 'BAR' ? 'COPY BAR' : 'COPY CUSTOMER'} ]`);
   left();
   divider();
 
-  // ── Order info ──
-  line(`No: ${data.orderNumber}`);
-  line(`Tgl: ${data.date}`);
-  if (data.customerName) line(`Plg: ${data.customerName}`);
+  // ── Order info ────────────────────────────────────────────────────────────
+  line(`No  : ${data.orderNumber}`);
+  line(`Tgl : ${data.date}`);
+  if (data.tableInfo) line(`Meja: ${data.tableInfo}`);
+  if (data.customerName) line(`Plg : ${data.customerName}`);
   divider();
 
-  // ── Items ──
-  const W = 32; // chars wide for 58mm
+  // ── Items ─────────────────────────────────────────────────────────────────
   for (const item of data.items) {
-    const nameStr = item.name.length > 20 ? item.name.slice(0, 19) + '.' : item.name;
-    line(nameStr);
-    const qtyPrice = `  ${item.qty}x ${formatNum(item.price)}`;
-    const sub = formatNum(item.subtotal);
-    const spaces = W - qtyPrice.length - sub.length;
-    line(qtyPrice + ' '.repeat(Math.max(1, spaces)) + sub);
+    const name = item.name.length > 22 ? item.name.slice(0, 21) + '.' : item.name;
+    line(name);
+    row(`  ${item.qty}x ${rp(item.price)}`, rp(item.subtotal));
   }
   divider();
 
-  // ── Totals ──
-  const row = (label: string, val: string) => {
-    const spaces = W - label.length - val.length;
-    line(label + ' '.repeat(Math.max(1, spaces)) + val);
-  };
-
-  if (data.discount && data.discount > 0) row('Diskon', `-${formatNum(data.discount)}`);
-  if (data.tax && data.tax > 0) row('Pajak', formatNum(data.tax));
-  if (data.serviceCharge && data.serviceCharge > 0) row('Service', formatNum(data.serviceCharge));
-
+  // ── Totals ────────────────────────────────────────────────────────────────
+  if (data.discount && data.discount > 0) row('Diskon', `-${rp(data.discount)}`);
+  if (data.tax && data.tax > 0) row('Pajak', rp(data.tax));
+  if (data.serviceCharge && data.serviceCharge > 0) row('Service', rp(data.serviceCharge));
   bold(true);
-  row('TOTAL', formatNum(data.total));
+  row('TOTAL', rp(data.total));
   bold(false);
   row('Bayar', data.payMethod);
-  if (data.received) row('Tunai', formatNum(data.received));
-  if (data.change && data.change > 0) row('Kembali', formatNum(data.change));
+  if (data.received) row('Tunai', rp(data.received));
+  if (data.change && data.change > 0) row('Kembali', rp(data.change));
 
-  // ── Points ──
-  if (data.pointsEarned || data.totalPoints) {
+  // ── Poin (customer copy only) ─────────────────────────────────────────────
+  if (copy === 'CUSTOMER' && (data.pointsEarned || data.customerPoints !== undefined)) {
     divider();
-    if (data.pointsEarned) line(`+ ${data.pointsEarned} poin didapat`);
-    if (data.totalPoints) {
+    if (data.pointsEarned) {
       bold(true);
-      line(`Total poin: ${data.totalPoints} *`);
+      line(`+ ${data.pointsEarned} poin didapat`);
       bold(false);
     }
-    if (data.checkUrl) { center(); line(data.checkUrl); left(); }
+    if (data.customerPoints !== undefined) {
+      line(`Total poin kamu: ${data.customerPoints} poin`);
+    }
   }
 
-  // ── Footer ──
+  // ── Footer ────────────────────────────────────────────────────────────────
   divider();
   center();
-  line('Terima kasih!');
-  line('Soeka House - Bogor');
+  line('Terima kasih sudah mampir!');
+  feed(1);
+  line('@soeka.house');
+  feed(1);
+  line('Komplain: 087897594105');
   feed(3);
 
-  // Cut paper
+  // ── Cut ───────────────────────────────────────────────────────────────────
   push(GS, 0x56, 0x41, 0x00);
 
-  return new Uint8Array(cmds);
+  return cmds;
 }
 
-function formatNum(n: number): string {
-  return 'Rp' + n.toLocaleString('id-ID');
+export function buildReceipt(data: ReceiptData): Uint8Array {
+  // Print 2 copies: BAR first, then CUSTOMER
+  const bar      = buildSingleReceipt(data, 'BAR');
+  const customer = buildSingleReceipt(data, 'CUSTOMER');
+  return new Uint8Array([...bar, ...customer]);
 }

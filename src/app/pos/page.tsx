@@ -7,6 +7,7 @@ import { api } from '@/lib/fetch';
 import { formatCurrency, Modal, Button, Input } from '@/components/ui';
 import clsx from 'clsx';
 import { getSavedPrinter, isConnected, pairAndConnect, printData, disconnect } from '@/lib/bluetooth-printer';
+import { buildReceipt } from '@/lib/escpos';
 
 interface ModOption {
   id: string; name: string; effect: 'ADJUST' | 'ADD';
@@ -1027,31 +1028,37 @@ export default function POSPage() {
             <div className="mt-auto space-y-2">
               <button onClick={async () => {
                 const o = lastOrder;
-                const ESC=0x1B,GS=0x1D,LF=0x0A;
-                const enc=(s: string)=>Array.from(s).map(c=>c.charCodeAt(0));
-                const W=32;
-                const row=(a: string,b: string)=>{const sp=W-a.length-b.length;return enc(a+' '.repeat(Math.max(1,sp))+b);};
-                const cmds:number[]=[
-                  ESC,0x40,ESC,0x61,0x01,GS,0x21,0x11,ESC,0x45,1,...enc('SOEKA HOUSE'),LF,GS,0x21,0x00,ESC,0x45,0,
-                  ...enc(`No: ${o.orderNumber}`),LF,...enc(new Date().toLocaleString('id-ID')),LF,
-                  ...enc('--------------------------------'),LF,
-                  ...(o.items||[]).flatMap((i:any)=>[...enc(i.product?.name||''),LF,...row(`  ${i.quantity}x Rp${(i.unitPrice||i.price||0).toLocaleString('id-ID')}`,`Rp${(i.subtotal||0).toLocaleString('id-ID')}`),LF]),
-                  ...enc('--------------------------------'),LF,
-                  ESC,0x45,1,...row('TOTAL',`Rp${(o.total||0).toLocaleString('id-ID')}`),LF,ESC,0x45,0,
-                  ...(o.payment?.change>0?[...row('Kembali',`Rp${(o.payment.change).toLocaleString('id-ID')}`),LF]:[]),
-                  ...enc('--------------------------------'),LF,ESC,0x61,0x01,...enc('Terima kasih!'),LF,LF,LF,
-                  GS,0x56,0x41,0x00,
-                ];
+                const data = buildReceipt({
+                  orderNumber: o.orderNumber,
+                  date: new Date().toLocaleString('id-ID'),
+                  tableInfo: o.notes?.replace('[QR Menu] ', '') || undefined,
+                  customerName: o.billName || o.customer?.name || undefined,
+                  customerPoints: o.customer?.points ?? undefined,
+                  pointsEarned: o.pointsEarned ?? undefined,
+                  items: (o.items || []).map((i: any) => ({
+                    name: i.product?.name || i.name || '',
+                    qty: i.quantity,
+                    price: i.unitPrice || i.price || 0,
+                    subtotal: i.subtotal || 0,
+                  })),
+                  subtotal: o.subtotal,
+                  discount: o.discount,
+                  tax: o.tax,
+                  serviceCharge: o.serviceCharge,
+                  total: o.total,
+                  payMethod: o.payment?.method || 'CASH',
+                  received: o.payment?.received,
+                  change: o.payment?.change,
+                });
                 try {
-                  await printData(new Uint8Array(cmds));
+                  await printData(data);
                   setPrinterReady(true);
                 } catch(e: any) {
                   if (e.message === 'NO_DEVICE') {
-                    // Pair dulu
                     try {
                       const info = await pairAndConnect();
                       setPrinterName(info.name); setPrinterReady(true);
-                      await printData(new Uint8Array(cmds));
+                      await printData(data);
                     } catch(e2: any) { if (e2.name !== 'NotFoundError') alert(`Gagal: ${e2.message}`); }
                   } else { alert(`Gagal print: ${e.message}`); }
                 }
