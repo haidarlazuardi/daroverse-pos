@@ -6,6 +6,7 @@ import { useAuthStore, useCartStore, CartLine, SelectedModifier, lineUnitPrice }
 import { api } from '@/lib/fetch';
 import { formatCurrency, Modal, Button, Input } from '@/components/ui';
 import clsx from 'clsx';
+import { getSavedPrinter, isConnected, pairAndConnect, printData, disconnect } from '@/lib/bluetooth-printer';
 
 interface ModOption {
   id: string; name: string; effect: 'ADJUST' | 'ADD';
@@ -344,6 +345,8 @@ export default function POSPage() {
   const [qrOrders, setQrOrders]       = useState<any[]>([]);
   const [toast, setToast]             = useState<string>('');
   const [queueCount, setQueueCount]   = useState(0);
+  const [printerName, setPrinterName] = useState<string>('');
+  const [printerReady, setPrinterReady] = useState(false);
   const [selectedDiscount, setSelectedDiscount] = useState('');
   const [editLine, setEditLine] = useState<CartLine | null>(null);
   const [config, setConfig] = useState<{ product: Product; modifiers: SelectedModifier[] } | null>(null);
@@ -362,6 +365,12 @@ export default function POSPage() {
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { hydrate(); }, [hydrate]);
+
+  // Check saved printer on mount
+  useEffect(() => {
+    const saved = getSavedPrinter();
+    if (saved) { setPrinterName(saved.name); setPrinterReady(isConnected()); }
+  }, []);
 
   // Unlock AudioContext on first click (required by browsers)
   useEffect(() => {
@@ -1017,42 +1026,38 @@ export default function POSPage() {
             </div>
             <div className="mt-auto space-y-2">
               <button onClick={async () => {
-                if (!navigator.bluetooth) { printReceipt(); return; } // fallback ke window.print
+                const o = lastOrder;
+                const ESC=0x1B,GS=0x1D,LF=0x0A;
+                const enc=(s: string)=>Array.from(s).map(c=>c.charCodeAt(0));
+                const W=32;
+                const row=(a: string,b: string)=>{const sp=W-a.length-b.length;return enc(a+' '.repeat(Math.max(1,sp))+b);};
+                const cmds:number[]=[
+                  ESC,0x40,ESC,0x61,0x01,GS,0x21,0x11,ESC,0x45,1,...enc('SOEKA HOUSE'),LF,GS,0x21,0x00,ESC,0x45,0,
+                  ...enc(`No: ${o.orderNumber}`),LF,...enc(new Date().toLocaleString('id-ID')),LF,
+                  ...enc('--------------------------------'),LF,
+                  ...(o.items||[]).flatMap((i:any)=>[...enc(i.product?.name||''),LF,...row(`  ${i.quantity}x Rp${(i.unitPrice||i.price||0).toLocaleString('id-ID')}`,`Rp${(i.subtotal||0).toLocaleString('id-ID')}`),LF]),
+                  ...enc('--------------------------------'),LF,
+                  ESC,0x45,1,...row('TOTAL',`Rp${(o.total||0).toLocaleString('id-ID')}`),LF,ESC,0x45,0,
+                  ...(o.payment?.change>0?[...row('Kembali',`Rp${(o.payment.change).toLocaleString('id-ID')}`),LF]:[]),
+                  ...enc('--------------------------------'),LF,ESC,0x61,0x01,...enc('Terima kasih!'),LF,LF,LF,
+                  GS,0x56,0x41,0x00,
+                ];
                 try {
-                  const SERVICES = ['000018f0-0000-1000-8000-00805f9b34fb','0000ff00-0000-1000-8000-00805f9b34fb','49535343-fe7d-4ae5-8fa9-9fafd205e455','0000ffe0-0000-1000-8000-00805f9b34fb'];
-                  const CHARS   = ['000018f1-0000-1000-8000-00805f9b34fb','0000ff02-0000-1000-8000-00805f9b34fb','49535343-8841-43f4-a8d4-ecbe34729bb3','0000ffe1-0000-1000-8000-00805f9b34fb'];
-                  const device  = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: SERVICES });
-                  const server  = await device.gatt!.connect();
-                  let ch: BluetoothRemoteGATTCharacteristic | null = null;
-                  for (const svc of SERVICES) {
-                    try { const s = await server.getPrimaryService(svc); for (const c of CHARS) { try { ch = await s.getCharacteristic(c); break; } catch {} } if (ch) break; } catch {}
-                  }
-                  if (!ch) { const svcs = await server.getPrimaryServices(); for (const s of svcs) { const cs = await s.getCharacteristics(); for (const c of cs) { if (c.properties.write||c.properties.writeWithoutResponse) { ch=c; break; } } if (ch) break; } }
-                  if (!ch) throw new Error('Characteristic tidak ditemukan');
-                  // Build ESC/POS receipt
-                  const ESC=0x1B,GS=0x1D,LF=0x0A;
-                  const o = lastOrder;
-                  const enc = (s: string) => Array.from(s).map(c=>c.charCodeAt(0));
-                  const W=32;
-                  const row=(a: string,b: string)=>{const sp=W-a.length-b.length;return enc(a+' '.repeat(Math.max(1,sp))+b);};
-                  const cmds:number[]=[
-                    ESC,0x40,ESC,0x61,0x01,GS,0x21,0x11,ESC,0x45,1,...enc('SOEKA HOUSE'),LF,GS,0x21,0x00,ESC,0x45,0,
-                    ...enc(`No: ${o.orderNumber}`),LF,...enc(new Date().toLocaleString('id-ID')),LF,
-                    ...enc('--------------------------------'),LF,
-                    ...(o.items||[]).flatMap((i:any)=>[...enc(i.product?.name||''),LF,...row(`  ${i.quantity}x Rp${(i.unitPrice||i.price||0).toLocaleString('id-ID')}`,`Rp${(i.subtotal||0).toLocaleString('id-ID')}`),LF]),
-                    ...enc('--------------------------------'),LF,
-                    ESC,0x45,1,...row('TOTAL',`Rp${(o.total||0).toLocaleString('id-ID')}`),LF,ESC,0x45,0,
-                    ...(o.payment?.change>0?[...row('Kembali',`Rp${(o.payment.change).toLocaleString('id-ID')}`),LF]:[]),
-                    ...enc('--------------------------------'),LF,ESC,0x61,0x01,...enc('Terima kasih!'),LF,LF,LF,
-                    GS,0x56,0x41,0x00,
-                  ];
-                  const data=new Uint8Array(cmds);
-                  for(let i=0;i<data.length;i+=20){try{await ch.writeValueWithoutResponse(data.slice(i,i+20));}catch{await ch.writeValue(data.slice(i,i+20));}await new Promise(r=>setTimeout(r,20));}
-                  server.disconnect();
-                } catch(e:any) {
-                  if (e.name !== 'NotFoundError') alert(`Gagal print: ${e.message}`);
+                  await printData(new Uint8Array(cmds));
+                  setPrinterReady(true);
+                } catch(e: any) {
+                  if (e.message === 'NO_DEVICE') {
+                    // Pair dulu
+                    try {
+                      const info = await pairAndConnect();
+                      setPrinterName(info.name); setPrinterReady(true);
+                      await printData(new Uint8Array(cmds));
+                    } catch(e2: any) { if (e2.name !== 'NotFoundError') alert(`Gagal: ${e2.message}`); }
+                  } else { alert(`Gagal print: ${e.message}`); }
                 }
-              }} className="btn btn-md btn-secondary w-full">🖨 Cetak Struk (BT)</button>
+              }} className="btn btn-md btn-secondary w-full">
+                🖨 Cetak Struk {printerReady ? `(${printerName})` : '(BT)'}
+              </button>
               <button onClick={resetCheckout} className="btn btn-lg btn-primary w-full text-lg">Order baru</button>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store';
 import { api } from '@/lib/fetch';
 import { formatCurrency } from '@/components/ui';
+import { getSavedPrinter, isConnected, pairAndConnect, printData } from '@/lib/bluetooth-printer';
 
 interface StockLevel { location: 'GUDANG' | 'BAR' | 'KITCHEN'; quantity: number }
 interface Ingredient {
@@ -519,101 +520,38 @@ function ExpenseForm({ busy, setBusy, onDone }: any) {
 
 // ── PrinterSetup ─────────────────────────────────────────────────────────────
 function PrinterSetup({ onBack }: { onBack: () => void }) {
-  const [printer, setPrinter] = useState<{ name: string; id: string } | null>(null);
+  const [info, setInfo] = useState<{ name: string } | null>(getSavedPrinter);
+  const [connected, setConnected] = useState(isConnected);
   const [status, setStatus] = useState('');
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    try {
-      const s = localStorage.getItem('soeka_bt_printer');
-      if (s) setPrinter(JSON.parse(s));
-    } catch {}
-  }, []);
-
-  const SERVICES = [
-    '000018f0-0000-1000-8000-00805f9b34fb',
-    '0000ff00-0000-1000-8000-00805f9b34fb',
-    '49535343-fe7d-4ae5-8fa9-9fafd205e455',
-    '0000ffe0-0000-1000-8000-00805f9b34fb',
-  ];
-
   async function pair() {
-    if (!navigator.bluetooth) { setStatus('❌ Browser tidak support Web Bluetooth. Pakai Chrome/Android.'); return; }
     setBusy(true); setStatus('Mencari printer...');
     try {
-      const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: SERVICES });
-      const info = { name: device.name || 'Printer BT', id: device.id };
-      localStorage.setItem('soeka_bt_printer', JSON.stringify(info));
-      setPrinter(info);
-      setStatus(`✅ Berhasil pair: ${info.name}`);
-    } catch (e: any) {
-      setStatus(`❌ ${e.message || 'Gagal pair'}`);
+      const p = await pairAndConnect();
+      setInfo(p); setConnected(true);
+      setStatus(`✅ Terhubung: ${p.name}`);
+    } catch(e: any) {
+      if (e.name !== 'NotFoundError') setStatus(`❌ ${e.message}`);
     } finally { setBusy(false); }
   }
 
   async function testPrint() {
-    if (!navigator.bluetooth) { setStatus('❌ Browser tidak support Web Bluetooth.'); return; }
-    setBusy(true); setStatus('Menghubungkan...');
+    setBusy(true); setStatus('Mencetak...');
     try {
-      const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: SERVICES });
-      setStatus('Connecting...');
-      const server = await device.gatt!.connect();
-
-      let char: BluetoothRemoteGATTCharacteristic | null = null;
-      const CHARS = ['000018f1-0000-1000-8000-00805f9b34fb','0000ff02-0000-1000-8000-00805f9b34fb','49535343-8841-43f4-a8d4-ecbe34729bb3','0000ffe1-0000-1000-8000-00805f9b34fb'];
-
-      for (const svc of SERVICES) {
-        try {
-          const s = await server.getPrimaryService(svc);
-          for (const c of CHARS) {
-            try { char = await s.getCharacteristic(c); break; } catch {}
-          }
-          if (char) break;
-        } catch {}
-      }
-      if (!char) {
-        const svcs = await server.getPrimaryServices();
-        for (const s of svcs) {
-          const cs = await s.getCharacteristics();
-          for (const c of cs) { if (c.properties.write || c.properties.writeWithoutResponse) { char = c; break; } }
-          if (char) break;
-        }
-      }
-      if (!char) throw new Error('Characteristic tidak ditemukan');
-
-      // Build test print
-      const ESC = 0x1B, GS = 0x1D, LF = 0x0A;
-      const cmds = [
-        ESC, 0x40,
-        ESC, 0x61, 0x01,
-        GS, 0x21, 0x11,
-        ESC, 0x45, 1,
-        ...Array.from('SOEKA HOUSE').map(c => c.charCodeAt(0)), LF,
-        GS, 0x21, 0x00,
-        ESC, 0x45, 0,
-        ...Array.from('Test print berhasil!').map(c => c.charCodeAt(0)), LF,
-        ...Array.from(new Date().toLocaleString('id-ID')).map(c => c.charCodeAt(0)), LF,
-        LF, LF, LF,
-        GS, 0x56, 0x41, 0x00,
+      const ESC=0x1B,GS=0x1D,LF=0x0A;
+      const enc=(s: string)=>Array.from(s).map(c=>c.charCodeAt(0));
+      const cmds=[
+        ESC,0x40,ESC,0x61,0x01,GS,0x21,0x11,ESC,0x45,1,...enc('SOEKA HOUSE'),LF,
+        GS,0x21,0x00,ESC,0x45,0,...enc('Test print berhasil!'),LF,
+        ...enc(new Date().toLocaleString('id-ID')),LF,LF,LF,GS,0x56,0x41,0x00,
       ];
-      const data = new Uint8Array(cmds);
-      const CHUNK = 20;
-      for (let i = 0; i < data.length; i += CHUNK) {
-        try { await char.writeValueWithoutResponse(data.slice(i, i + CHUNK)); }
-        catch { await char.writeValue(data.slice(i, i + CHUNK)); }
-        await new Promise(r => setTimeout(r, 20));
-      }
-      server.disconnect();
+      await printData(new Uint8Array(cmds));
       setStatus('✅ Test print berhasil!');
-    } catch (e: any) {
+    } catch(e: any) {
       setStatus(`❌ ${e.message}`);
+      setConnected(false);
     } finally { setBusy(false); }
-  }
-
-  function unpair() {
-    localStorage.removeItem('soeka_bt_printer');
-    setPrinter(null);
-    setStatus('Printer dilepas');
   }
 
   return (
@@ -624,31 +562,24 @@ function PrinterSetup({ onBack }: { onBack: () => void }) {
       </button>
       <h2 className="text-xl font-black text-gray-900">Pengaturan Printer</h2>
 
-      {/* Status printer */}
-      <div className={`rounded-2xl p-4 border-2 ${printer ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+      <div className={`rounded-2xl p-4 border-2 ${connected ? 'border-green-200 bg-green-50' : info ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-gray-50'}`}>
         <div className="flex items-center gap-3">
-          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${printer ? 'bg-green-100' : 'bg-gray-100'}`}>
-            🖨️
-          </div>
+          <span className="text-2xl">{connected ? '🟢' : info ? '🟡' : '⚫'}</span>
           <div>
-            <p className="font-bold text-gray-900">{printer ? printer.name : 'Belum ada printer'}</p>
-            <p className="text-xs text-gray-500">{printer ? 'Printer tersimpan' : 'Pair printer Bluetooth dulu'}</p>
+            <p className="font-bold text-gray-900">{info ? info.name : 'Belum ada printer'}</p>
+            <p className="text-xs text-gray-500">{connected ? 'Terhubung & siap cetak' : info ? 'Tersimpan, belum connect' : 'Pair printer dulu'}</p>
           </div>
-          {printer && (
-            <button onClick={unpair} className="ml-auto text-xs text-red-500 font-semibold">Lepas</button>
-          )}
         </div>
       </div>
 
-      {/* Buttons */}
       <div className="space-y-3">
         <button onClick={pair} disabled={busy}
           className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-60"
           style={{ background: '#1C1C1C' }}>
-          {busy ? 'Proses...' : printer ? '🔄 Ganti Printer' : '🔗 Pair Printer Baru'}
+          {busy ? 'Proses...' : connected ? '🔄 Ganti Printer' : info ? '🔗 Connect Ulang' : '🔗 Pair Printer Baru'}
         </button>
-        {printer && (
-          <button onClick={testPrint} disabled={busy}
+        {info && (
+          <button onClick={testPrint} disabled={busy || !connected}
             className="w-full py-4 rounded-2xl font-bold text-base border-2 disabled:opacity-60"
             style={{ borderColor: '#48654D', color: '#48654D' }}>
             {busy ? 'Printing...' : '🖨️ Test Print'}
@@ -656,20 +587,18 @@ function PrinterSetup({ onBack }: { onBack: () => void }) {
         )}
       </div>
 
-      {/* Status message */}
       {status && (
         <div className={`rounded-xl px-4 py-3 text-sm font-medium ${status.startsWith('✅') ? 'bg-green-50 text-green-700' : status.startsWith('❌') ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-700'}`}>
           {status}
         </div>
       )}
 
-      {/* Info */}
       <div className="rounded-xl p-4 bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-1">
-        <p className="font-bold">⚠️ Catatan:</p>
-        <p>• Pakai Chrome / Chrome Android untuk Web Bluetooth</p>
-        <p>• Safari iOS tidak support Bluetooth dari browser</p>
-        <p>• Pastikan printer sudah nyala dan dalam jangkauan BT</p>
-        <p>• Setiap print akan minta pilih device — pilih printer yang sama</p>
+        <p className="font-bold">💡 Cara pakai:</p>
+        <p>1. Pair printer sekali di halaman ini</p>
+        <p>2. Selama tab tidak ditutup, cetak langsung tanpa popup</p>
+        <p>3. Kalau tab ditutup/refresh, pair ulang sekali lagi</p>
+        <p>4. Pakai Chrome — Safari iOS tidak support</p>
       </div>
     </div>
   );
