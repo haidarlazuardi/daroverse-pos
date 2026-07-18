@@ -11,7 +11,7 @@ interface Ingredient {
   id: string; name: string; unit: string; type: 'RAW' | 'PREPPED';
   defaultLocation: 'GUDANG' | 'BAR' | 'KITCHEN' | null; minStock: number; stockLevels: StockLevel[];
 }
-type Mode = 'home' | 'batch' | 'take' | 'check' | 'waste' | 'receive' | 'opname' | 'menu' | 'expense';
+type Mode = 'home' | 'batch' | 'take' | 'check' | 'waste' | 'receive' | 'opname' | 'menu' | 'expense' | 'printer';
 
 const LOC_LABEL: Record<string, string> = { GUDANG: 'Gudang', BAR: 'Bar', KITCHEN: 'Dapur' };
 
@@ -51,7 +51,7 @@ export default function StaffPage() {
 
   if (!user) return null;
 
-  const TITLES: Record<Mode, string> = { home: `Halo, ${user.name}`, batch: 'Bikin batch', take: 'Ambil bahan', check: 'Cek stok', waste: 'Buang', receive: 'Terima barang', opname: 'Stock opname', menu: 'Lihat menu', expense: 'Catat pengeluaran' };
+  const TITLES: Record<Mode, string> = { home: `Halo, ${user.name}`, batch: 'Bikin batch', take: 'Ambil bahan', check: 'Cek stok', waste: 'Buang', receive: 'Terima barang', opname: 'Stock opname', menu: 'Lihat menu', expense: 'Catat pengeluaran', printer: 'Pengaturan Printer' };
 
   const tiles: { mode: Mode; perm: string; color: string; label: string; desc: string; icon: string }[] = [
     { mode: 'batch', perm: 'batch', color: '#3B6D11', label: 'Bikin batch', desc: 'Racik stok olahan', icon: 'M12 8a4 4 0 100 8 4 4 0 000-8z' },
@@ -62,6 +62,7 @@ export default function StaffPage() {
     { mode: 'opname', perm: 'opname_input', color: '#0E7C6B', label: 'Opname', desc: 'Hitung stok fisik', icon: 'M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11' },
     { mode: 'menu', perm: 'view_menu', color: '#555', label: 'Lihat menu', desc: 'Daftar & resep', icon: 'M4 6h16M4 12h16M4 18h7' },
     { mode: 'expense', perm: 'expense', color: '#B45309', label: 'Pengeluaran', desc: 'Belanja kecil', icon: 'M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6' },
+    { mode: 'printer', perm: 'view_menu', color: '#374151', label: 'Printer', desc: 'Setup Bluetooth printer', icon: 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z' },
   ];
   const visible = tiles.filter((t) => can(t.perm));
 
@@ -127,6 +128,7 @@ export default function StaffPage() {
         {mode === 'opname' && <Opname canApply={can('opname_apply')} busy={busy} setBusy={setBusy} onDone={(m) => { flash(m); load(); }} />}
         {mode === 'menu' && <MenuView />}
         {mode === 'expense' && <ExpenseForm busy={busy} setBusy={setBusy} onDone={(m) => { flash(m); setMode('home'); }} />}
+        {mode === 'printer' && <PrinterSetup onBack={() => setMode('home')} />}
       </main>
 
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-lg text-sm font-medium z-50">{toast}</div>}
@@ -511,6 +513,164 @@ function ExpenseForm({ busy, setBusy, onDone }: any) {
       <div><label className="label">Untuk apa?</label><input value={description} onChange={(e) => setDesc(e.target.value)} className="input text-base py-3" placeholder="cth. Galon air 2x" /></div>
       <div><label className="label">Jumlah (Rp)</label><input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="input text-base py-3" /></div>
       <button onClick={submit} disabled={busy || !description || !amount} className="btn btn-lg btn-primary w-full">{busy ? '...' : 'Catat'}</button>
+    </div>
+  );
+}
+
+// ── PrinterSetup ─────────────────────────────────────────────────────────────
+function PrinterSetup({ onBack }: { onBack: () => void }) {
+  const [printer, setPrinter] = useState<{ name: string; id: string } | null>(null);
+  const [status, setStatus] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    try {
+      const s = localStorage.getItem('soeka_bt_printer');
+      if (s) setPrinter(JSON.parse(s));
+    } catch {}
+  }, []);
+
+  const SERVICES = [
+    '000018f0-0000-1000-8000-00805f9b34fb',
+    '0000ff00-0000-1000-8000-00805f9b34fb',
+    '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+    '0000ffe0-0000-1000-8000-00805f9b34fb',
+  ];
+
+  async function pair() {
+    if (!navigator.bluetooth) { setStatus('❌ Browser tidak support Web Bluetooth. Pakai Chrome/Android.'); return; }
+    setBusy(true); setStatus('Mencari printer...');
+    try {
+      const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: SERVICES });
+      const info = { name: device.name || 'Printer BT', id: device.id };
+      localStorage.setItem('soeka_bt_printer', JSON.stringify(info));
+      setPrinter(info);
+      setStatus(`✅ Berhasil pair: ${info.name}`);
+    } catch (e: any) {
+      setStatus(`❌ ${e.message || 'Gagal pair'}`);
+    } finally { setBusy(false); }
+  }
+
+  async function testPrint() {
+    if (!navigator.bluetooth) { setStatus('❌ Browser tidak support Web Bluetooth.'); return; }
+    setBusy(true); setStatus('Menghubungkan...');
+    try {
+      const device = await navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: SERVICES });
+      setStatus('Connecting...');
+      const server = await device.gatt!.connect();
+
+      let char: BluetoothRemoteGATTCharacteristic | null = null;
+      const CHARS = ['000018f1-0000-1000-8000-00805f9b34fb','0000ff02-0000-1000-8000-00805f9b34fb','49535343-8841-43f4-a8d4-ecbe34729bb3','0000ffe1-0000-1000-8000-00805f9b34fb'];
+
+      for (const svc of SERVICES) {
+        try {
+          const s = await server.getPrimaryService(svc);
+          for (const c of CHARS) {
+            try { char = await s.getCharacteristic(c); break; } catch {}
+          }
+          if (char) break;
+        } catch {}
+      }
+      if (!char) {
+        const svcs = await server.getPrimaryServices();
+        for (const s of svcs) {
+          const cs = await s.getCharacteristics();
+          for (const c of cs) { if (c.properties.write || c.properties.writeWithoutResponse) { char = c; break; } }
+          if (char) break;
+        }
+      }
+      if (!char) throw new Error('Characteristic tidak ditemukan');
+
+      // Build test print
+      const ESC = 0x1B, GS = 0x1D, LF = 0x0A;
+      const cmds = [
+        ESC, 0x40,
+        ESC, 0x61, 0x01,
+        GS, 0x21, 0x11,
+        ESC, 0x45, 1,
+        ...Array.from('SOEKA HOUSE').map(c => c.charCodeAt(0)), LF,
+        GS, 0x21, 0x00,
+        ESC, 0x45, 0,
+        ...Array.from('Test print berhasil!').map(c => c.charCodeAt(0)), LF,
+        ...Array.from(new Date().toLocaleString('id-ID')).map(c => c.charCodeAt(0)), LF,
+        LF, LF, LF,
+        GS, 0x56, 0x41, 0x00,
+      ];
+      const data = new Uint8Array(cmds);
+      const CHUNK = 20;
+      for (let i = 0; i < data.length; i += CHUNK) {
+        try { await char.writeValueWithoutResponse(data.slice(i, i + CHUNK)); }
+        catch { await char.writeValue(data.slice(i, i + CHUNK)); }
+        await new Promise(r => setTimeout(r, 20));
+      }
+      server.disconnect();
+      setStatus('✅ Test print berhasil!');
+    } catch (e: any) {
+      setStatus(`❌ ${e.message}`);
+    } finally { setBusy(false); }
+  }
+
+  function unpair() {
+    localStorage.removeItem('soeka_bt_printer');
+    setPrinter(null);
+    setStatus('Printer dilepas');
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      <button onClick={onBack} className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+        Kembali
+      </button>
+      <h2 className="text-xl font-black text-gray-900">Pengaturan Printer</h2>
+
+      {/* Status printer */}
+      <div className={`rounded-2xl p-4 border-2 ${printer ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${printer ? 'bg-green-100' : 'bg-gray-100'}`}>
+            🖨️
+          </div>
+          <div>
+            <p className="font-bold text-gray-900">{printer ? printer.name : 'Belum ada printer'}</p>
+            <p className="text-xs text-gray-500">{printer ? 'Printer tersimpan' : 'Pair printer Bluetooth dulu'}</p>
+          </div>
+          {printer && (
+            <button onClick={unpair} className="ml-auto text-xs text-red-500 font-semibold">Lepas</button>
+          )}
+        </div>
+      </div>
+
+      {/* Buttons */}
+      <div className="space-y-3">
+        <button onClick={pair} disabled={busy}
+          className="w-full py-4 rounded-2xl font-bold text-white text-base disabled:opacity-60"
+          style={{ background: '#1C1C1C' }}>
+          {busy ? 'Proses...' : printer ? '🔄 Ganti Printer' : '🔗 Pair Printer Baru'}
+        </button>
+        {printer && (
+          <button onClick={testPrint} disabled={busy}
+            className="w-full py-4 rounded-2xl font-bold text-base border-2 disabled:opacity-60"
+            style={{ borderColor: '#48654D', color: '#48654D' }}>
+            {busy ? 'Printing...' : '🖨️ Test Print'}
+          </button>
+        )}
+      </div>
+
+      {/* Status message */}
+      {status && (
+        <div className={`rounded-xl px-4 py-3 text-sm font-medium ${status.startsWith('✅') ? 'bg-green-50 text-green-700' : status.startsWith('❌') ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-700'}`}>
+          {status}
+        </div>
+      )}
+
+      {/* Info */}
+      <div className="rounded-xl p-4 bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-1">
+        <p className="font-bold">⚠️ Catatan:</p>
+        <p>• Pakai Chrome / Chrome Android untuk Web Bluetooth</p>
+        <p>• Safari iOS tidak support Bluetooth dari browser</p>
+        <p>• Pastikan printer sudah nyala dan dalam jangkauan BT</p>
+        <p>• Setiap print akan minta pilih device — pilih printer yang sama</p>
+      </div>
     </div>
   );
 }
