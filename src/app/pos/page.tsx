@@ -1032,6 +1032,7 @@ export default function POSPage() {
                   orderNumber: o.orderNumber,
                   date: new Date().toLocaleString('id-ID'),
                   tableInfo: o.notes?.replace('[QR Menu] ', '') || undefined,
+                  cashierName: user?.name || undefined,
                   customerName: o.billName || o.customer?.name || undefined,
                   customerPoints: o.customer?.points ?? undefined,
                   pointsEarned: o.pointsEarned ?? undefined,

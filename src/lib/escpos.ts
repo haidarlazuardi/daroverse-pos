@@ -20,6 +20,7 @@ export interface ReceiptData {
   payMethod: string;
   received?: number;
   change?: number;
+  cashierName?: string;
 }
 
 const W = 32; // chars for 58mm paper
@@ -58,7 +59,7 @@ function buildSingleReceipt(data: ReceiptData, copy: 'BAR' | 'CUSTOMER'): number
 
   // ── Copy label ────────────────────────────────────────────────────────────
   center();
-  line(`[ ${copy === 'BAR' ? 'COPY BAR' : 'COPY CUSTOMER'} ]`);
+  line(`[ ${copy === 'BAR' ? 'STAFF RECEIPT' : 'CUSTOMER RECEIPT'} ]`);
   left();
   divider();
 
@@ -66,6 +67,7 @@ function buildSingleReceipt(data: ReceiptData, copy: 'BAR' | 'CUSTOMER'): number
   line(`No  : ${data.orderNumber}`);
   line(`Tgl : ${data.date}`);
   if (data.tableInfo) line(`Meja: ${data.tableInfo}`);
+  if (data.cashierName) line(`Kasir: ${data.cashierName}`);
   if (data.customerName) line(`Plg : ${data.customerName}`);
   divider();
 
@@ -108,7 +110,7 @@ function buildSingleReceipt(data: ReceiptData, copy: 'BAR' | 'CUSTOMER'): number
   feed(1);
   line('@soeka.house');
   feed(1);
-  line('Komplain: 087897594105');
+  line('Kritik & Saran: 087897594105');
   feed(3);
 
   // ── Cut ───────────────────────────────────────────────────────────────────
