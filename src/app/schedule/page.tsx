@@ -28,7 +28,7 @@ export default function SchedulePage() {
     setLoading(true);
     const [s, u, sh] = await Promise.all([
       api.get<any[]>(`/api/work-schedules?from=${from}&to=${to}`),
-      api.get<any[]>('/api/users?active=1'),
+      api.get<any[]>('/api/employees?active=1'),
       api.get<any[]>('/api/shift-templates'),
     ]);
     setSchedules(s||[]); setUsers((u||[]).filter((u: any) => u.employeeType)); setShifts(sh||[]);

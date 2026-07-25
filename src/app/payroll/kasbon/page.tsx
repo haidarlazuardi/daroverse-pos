@@ -16,7 +16,7 @@ export default function KasbonPage() {
   async function load() {
     const [k, u] = await Promise.all([
       api.get<any[]>('/api/kasbon'),
-      api.get<any[]>('/api/users'),
+      api.get<any[]>('/api/employees?active=1'),
     ]);
     setKasbons(k||[]); setUsers(u||[]);
     setLoading(false);
