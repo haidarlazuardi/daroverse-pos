@@ -985,6 +985,9 @@ model Attendance {
   type           AttendanceType
   photo          String         // base64 compressed, auto-expire
   photoExpiresAt DateTime
+  latitude       Float?
+  longitude      Float?
+  accuracy       Float?
   notes          String?
   createdAt      DateTime       @default(now())
 

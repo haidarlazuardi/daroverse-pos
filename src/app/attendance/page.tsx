@@ -100,6 +100,13 @@ export default function AttendancePage() {
                               className="w-full h-16 object-cover rounded-lg" style={{ transform: 'scaleX(-1)' }}/>
                           </button>
                         )}
+                        {checkIn.latitude && (
+                          <a href={`https://maps.google.com/?q=${checkIn.latitude},${checkIn.longitude}`}
+                            target="_blank" rel="noopener noreferrer"
+                            className="mt-1 flex items-center gap-1 text-xs text-green-600 underline">
+                            📍 Lihat peta
+                          </a>
+                        )}
                       </div>
                     ) : <p className="text-sm text-gray-400">—</p>}
                   </div>
@@ -118,6 +125,13 @@ export default function AttendancePage() {
                             <img src={checkOut.photo} alt="selfie pulang"
                               className="w-full h-16 object-cover rounded-lg" style={{ transform: 'scaleX(-1)' }}/>
                           </button>
+                        )}
+                        {checkOut.latitude && (
+                          <a href={`https://maps.google.com/?q=${checkOut.latitude},${checkOut.longitude}`}
+                            target="_blank" rel="noopener noreferrer"
+                            className="mt-1 flex items-center gap-1 text-xs text-red-500 underline">
+                            📍 Lihat peta
+                          </a>
                         )}
                       </div>
                     ) : (

@@ -26,6 +26,8 @@ export default function AbsensiPage() {
   const [result, setResult]         = useState<any>(null);
   const [error, setError]           = useState('');
   const [stream, setStream]         = useState<MediaStream | null>(null);
+  const [location, setLocation]     = useState<{ lat: number; lng: number; accuracy: number } | null>(null);
+  const [locError, setLocError]     = useState('');
 
   const videoRef  = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -67,7 +69,6 @@ export default function AbsensiPage() {
     const SIZE = 480;
     canvas.width = SIZE; canvas.height = SIZE;
     const ctx = canvas.getContext('2d')!;
-    // Crop center square
     const vw = video.videoWidth, vh = video.videoHeight;
     const side = Math.min(vw, vh);
     const sx = (vw - side) / 2, sy = (vh - side) / 2;
@@ -76,6 +77,18 @@ export default function AbsensiPage() {
     setPhoto(b64);
     stopStream();
     setStep('preview');
+
+    // Get location immediately after photo
+    setLocError('');
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: Math.round(pos.coords.accuracy) }),
+        () => setLocError('Lokasi tidak bisa diakses'),
+        { timeout: 8000, enableHighAccuracy: true }
+      );
+    } else {
+      setLocError('Browser tidak support GPS');
+    }
   }
 
   async function submit() {
@@ -85,7 +98,7 @@ export default function AbsensiPage() {
       const r = await fetch('/api/public/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: selected.id, photo }),
+        body: JSON.stringify({ userId: selected.id, photo, location }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Gagal');
@@ -206,7 +219,7 @@ export default function AbsensiPage() {
 
         {/* Info */}
         <div className="rounded-2xl p-4 border" style={{ background: 'white', borderColor: '#EDE5D8' }}>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-full flex items-center justify-center font-black text-white"
               style={{ background: green }}>
               {selected?.name.charAt(0).toUpperCase()}
@@ -218,6 +231,22 @@ export default function AbsensiPage() {
                 {new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}
               </p>
             </div>
+          </div>
+          {/* Location */}
+          <div className="flex items-center gap-2 pt-3 border-t" style={{ borderColor: '#EDE5D8' }}>
+            <span className="text-base">📍</span>
+            {location ? (
+              <div>
+                <p className="text-xs font-semibold" style={{ color: dark }}>
+                  {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+                </p>
+                <p className="text-xs" style={{ color: muted }}>Akurasi ±{location.accuracy}m</p>
+              </div>
+            ) : locError ? (
+              <p className="text-xs text-amber-600">{locError} — absensi tetap bisa dilanjutkan</p>
+            ) : (
+              <p className="text-xs" style={{ color: muted }}>Mendapatkan lokasi...</p>
+            )}
           </div>
         </div>
 

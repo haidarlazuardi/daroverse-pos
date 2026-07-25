@@ -16,7 +16,7 @@ export async function GET() {
 // POST — submit absensi
 export async function POST(req: NextRequest) {
   try {
-    const { userId, photo } = await req.json();
+    const { userId, photo, location } = await req.json();
     if (!userId || !photo) return error('userId dan photo wajib', 400);
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -40,7 +40,12 @@ export async function POST(req: NextRequest) {
     const photoExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 hari
 
     const attendance = await (prisma as any).attendance.create({
-      data: { userId, type, photo, photoExpiresAt },
+      data: {
+        userId, type, photo, photoExpiresAt,
+        latitude:  location?.lat  ?? null,
+        longitude: location?.lng  ?? null,
+        accuracy:  location?.accuracy ?? null,
+      },
     });
 
     return success({ ...attendance, userName: user.name, type }, 201);
