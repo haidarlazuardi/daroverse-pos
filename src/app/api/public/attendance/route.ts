@@ -3,11 +3,11 @@ import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error } from '@/lib/api-helpers';
 
-// GET — list active users untuk dropdown
+// GET — list employees (bukan semua user) untuk dropdown absensi
 export async function GET() {
   const users = await prisma.user.findMany({
-    where: { active: true },
-    select: { id: true, name: true, role: true },
+    where: { active: true, employeeType: { not: null } },
+    select: { id: true, name: true, employeeType: true },
     orderBy: { name: 'asc' },
   });
   return success(users);
