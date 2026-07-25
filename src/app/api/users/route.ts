@@ -8,14 +8,14 @@ import { ADMIN_ROLES, SENIOR_ROLES } from '@/lib/auth';
 
 export const GET = withAuth(async () => {
   const users = await prisma.user.findMany({
-    select: { id: true, name: true, email: true, role: true, active: true, createdAt: true },
+    select: { id: true, name: true, email: true, role: true, active: true, createdAt: true, employeeType: true, dailyRate: true, bankName: true, bankAccount: true, bankAccountName: true, joinDate: true },
     orderBy: { createdAt: 'desc' },
   });
   return success(users);
 }, SENIOR_ROLES);
 
 export const POST = withAuth(async (req) => {
-  const { name, email, password, role, pin } = await req.json();
+  const { name, email, password, role, pin, employeeType, dailyRate, bankName, bankAccount, bankAccountName, joinDate } = await req.json();
 
   if (!name || !email || !password) return error('Name, email, and password are required');
 
@@ -24,12 +24,17 @@ export const POST = withAuth(async (req) => {
 
   const user = await prisma.user.create({
     data: {
-      name,
-      email,
+      name, email,
       password: await hashPassword(password),
       role: role || 'CASHIER',
-      pin,
-    },
+      pin: pin || null,
+      employeeType: employeeType || null,
+      dailyRate: dailyRate || null,
+      bankName: bankName || null,
+      bankAccount: bankAccount || null,
+      bankAccountName: bankAccountName || null,
+      joinDate: joinDate ? new Date(joinDate) : null,
+    } as any,
     select: { id: true, name: true, email: true, role: true },
   });
 
@@ -37,13 +42,19 @@ export const POST = withAuth(async (req) => {
 }, SENIOR_ROLES);
 
 export const PATCH = withAuth(async (req) => {
-  const { id, name, email, role, password, active } = await req.json();
+  const { id, name, email, role, password, active, employeeType, dailyRate, bankName, bankAccount, bankAccountName, joinDate } = await req.json();
   if (!id) return error('ID wajib diisi');
   const updateData: any = {};
-  if (name !== undefined)   updateData.name   = name;
-  if (email !== undefined)  updateData.email  = email;
-  if (role !== undefined)   updateData.role   = role;
-  if (active !== undefined) updateData.active = active;
+  if (name !== undefined)            updateData.name            = name;
+  if (email !== undefined)           updateData.email           = email;
+  if (role !== undefined)            updateData.role            = role;
+  if (active !== undefined)          updateData.active          = active;
+  if (employeeType !== undefined)    updateData.employeeType    = employeeType;
+  if (dailyRate !== undefined)       updateData.dailyRate       = dailyRate;
+  if (bankName !== undefined)        updateData.bankName        = bankName;
+  if (bankAccount !== undefined)     updateData.bankAccount     = bankAccount;
+  if (bankAccountName !== undefined) updateData.bankAccountName = bankAccountName;
+  if (joinDate !== undefined)        updateData.joinDate        = joinDate ? new Date(joinDate) : null;
   if (password) {
     updateData.password = await hashPassword(password);
   }
