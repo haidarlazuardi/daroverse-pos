@@ -165,6 +165,7 @@ model User {
   orders           Order[]
   shifts           Shift[]
   productionOrders ProductionOrder[]
+  attendances      Attendance[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -966,4 +967,28 @@ model QRMenuSettings {
   updatedAt   DateTime @updatedAt
 
   @@map("qr_menu_settings")
+}
+
+// ═══════════════════════════════════════════════════════
+//  ATTENDANCE
+// ═══════════════════════════════════════════════════════
+
+enum AttendanceType {
+  CHECK_IN
+  CHECK_OUT
+}
+
+model Attendance {
+  id             String         @id @default(cuid())
+  userId         String
+  user           User           @relation(fields: [userId], references: [id])
+  type           AttendanceType
+  photo          String         // base64 compressed, auto-expire
+  photoExpiresAt DateTime
+  notes          String?
+  createdAt      DateTime       @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+  @@map("attendances")
 }
