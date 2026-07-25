@@ -162,10 +162,21 @@ model User {
   role             Role              @default(CASHIER)
   pin              String?
   active           Boolean           @default(true)
+  // Employee fields
+  employeeType     EmployeeType?
+  dailyRate        Float?
+  bankName         String?
+  bankAccount      String?
+  bankAccountName  String?
+  joinDate         DateTime?
+
   orders           Order[]
   shifts           Shift[]
   productionOrders ProductionOrder[]
   attendances      Attendance[]
+  workSchedules    WorkSchedule[]
+  kasbons          Kasbon[]
+  payrollRecords   PayrollRecord[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -994,4 +1005,127 @@ model Attendance {
   @@index([userId, createdAt])
   @@index([createdAt])
   @@map("attendances")
+}
+
+// ═══════════════════════════════════════════════════════
+//  PAYROLL SYSTEM
+// ═══════════════════════════════════════════════════════
+
+enum EmployeeType {
+  HELPER        // Rp 50.000/hari
+  STAFF         // Rp 60.000/hari (kitchen/barista)
+  MANAGER
+}
+
+enum PayrollStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  PAID
+}
+
+enum KasbonStatus {
+  ACTIVE
+  LUNAS
+}
+
+model ShiftTemplate {
+  id          String          @id @default(cuid())
+  name        String          // "Shift Pagi", "Shift Sore"
+  startTime   String          // "09:00"
+  endTime     String          // "17:00"
+  active      Boolean         @default(true)
+  schedules   WorkSchedule[]
+  createdAt   DateTime        @default(now())
+
+  @@map("shift_templates")
+}
+
+model WorkSchedule {
+  id              String        @id @default(cuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  shiftTemplateId String
+  shift           ShiftTemplate @relation(fields: [shiftTemplateId], references: [id])
+  date            DateTime      // specific date
+  isOffDay        Boolean       @default(false)
+  createdBy       String
+  createdAt       DateTime      @default(now())
+
+  @@unique([userId, date])
+  @@index([date])
+  @@map("work_schedules")
+}
+
+model Kasbon {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id])
+  amount      Float        // total kasbon
+  remaining   Float        // sisa belum lunas
+  status      KasbonStatus @default(ACTIVE)
+  reason      String?
+  createdBy   String
+  createdAt   DateTime     @default(now())
+  payments    KasbonPayment[]
+
+  @@index([userId, status])
+  @@map("kasbons")
+}
+
+model KasbonPayment {
+  id        String   @id @default(cuid())
+  kasbonId  String
+  kasbon    Kasbon   @relation(fields: [kasbonId], references: [id])
+  amount    Float
+  periodId  String?  // link ke PayrollPeriod
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@map("kasbon_payments")
+}
+
+model PayrollPeriod {
+  id                 String         @id @default(cuid())
+  year               Int
+  month              Int            // 1-12
+  status             PayrollStatus  @default(DRAFT)
+  totalRevenue       Float          @default(0)
+  serviceChargePool  Float          @default(0) // totalRevenue * 5%
+  totalPayout        Float          @default(0)
+  approvedBy         String?
+  approvedAt         DateTime?
+  paidAt             DateTime?
+  notes              String?
+  records            PayrollRecord[]
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@unique([year, month])
+  @@map("payroll_periods")
+}
+
+model PayrollRecord {
+  id                String        @id @default(cuid())
+  periodId          String
+  period            PayrollPeriod @relation(fields: [periodId], references: [id])
+  userId            String
+  user              User          @relation(fields: [userId], references: [id])
+  employeeType      EmployeeType
+  dailyRate         Float
+  scheduledDays     Int           @default(0)
+  presentDays       Int           @default(0)
+  baseSalary        Float         @default(0) // dailyRate × presentDays
+  serviceCharge     Float         @default(0)
+  kasbonDeduction   Float         @default(0)
+  totalAmount       Float         @default(0) // baseSalary + serviceCharge - kasbonDeduction
+  bankName          String?
+  bankAccount       String?
+  bankAccountName   String?
+  notes             String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@unique([periodId, userId])
+  @@map("payroll_records")
 }
