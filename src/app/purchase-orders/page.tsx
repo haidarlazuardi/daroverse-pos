@@ -53,9 +53,22 @@ export default function PurchaseOrdersPage() {
     setFormError(''); setSlideOpen(true);
   }
 
-  function openDetail(po: PO) { setDetailPO(po); setSlideOpen(true); }
+  async function openDetail(po: PO) {
+    // Re-fetch untuk pastikan items ter-include
+    try {
+      const full = await api.get<PO>(`/api/purchase-orders/${po.id}`);
+      setDetailPO(full || po);
+    } catch {
+      setDetailPO(po);
+    }
+    setSlideOpen(true);
+  }
 
   function printPO(po: PO) {
+    if (!po.items || po.items.length === 0) {
+      alert(`PO ${po.poNumber} tidak memiliki item. Kemungkinan item belum tersimpan saat PO dibuat.`);
+      return;
+    }
     const date = new Date(po.createdAt).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
     const rows = po.items.map((item, i) => `
       <tr>
@@ -148,10 +161,16 @@ export default function PurchaseOrdersPage() {
   function updateItem(i: number, field: string, value: string) {
     const items = [...form.items];
     (items[i] as any)[field] = value;
-    // Auto-fill price from ingredient
+    // Auto-fill price dari ingredient — pakai harga per satuan BELI
     if (field === 'ingredientId') {
       const ing = ingredients.find(x => x.id === value);
-      if (ing) items[i].unitPrice = String(ing.latestPrice);
+      if (ing) {
+        // harga per purchase unit = latestPrice (per base unit) × conversionRate
+        const pricePerPurchaseUnit = ing.conversionRate
+          ? Math.round(ing.latestPrice * ing.conversionRate)
+          : ing.latestPrice;
+        items[i].unitPrice = String(pricePerPurchaseUnit);
+      }
     }
     setForm({ ...form, items });
   }
@@ -326,21 +345,27 @@ export default function PurchaseOrdersPage() {
               <div className="space-y-2">
                 {form.items.map((item, i) => {
                   const ing = ingredients.find(x => x.id === item.ingredientId);
+                  const purchaseUnit = ing?.purchaseUnit || ing?.unit || 'unit';
+                  const pricePerUnit = parseFloat(item.unitPrice) || 0;
+                  const qty = parseFloat(item.quantity) || 0;
                   return (
                     <div key={i} className="grid grid-cols-12 gap-2 items-start">
                       <div className="col-span-5">
                         <select className="select w-full" value={item.ingredientId} onChange={e => updateItem(i, 'ingredientId', e.target.value)}>
                           <option value="">Pilih bahan</option>
-                          {ingredients.map(x => <option key={x.id} value={x.id}>{x.name} ({x.unit})</option>)}
+                          {ingredients.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
                         </select>
+                        {ing && <p className="text-xs text-gray-400 mt-0.5">Stok: {ing.unit} · Beli: {ing.purchaseUnit || ing.unit}</p>}
                       </div>
                       <div className="col-span-3">
                         <input className="input w-full" type="number" placeholder="Qty" value={item.quantity} onChange={e => updateItem(i, 'quantity', e.target.value)} />
-                        {ing?.purchaseUnit && <p className="text-xs text-gray-400 mt-0.5">{ing.purchaseUnit}</p>}
+                        <p className="text-xs text-gray-400 mt-0.5">{purchaseUnit}</p>
                       </div>
                       <div className="col-span-3">
-                        <input className="input w-full" type="number" placeholder="Harga/unit" value={item.unitPrice} onChange={e => updateItem(i, 'unitPrice', e.target.value)} />
-                        {item.quantity && item.unitPrice && <p className="text-xs text-gray-400 mt-0.5">{formatCurrency((parseFloat(item.quantity)||0)*(parseFloat(item.unitPrice)||0))}</p>}
+                        <input className="input w-full" type="number" placeholder={`Harga/${purchaseUnit}`} value={item.unitPrice} onChange={e => updateItem(i, 'unitPrice', e.target.value)} />
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {qty > 0 && pricePerUnit > 0 ? formatCurrency(qty * pricePerUnit) : `per ${purchaseUnit}`}
+                        </p>
                       </div>
                       <div className="col-span-1 pt-2">
                         <button onClick={() => removeItem(i)} className="p-1.5 text-red-400 hover:text-red-600">
