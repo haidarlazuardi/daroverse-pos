@@ -10,7 +10,7 @@ import { api } from '@/lib/fetch';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
 
-interface POItem { id: string; quantity: number; unitPrice: number; totalPrice: number; ingredient: { id: string; name: string; unit: string } }
+interface POItem { id: string; quantity: number; unitPrice: number; totalPrice: number; ingredient: { id: string; name: string; unit: string; purchaseUnit: string | null; conversionRate: number | null } }
 interface PO { id: string; poNumber: string; status: string; totalAmount: number; notes: string | null; createdAt: string; completedAt: string | null; supplier: { id: string; name: string }; items: POItem[] }
 interface Supplier { id: string; name: string }
 interface Ingredient { id: string; name: string; unit: string; latestPrice: number; purchaseUnit: string | null; conversionRate: number | null }
@@ -74,7 +74,7 @@ export default function PurchaseOrdersPage() {
       <tr>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">${i + 1}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee">${item.ingredient.name}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">${item.quantity} ${item.ingredient.unit}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">${item.quantity} ${item.ingredient.purchaseUnit || item.ingredient.unit}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right">Rp ${item.unitPrice.toLocaleString('id-ID')}</td>
         <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:right">Rp ${(item.quantity * item.unitPrice).toLocaleString('id-ID')}</td>
       </tr>`).join('');
@@ -315,7 +315,9 @@ export default function PurchaseOrdersPage() {
                   {detailPO.items.map(item => (
                     <tr key={item.id}>
                       <td className="px-4 py-3 font-medium text-gray-900">{item.ingredient.name}</td>
-                      <td className="px-4 py-3 text-right text-gray-600">{item.quantity} {item.ingredient.unit}</td>
+                      <td className="px-4 py-3 text-right text-gray-600">
+                        {item.quantity} {item.ingredient.purchaseUnit || item.ingredient.unit}
+                      </td>
                       <td className="px-4 py-3 text-right text-gray-600">{formatCurrency(item.unitPrice)}</td>
                       <td className="px-4 py-3 text-right font-medium">{formatCurrency(item.totalPrice)}</td>
                     </tr>
