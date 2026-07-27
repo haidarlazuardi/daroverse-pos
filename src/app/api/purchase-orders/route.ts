@@ -63,6 +63,17 @@ export const POST = withAuth(async (req, user) => {
 
     if (markComplete) {
       await receivePurchaseOrder(po.id, user.userId);
+      // Auto-create expense
+      if (totalAmount > 0) {
+        await prisma.expense.create({
+          data: {
+            category: 'PURCHASE' as any,
+            description: `Pembelian PO #${po.poNumber} — ${po.supplier?.name || 'Supplier'}`,
+            amount: totalAmount,
+            paidBy: user.name || user.userId,
+          },
+        });
+      }
     }
 
     return success(po, 201);
@@ -81,8 +92,9 @@ export const PATCH = withAuth(async (req, user) => {
 
     if (action === 'complete') {
       await receivePurchaseOrder(id, user.userId);
+      // receivePurchaseOrder sudah handle: latestPrice update + stock increment + stockMovement + recalculateProductCosts
 
-      // Auto-create expense + auto-update latestPrice per ingredient
+      // Auto-create expense
       try {
         const po = await prisma.purchaseOrder.findUnique({
           where: { id },
@@ -93,21 +105,6 @@ export const PATCH = withAuth(async (req, user) => {
         });
         if (po) {
           const totalCost = po.items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
-
-          // Auto-update latestPrice per ingredient dari harga PO
-          for (const item of po.items) {
-            if (item.ingredient && item.unitPrice > 0) {
-              // unitPrice di PO = harga per purchaseUnit
-              // latestPrice di ingredient = harga per unit dasar
-              const convRate = item.ingredient.conversionRate || 1;
-              const pricePerBaseUnit = item.unitPrice / convRate;
-              await prisma.ingredient.update({
-                where: { id: item.ingredientId },
-                data: { latestPrice: pricePerBaseUnit },
-              });
-            }
-          }
-
           if (totalCost > 0) {
             await prisma.expense.create({
               data: {
@@ -120,7 +117,7 @@ export const PATCH = withAuth(async (req, user) => {
           }
         }
       } catch (expErr) {
-        console.error('Failed to update after PO complete:', expErr);
+        console.error('Failed to create expense after PO complete:', expErr);
       }
 
       return success({ completed: true });
