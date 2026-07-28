@@ -27,7 +27,6 @@ export const GET = withAuth(async (req: NextRequest, _user: any) => {
     if (!grouped[cat]) grouped[cat] = [];
     grouped[cat].push({
       name: p.name,
-      description: p.description || '',
       serving: '1 porsi',
       ingredients: (p.recipe?.items || []).map((ri: any) => ({
         name: ri.ingredient.name,
