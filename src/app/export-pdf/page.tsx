@@ -197,87 +197,18 @@ function buildMenuHTML(data: any): string {
     grouped[cat].push(p);
   }
 
-  const css = `
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Segoe UI',Arial,sans-serif;color:#1C1C1C;background:#fff;font-size:8.5pt}
-    @media print{@page{size:A4 portrait;margin:10mm 12mm}.page{page-break-after:always}.page:last-child{page-break-after:avoid}}
-    .page{padding:8mm 10mm}
-    .hdr{display:flex;align-items:center;justify-content:space-between;padding-bottom:3mm;margin-bottom:3mm;border-bottom:2px solid #48654D}
-    .logo{width:9mm;height:9mm;background:#48654D;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:11pt;flex-shrink:0}
-    .hdr-title{font-size:13pt;font-weight:900;color:#2D4A32;margin-left:3mm}
-    .hdr-sub{font-size:7pt;color:#888;margin-left:3mm;margin-top:0.5mm}
-    .cat-bar{background:#2D4A32;color:#F6EDDB;padding:2.5mm 4mm;margin-bottom:3mm;display:flex;align-items:baseline;gap:3mm;font-size:11pt;font-weight:900}
-    .cat-n{font-size:7.5pt;opacity:0.7;font-weight:400}
-    .card{border:1px solid #EDE5D0;border-radius:4px;margin-bottom:3.5mm;overflow:hidden;break-inside:avoid}
-    .card-top{padding:2.5mm 4mm;background:#FAFAF8;border-bottom:1px solid #EDE5D0;display:flex;align-items:center;justify-content:space-between;gap:3mm}
-    .rname{font-size:11pt;font-weight:900;color:#2D4A32}
-    .rdesc{font-size:7.5pt;color:#777;font-style:italic;margin-top:0.5mm}
-    .rprice{font-size:10pt;font-weight:700;color:#48654D;text-align:right;flex-shrink:0}
-    .mbadge{font-size:7pt;font-weight:700;background:#F6EDDB;color:#48654D;padding:0.5mm 2mm;border-radius:3px;margin-top:1mm;display:inline-block}
-    .body{display:flex}
-    .ci{flex:0 0 42%;padding:2.5mm 3.5mm;border-right:1px solid #EDE5D0}
-    .cs{flex:1;padding:2.5mm 3.5mm}
-    .lbl{font-size:6.5pt;font-weight:700;color:#48654D;text-transform:uppercase;letter-spacing:0.8px;padding-bottom:1.5mm;border-bottom:1px solid #F0ECE4;margin-bottom:2mm}
-    .ir{display:flex;justify-content:space-between;padding:1mm 0;border-bottom:0.3px solid #F5F3EE;font-size:8pt}
-    .ir:last-child{border-bottom:none}
-    .iq{font-weight:700;color:#48654D;text-align:right;flex-shrink:0}
-    .sr{display:flex;gap:2.5mm;margin-bottom:2.5mm;font-size:8.5pt}
-    .sn{font-weight:900;color:#E8DFC8;font-size:14pt;min-width:5mm;text-align:center;line-height:1}
-    .st{color:#333;line-height:1.45;padding-top:1mm}
-    .bl{border-bottom:0.5px solid #EDE5D0;margin-bottom:5mm}
-    .bh{font-size:7pt;color:#bbb;font-style:italic;margin-top:2mm}
-    .nr{font-size:7.5pt;color:#999;font-style:italic}
-    .note{font-size:7.5pt;font-style:italic;color:#666;padding:2mm 3.5mm;background:#FFFBF0;border-top:0.5px solid #EDE5D0}
-    .ftr{margin-top:3mm;padding-top:2mm;border-top:0.5px solid #EDE5D0;display:flex;justify-content:space-between;font-size:6.5pt;color:#ccc}
-  `;
+  const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:8.5pt;color:#111}@media print{@page{size:A4 portrait;margin:10mm 12mm}.page{page-break-after:always}.page:last-child{page-break-after:avoid}}.page{padding:6mm 8mm}.hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #48654D;padding-bottom:2.5mm;margin-bottom:3mm}.logo{width:8mm;height:8mm;background:#48654D;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:10pt}.title{font-size:12pt;font-weight:900;color:#2D4A32;margin-left:2.5mm}.cat{background:#2D4A32;color:#F6EDDB;padding:2mm 4mm;font-size:10pt;font-weight:900;margin-bottom:2.5mm}.card{border:1px solid #EDE5D0;border-radius:3px;margin-bottom:2.5mm;overflow:hidden;break-inside:avoid}.ctop{padding:2mm 3mm;background:#FAFAF8;border-bottom:1px solid #EDE5D0}.rname{font-size:10pt;font-weight:900;color:#2D4A32}.body{display:flex}.ci{flex:0 0 42%;padding:2mm 3mm;border-right:1px solid #EDE5D0}.cs{flex:1;padding:2mm 3mm}.lbl{font-size:6.5pt;font-weight:700;color:#48654D;text-transform:uppercase;letter-spacing:0.8px;padding-bottom:1.5mm;border-bottom:1px solid #F0ECE4;margin-bottom:1.5mm}.ir{display:flex;justify-content:space-between;padding:0.8mm 0;border-bottom:0.3px solid #F5F3EE;font-size:8pt}.iq{font-weight:700;color:#48654D}.bl{border-bottom:0.5px solid #EDE5D0;margin-bottom:4.5mm}.bh{font-size:7pt;color:#bbb;font-style:italic;margin-top:1.5mm}.ftr{margin-top:2.5mm;padding-top:1.5mm;border-top:0.5px solid #EDE5D0;display:flex;justify-content:space-between;font-size:6.5pt;color:#ccc}`;
 
   const pages = Object.entries(grouped).map(([cat,items]:[string,any[]]) => {
     const cards = items.map((p:any) => {
       const ri = p.recipe?.items||[];
-      const steps = p.recipe?.instructions
-        ? p.recipe.instructions.split('\n').filter((s:string)=>s.trim())
-        : [];
-      const margin = p.price>0&&p.cost>0 ? Math.round(((p.price-p.cost)/p.price)*100) : null;
-
-      const ingrHTML = ri.length>0
+      const ingr = ri.length>0
         ? ri.map((r:any)=>`<div class="ir"><span>${r.ingredient.name}</span><span class="iq">${fmt(r.quantity)} ${r.ingredient.unit}</span></div>`).join('')
-        : `<p class="nr">Belum ada resep</p>`;
-
-      const stepsHTML = steps.length>0
-        ? steps.map((s:string,i:number)=>`<div class="sr"><span class="sn">${i+1}</span><span class="st">${s}</span></div>`).join('')
-        : Array(6).fill(0).map(()=>`<div class="bl"></div>`).join('')+`<p class="bh">Diisi oleh tim operasional</p>`;
-
-      return `<div class="card">
-        <div class="card-top">
-          <div>
-            <div class="rname">${p.name}</div>
-            ${p.description?`<div class="rdesc">${p.description}</div>`:''}
-          </div>
-          <div style="text-align:right">
-            <div class="rprice">${p.price>0?rp(p.price):'—'}</div>
-            ${margin!==null?`<div class="mbadge">Margin ${margin}%</div>`:''}
-          </div>
-        </div>
-        <div class="body">
-          <div class="ci"><div class="lbl">Bahan</div>${ingrHTML}</div>
-          <div class="cs"><div class="lbl">Cara Pembuatan</div>${stepsHTML}</div>
-        </div>
-        ${p.recipe?.instructions===null&&ri.length===0?'':p.notes?`<div class="note">📌 ${p.notes}</div>`:''}
-      </div>`;
+        : '<span style="font-size:7.5pt;color:#aaa">Belum ada resep</span>';
+      const steps = Array(6).fill(0).map(()=>'<div class="bl"></div>').join('')+'<p class="bh">Diisi oleh tim operasional</p>';
+      return `<div class="card"><div class="ctop"><div class="rname">${p.name}</div></div><div class="body"><div class="ci"><div class="lbl">Bahan</div>${ingr}</div><div class="cs"><div class="lbl">Cara Pembuatan</div>${steps}</div></div></div>`;
     }).join('');
-
-    return `<div class="page">
-      <div class="hdr">
-        <div style="display:flex;align-items:center">
-          <div class="logo">S</div>
-          <div><div class="hdr-title">Menu &amp; Resep</div><div class="hdr-sub">Soeka House — Bogor</div></div>
-        </div>
-        <div style="font-size:7pt;color:#888">${now}</div>
-      </div>
-      <div class="cat-bar">${cat}<span class="cat-n">${items.length} menu</span></div>
-      ${cards}
-      <div class="ftr"><span>SOEKA HOUSE — Recipe Book</span><span>Dicetak ${now}</span></div>
-    </div>`;
+    return `<div class="page"><div class="hdr"><div style="display:flex;align-items:center"><div class="logo">S</div><div class="title">Menu &amp; Resep</div></div><div style="font-size:7pt;color:#888">${now}</div></div><div class="cat">${cat} <span style="font-size:7.5pt;opacity:0.7;font-weight:400">${items.length} menu</span></div>${cards}<div class="ftr"><span>SOEKA HOUSE — Panduan Produksi</span><span>${now}</span></div></div>`;
   }).join('');
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Menu &amp; Resep — Soeka House</title><style>${css}</style></head><body>${pages}</body></html>`;
