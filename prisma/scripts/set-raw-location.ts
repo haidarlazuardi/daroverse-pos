@@ -5,10 +5,7 @@ async function main() {
   const result = await prisma.ingredient.updateMany({
     where: {
       type: 'RAW',
-      OR: [
-        { defaultLocation: null },
-        { defaultLocation: '' },
-      ],
+      defaultLocation: null,
     },
     data: { defaultLocation: 'GUDANG' as any },
   });
