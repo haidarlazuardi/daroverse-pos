@@ -34,7 +34,7 @@ export const GET = withAuth(async (req: NextRequest, _user: any) => {
         unit: ri.ingredient.unit,
       })),
       steps: p.recipe?.instructions
-        ? p.recipe.instructions.split('\n').filter((s: string) => s.trim())
+        ? String(p.recipe.instructions).split('\n').filter((s: string) => s.trim())
         : [],
     });
   }
