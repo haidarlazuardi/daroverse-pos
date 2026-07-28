@@ -182,6 +182,35 @@ export default function BahanBakuPage() {
     finally { setDeleting(false); }
   }
 
+
+  function printRaw() {
+    const now = new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+    const rows = rawData.map((i,n) => `<tr>
+      <td>${n+1}</td><td><strong>${i.name}</strong></td><td>${i.unit}</td>
+      <td>${i.purchaseUnit||'—'}</td>
+      <td>${i.conversionRate?`${i.conversionRate} ${i.unit}`:'—'}</td>
+      <td style="text-align:right">${i.latestPrice>0?'Rp '+Math.round(i.latestPrice).toLocaleString('id-ID'):'—'}</td>
+      <td style="text-align:right">${i.conversionRate&&i.latestPrice?'Rp '+Math.round(i.latestPrice*i.conversionRate).toLocaleString('id-ID'):'—'}</td>
+      <td style="text-align:right">${i.minStock>0?`${i.minStock} ${i.unit}`:'—'}</td>
+      <td>${(i as any).defaultLocation||'GUDANG'}</td>
+    </tr>`).join('');
+    const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:8.5pt;color:#111}@media print{@page{size:A4 landscape;margin:10mm 12mm}}.hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #48654D;padding-bottom:3mm;margin-bottom:4mm}.logo{width:9mm;height:9mm;background:#48654D;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:11pt}.title{font-size:14pt;font-weight:900;color:#2D4A32;margin-left:3mm}.sec{background:#48654D;color:#F6EDDB;padding:2mm 4mm;font-size:10pt;font-weight:900;margin-bottom:0}table{width:100%;border-collapse:collapse}th{background:#F6EDDB;color:#2D4A32;font-size:7pt;font-weight:700;text-transform:uppercase;padding:2mm 2.5mm;text-align:left;border-bottom:1.5px solid #D8CFC0}td{padding:1.8mm 2.5mm;border-bottom:0.5px solid #F0ECE4;font-size:8.5pt}tr:nth-child(even) td{background:#FAFAF8}.ftr{margin-top:3mm;font-size:7pt;color:#aaa;display:flex;justify-content:space-between;border-top:0.5px solid #eee;padding-top:2mm}`;
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bahan Mentah</title><style>${css}</style></head><body><div class="hdr"><div style="display:flex;align-items:center"><div class="logo">S</div><div class="title">Master Bahan Mentah</div></div><div style="font-size:7.5pt;color:#888">Soeka House — ${now}</div></div><div class="sec">Bahan Mentah (RAW) — ${rawData.length} bahan</div><table><tr><th>#</th><th>Nama</th><th>Satuan</th><th>Satuan Beli</th><th>Isi/Satuan</th><th>Harga/Unit</th><th>Harga/Satuan Beli</th><th>Stok Min</th><th>Lokasi</th></tr>${rows}</table><div class="ftr"><span>SOEKA HOUSE — Dokumen Internal</span><span>Dicetak ${now}</span></div><script>window.onload=()=>window.print()</script></body></html>`;
+    const w = window.open('','_blank'); if(w){w.document.write(html);w.document.close();}
+  }
+
+  function printPrepped() {
+    const now = new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+    const rows = prepData.map((i,n) => {
+      const items = (i as any).prepRecipe?.items||[];
+      const recipe = items.map((r:any)=>`${r.ingredient.name}: ${r.quantity} ${r.ingredient.unit}`).join(', ');
+      return `<tr><td>${n+1}</td><td><strong>${i.name}</strong></td><td>${i.unit}</td><td style="text-align:right">${i.latestPrice>0?'Rp '+Math.round(i.latestPrice).toLocaleString('id-ID'):'—'}</td><td style="text-align:right">${i.minStock>0?`${i.minStock} ${i.unit}`:'—'}</td><td>${(i as any).defaultLocation||'—'}</td><td style="font-size:7.5pt;color:#555">${recipe||'—'}</td></tr>`;
+    }).join('');
+    const css = `*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:8.5pt;color:#111}@media print{@page{size:A4 landscape;margin:10mm 12mm}}.hdr{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #48654D;padding-bottom:3mm;margin-bottom:4mm}.logo{width:9mm;height:9mm;background:#48654D;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:11pt}.title{font-size:14pt;font-weight:900;color:#2D4A32;margin-left:3mm}.sec{background:#48654D;color:#F6EDDB;padding:2mm 4mm;font-size:10pt;font-weight:900;margin-bottom:0}table{width:100%;border-collapse:collapse}th{background:#F6EDDB;color:#2D4A32;font-size:7pt;font-weight:700;text-transform:uppercase;padding:2mm 2.5mm;text-align:left;border-bottom:1.5px solid #D8CFC0}td{padding:1.8mm 2.5mm;border-bottom:0.5px solid #F0ECE4;font-size:8.5pt;vertical-align:top}tr:nth-child(even) td{background:#FAFAF8}.ftr{margin-top:3mm;font-size:7pt;color:#aaa;display:flex;justify-content:space-between;border-top:0.5px solid #eee;padding-top:2mm}`;
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bahan Olahan</title><style>${css}</style></head><body><div class="hdr"><div style="display:flex;align-items:center"><div class="logo">S</div><div class="title">Master Bahan Olahan</div></div><div style="font-size:7.5pt;color:#888">Soeka House — ${now}</div></div><div class="sec">Bahan Olahan (PREPPED) — ${prepData.length} bahan</div><table><tr><th>#</th><th>Nama</th><th>Satuan</th><th>Harga/Unit</th><th>Stok Min</th><th>Lokasi</th><th>Komposisi Resep</th></tr>${rows}</table><div class="ftr"><span>SOEKA HOUSE — Dokumen Internal</span><span>Dicetak ${now}</span></div><script>window.onload=()=>window.print()</script></body></html>`;
+    const w = window.open('','_blank'); if(w){w.document.write(html);w.document.close();}
+  }
+
   // ── Export / Import / Template ────────────────────────────────────────────
   function handleExport() {
     const rows = rawData.map(i => ({
@@ -296,7 +325,7 @@ export default function BahanBakuPage() {
 
         {tab === 'raw' ? (
           <>
-            <Toolbar search={search} onSearch={setSearch} searchPlaceholder="Cari bahan..." onExport={handleExport} onDownloadTemplate={handleDownloadTemplate} onImport={handleImport} onAdd={openAddRaw} addLabel="Bahan Baru" />
+            <Toolbar search={search} onSearch={setSearch} searchPlaceholder="Cari bahan..." onExport={handleExport} onPrint={printRaw} onDownloadTemplate={handleDownloadTemplate} onImport={handleImport} onAdd={openAddRaw} addLabel="Bahan Baru" />
             {loading ? (
               <div className="flex justify-center py-16"><div className="w-7 h-7 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--brand)', borderTopColor: 'transparent' }} /></div>
             ) : sortedGroups.length === 0 ? (
@@ -365,7 +394,7 @@ export default function BahanBakuPage() {
           </>
         ) : (
           <>
-            <Toolbar search={search} onSearch={setSearch} searchPlaceholder="Cari bahan olahan..." onAdd={openAddPrep} addLabel="Tambah Olahan" />
+            <Toolbar search={search} onSearch={setSearch} searchPlaceholder="Cari bahan olahan..." onPrint={printPrepped} onAdd={openAddPrep} addLabel="Tambah Olahan" />
             {loading ? (
               <div className="flex justify-center py-16"><div className="w-7 h-7 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--brand)', borderTopColor: 'transparent' }} /></div>
             ) : filteredPrep.length === 0 ? (
