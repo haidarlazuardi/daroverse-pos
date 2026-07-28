@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, withAuth } from '@/lib/api-helpers';
+import { recalculateProductCosts } from '@/lib/stock-engine';
 import { ADMIN_ROLES, STOCK_ROLES } from '@/lib/auth';
 
 export const GET = withAuth(async (req) => {
@@ -136,6 +137,11 @@ export const PATCH = withAuth(async (req) => {
         },
       });
     }
+  }
+
+  // Trigger recalculate HPP produk jika harga berubah
+  if (data.latestPrice !== undefined) {
+    recalculateProductCosts([id]).catch(() => {}); // async, tidak block response
   }
 
   return success(ingredient);

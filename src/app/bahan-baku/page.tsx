@@ -25,7 +25,7 @@ interface PrepIngredient extends Ingredient {
 
 const EMPTY_RAW = {
   name: '', type: 'RAW', unit: 'g', purchaseUnit: '', conversionRate: '',
-  latestPrice: '', purchasePrice: '', minStock: '', defaultLocation: '', isPackaging: false,
+  latestPrice: '', purchasePrice: '', minStock: '', defaultLocation: 'GUDANG', isPackaging: false,
 };
 const EMPTY_PREP = { name: '', unit: 'ml', yieldQty: '', yieldUnit: 'ml', minStock: '', latestPrice: '', shelfLifeDays: '', steps: [] as { title: string; description: string }[] };
 const UNITS = ['g','ml','pcs','kg','liter','botol','pack','kaleng','lembar','buah'];
@@ -100,7 +100,7 @@ export default function BahanBakuPage() {
       latestPrice: String(ing.latestPrice),
       purchasePrice: ing.conversionRate ? String(ing.latestPrice * ing.conversionRate) : '',
       minStock: String(ing.minStock),
-      defaultLocation: (ing as any).defaultLocation || '',
+      defaultLocation: (ing as any).defaultLocation || (ing.type === 'RAW' ? 'GUDANG' : ''),
       isPackaging: (ing as any).isPackaging || false,
     });
     setRawSlide(true);
