@@ -126,7 +126,7 @@ export function buildReceipt(data: ReceiptData): Uint8Array {
   return new Uint8Array([...bar, ...customer]);
 }
 
-// ── Kitchen Ticket ────────────────────────────────────────────────────────────
+// ── Kitchen / Bar Ticket — minimal, hemat kertas ─────────────────────────────
 export function buildKitchenTicket(data: {
   orderNumber: string;
   tableInfo?: string;
@@ -135,39 +135,42 @@ export function buildKitchenTicket(data: {
   items: { name: string; qty: number; notes?: string }[];
   station: 'KITCHEN' | 'BAR';
 }): Uint8Array {
+  if (data.items.length === 0) return new Uint8Array([]);
   const ESC = 0x1B, GS = 0x1D, LF = 0x0A;
   const cmds: number[] = [];
   const push = (...b: number[]) => cmds.push(...b);
-  const enc  = (s: string) => Array.from(s).map(c => c.charCodeAt(0));
+  const enc  = (s: string) => Array.from(s.slice(0,32)).map(c => Math.min(127, c.charCodeAt(0)));
   const line = (s: string) => { cmds.push(...enc(s), LF); };
-  const feed = (n = 1) => { for (let i = 0; i < n; i++) push(LF); };
-  const center = () => push(ESC, 0x61, 0x01);
-  const left   = () => push(ESC, 0x61, 0x00);
-  const bold   = (on: boolean) => push(ESC, 0x45, on ? 1 : 0);
-  const dbl    = (on: boolean) => push(GS, 0x21, on ? 0x11 : 0x00);
+  const bold = (on: boolean) => push(ESC, 0x45, on ? 1 : 0);
+  const dbl  = (on: boolean) => push(GS, 0x21, on ? 0x11 : 0x00);
+  const cut  = () => push(GS, 0x56, 0x42, 0x10); // partial cut
 
-  push(ESC, 0x40);
-  center(); dbl(true); bold(true);
-  line(data.station === 'KITCHEN' ? '*** KITCHEN ***' : '*** BAR ***');
+  push(ESC, 0x40); // init
+
+  // Header — 1 baris
+  bold(true); dbl(true);
+  line(data.station === 'KITCHEN' ? 'KITCHEN' : 'BAR');
   dbl(false); bold(false);
-  left();
-  line('--------------------------------');
-  bold(true); line(`No: ${data.orderNumber}`); bold(false);
-  if (data.tableInfo) line(`Meja: ${data.tableInfo}`);
-  if (data.customerName) line(`Plg: ${data.customerName}`);
-  line(data.date);
-  line('--------------------------------');
 
+  // Order number + info — compact
+  bold(true); line(`#${data.orderNumber.slice(-6)}`); bold(false);
+  if (data.tableInfo) line(`Meja: ${data.tableInfo}`);
+  if (data.customerName) line(data.customerName.slice(0, 20));
+  line('---');
+
+  // Items — bold nama, normal qty
   for (const item of data.items) {
-    bold(true);
-    dbl(true);
-    line(`${item.qty}x ${item.name.slice(0, 14)}`);
+    dbl(true); bold(true);
+    line(`${item.qty}x ${item.name.slice(0, 13)}`);
     dbl(false); bold(false);
-    if (item.notes) line(`   * ${item.notes}`);
+    if (item.notes) line(`  *${item.notes.slice(0, 28)}`);
   }
 
-  line('--------------------------------');
-  feed(3);
-  push(GS, 0x56, 0x41, 0x00);
+  line('---');
+  // Time only (no date) - hemat baris
+  const t = data.date.split(' ').pop() || data.date;
+  line(t);
+  push(LF, LF);
+  cut();
   return new Uint8Array(cmds);
 }

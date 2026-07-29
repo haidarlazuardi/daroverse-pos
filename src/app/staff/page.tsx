@@ -643,10 +643,10 @@ function TransactionHistory({ onBack }: { onBack: () => void }) {
 
       // Kitchen ticket
       const kitchenItems = items.filter((_: any, idx: number) =>
-        (o.items?.[idx]?.product?.station || 'FOOD') === 'FOOD'
+        (o.items?.[idx]?.product?.station || 'DRINK') === 'FOOD'
       );
       const barItems = items.filter((_: any, idx: number) =>
-        (o.items?.[idx]?.product?.station || 'DRINK') !== 'FOOD'
+        (o.items?.[idx]?.product?.station || 'DRINK') === 'DRINK'
       );
 
       if (kitchenItems.length > 0) {

@@ -365,10 +365,10 @@ export default function POSPage() {
         price: i.unitPrice || i.price || 0,
       }));
       const kitchenItems = items.filter((_: any, idx: number) =>
-        (order.items[idx]?.product?.station || 'FOOD') === 'FOOD'
+        (order.items[idx]?.product?.station || 'DRINK') === 'FOOD'
       );
       const barItems = items.filter((_: any, idx: number) =>
-        (order.items[idx]?.product?.station || 'DRINK') !== 'FOOD'
+        (order.items[idx]?.product?.station || 'DRINK') === 'DRINK'
       );
       const date = new Date().toLocaleString('id-ID');
 
