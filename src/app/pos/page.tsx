@@ -350,9 +350,14 @@ export default function POSPage() {
   const [printerReady, setPrinterReady] = useState(false);
 
   // ── Auto print 3 struk ───────────────────────────────────────────────────
-  async function autoPrint(order: any) {
+  async function autoPrint(order: any, isOpenBill = false) {
     if (!order) return;
     try {
+      // Pastikan printer terhubung dulu
+      if (!isConnected()) {
+        try { await pairAndConnect(); } catch { return; } // user cancel pair = skip print
+      }
+
       const items = (order.items || []).map((i: any) => ({
         name: i.product?.name || i.name || '',
         qty: i.quantity,
@@ -367,6 +372,28 @@ export default function POSPage() {
       );
       const date = new Date().toLocaleString('id-ID');
 
+      if (isOpenBill) {
+        // Open bill — hanya kitchen + bar ticket, customer receipt dengan status OPEN BILL
+        const openBillReceipt = buildReceipt({
+          orderNumber: order.orderNumber,
+          date,
+          cashierName: user?.name || undefined,
+          customerName: order.billName || order.customer?.name || undefined,
+          items,
+          subtotal: order.subtotal,
+          discount: order.discount,
+          tax: order.tax,
+          serviceCharge: order.serviceCharge,
+          total: order.total,
+          payMethod: 'OPEN BILL',
+        });
+        if (kitchenItems.length > 0) await printData(buildKitchenTicket({ orderNumber: order.orderNumber, date, customerName: order.billName, items: kitchenItems, station: 'KITCHEN' })).catch(() => {});
+        if (barItems.length > 0)     await printData(buildKitchenTicket({ orderNumber: order.orderNumber, date, customerName: order.billName, items: barItems, station: 'BAR' })).catch(() => {});
+        await printData(openBillReceipt).catch(() => {});
+        return;
+      }
+
+      // Regular checkout — 3 struk
       const customerReceipt = buildReceipt({
         orderNumber: order.orderNumber,
         date,
@@ -385,29 +412,12 @@ export default function POSPage() {
         change: order.payment?.change,
       });
 
-      const kitchenTicket = buildKitchenTicket({
-        orderNumber: order.orderNumber,
-        date,
-        customerName: order.billName,
-        items: kitchenItems,
-        station: 'KITCHEN',
-      });
-
-      const barTicket = buildKitchenTicket({
-        orderNumber: order.orderNumber,
-        date,
-        customerName: order.billName,
-        items: barItems,
-        station: 'BAR',
-      });
-
-      // Print sequentially
-      if (kitchenItems.length > 0) await printData(kitchenTicket).catch(() => {});
-      if (barItems.length > 0)     await printData(barTicket).catch(() => {});
+      if (kitchenItems.length > 0) await printData(buildKitchenTicket({ orderNumber: order.orderNumber, date, customerName: order.billName, items: kitchenItems, station: 'KITCHEN' })).catch(() => {});
+      if (barItems.length > 0)     await printData(buildKitchenTicket({ orderNumber: order.orderNumber, date, customerName: order.billName, items: barItems, station: 'BAR' })).catch(() => {});
       await printData(customerReceipt).catch(() => {});
 
       setPrinterReady(true);
-    } catch { /* silent - print failure tidak block transaksi */ }
+    } catch { /* silent */ }
   }
   const [selectedDiscount, setSelectedDiscount] = useState('');
   const [editLine, setEditLine] = useState<CartLine | null>(null);
@@ -617,8 +627,10 @@ export default function POSPage() {
   const confirmSaveBill = async () => {
     if (cart.lines.length === 0) return;
     try {
-      await api.post('/api/orders', { ...commonBody(), open: true, billName: billName || 'Bill' });
+      const order = await api.post<any>('/api/orders', { ...commonBody(), open: true, billName: billName || 'Bill' });
       cart.clear(); setSelectedDiscount(''); setBillModal(false); setBillName(''); loadData();
+      // Print open bill ticket
+      autoPrint(order, true);
     } catch (e: any) { alert(e.message || 'Gagal'); }
   };
 
