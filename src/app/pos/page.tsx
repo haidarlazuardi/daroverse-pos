@@ -723,8 +723,8 @@ export default function POSPage() {
               {filtered.map((product) => {
                 const qty = cart.lines.filter((l) => l.productId === product.id).reduce((s, l) => s + l.quantity, 0);
                 const makeable = maxMakeable(product);
-                const out = makeable <= 0;
-                const low = !out && makeable !== Infinity && makeable <= 3;
+                const out = false; // TRIAL MODE: disabled stock check
+                const low = false; // TRIAL MODE: disabled low stock warning
                 return (
                   <button key={product.id} onClick={() => !out && addProduct(product)} disabled={out}
                     className={clsx('pos-product-card relative', out ? 'opacity-50 cursor-not-allowed' : qty > 0 ? 'pos-product-card-active' : 'pos-product-card-inactive')}>
