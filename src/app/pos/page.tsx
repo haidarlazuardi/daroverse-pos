@@ -7,7 +7,7 @@ import { api } from '@/lib/fetch';
 import { formatCurrency, Modal, Button, Input } from '@/components/ui';
 import clsx from 'clsx';
 import { getSavedPrinter, isConnected, pairAndConnect, printData, disconnect } from '@/lib/bluetooth-printer';
-import { buildReceipt } from '@/lib/escpos';
+import { buildReceipt, buildKitchenTicket } from '@/lib/escpos';
 
 interface ModOption {
   id: string; name: string; effect: 'ADJUST' | 'ADD';
@@ -348,6 +348,67 @@ export default function POSPage() {
   const [queueCount, setQueueCount]   = useState(0);
   const [printerName, setPrinterName] = useState<string>('');
   const [printerReady, setPrinterReady] = useState(false);
+
+  // ── Auto print 3 struk ───────────────────────────────────────────────────
+  async function autoPrint(order: any) {
+    if (!order) return;
+    try {
+      const items = (order.items || []).map((i: any) => ({
+        name: i.product?.name || i.name || '',
+        qty: i.quantity,
+        subtotal: i.subtotal || 0,
+        price: i.unitPrice || i.price || 0,
+      }));
+      const kitchenItems = items.filter((_: any, idx: number) =>
+        (order.items[idx]?.product?.station || 'FOOD') === 'FOOD'
+      );
+      const barItems = items.filter((_: any, idx: number) =>
+        (order.items[idx]?.product?.station || 'DRINK') !== 'FOOD'
+      );
+      const date = new Date().toLocaleString('id-ID');
+
+      const customerReceipt = buildReceipt({
+        orderNumber: order.orderNumber,
+        date,
+        cashierName: user?.name || undefined,
+        customerName: order.billName || order.customer?.name || undefined,
+        customerPoints: order.customer?.points,
+        pointsEarned: order.pointsEarned,
+        items,
+        subtotal: order.subtotal,
+        discount: order.discount,
+        tax: order.tax,
+        serviceCharge: order.serviceCharge,
+        total: order.total,
+        payMethod: order.payment?.method || 'CASH',
+        received: order.payment?.received,
+        change: order.payment?.change,
+      });
+
+      const kitchenTicket = buildKitchenTicket({
+        orderNumber: order.orderNumber,
+        date,
+        customerName: order.billName,
+        items: kitchenItems,
+        station: 'KITCHEN',
+      });
+
+      const barTicket = buildKitchenTicket({
+        orderNumber: order.orderNumber,
+        date,
+        customerName: order.billName,
+        items: barItems,
+        station: 'BAR',
+      });
+
+      // Print sequentially
+      if (kitchenItems.length > 0) await printData(kitchenTicket).catch(() => {});
+      if (barItems.length > 0)     await printData(barTicket).catch(() => {});
+      await printData(customerReceipt).catch(() => {});
+
+      setPrinterReady(true);
+    } catch { /* silent - print failure tidak block transaksi */ }
+  }
   const [selectedDiscount, setSelectedDiscount] = useState('');
   const [editLine, setEditLine] = useState<CartLine | null>(null);
   const [config, setConfig] = useState<{ product: Product; modifiers: SelectedModifier[] } | null>(null);
@@ -546,6 +607,9 @@ export default function POSPage() {
         order = await api.post('/api/orders', { ...commonBody(), open: false, paymentMethod: payMethod, paymentReference: payRef || undefined, received });
       }
       setLastOrder(order); setStep('receipt'); cart.clear(); setActiveBill(null); setSelectedDiscount(''); loadData();
+
+      // Auto-print 3 struk: Kitchen + Bar + Customer
+      autoPrint(order);
     } catch (e: any) { alert(e.message || 'Checkout gagal'); }
     finally { setSubmitting(false); }
   };

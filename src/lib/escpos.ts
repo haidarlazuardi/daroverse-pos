@@ -125,3 +125,49 @@ export function buildReceipt(data: ReceiptData): Uint8Array {
   const customer = buildSingleReceipt(data, 'CUSTOMER');
   return new Uint8Array([...bar, ...customer]);
 }
+
+// ── Kitchen Ticket ────────────────────────────────────────────────────────────
+export function buildKitchenTicket(data: {
+  orderNumber: string;
+  tableInfo?: string;
+  customerName?: string;
+  date: string;
+  items: { name: string; qty: number; notes?: string }[];
+  station: 'KITCHEN' | 'BAR';
+}): Uint8Array {
+  const ESC = 0x1B, GS = 0x1D, LF = 0x0A;
+  const cmds: number[] = [];
+  const push = (...b: number[]) => cmds.push(...b);
+  const enc  = (s: string) => Array.from(s).map(c => c.charCodeAt(0));
+  const line = (s: string) => { cmds.push(...enc(s), LF); };
+  const feed = (n = 1) => { for (let i = 0; i < n; i++) push(LF); };
+  const center = () => push(ESC, 0x61, 0x01);
+  const left   = () => push(ESC, 0x61, 0x00);
+  const bold   = (on: boolean) => push(ESC, 0x45, on ? 1 : 0);
+  const dbl    = (on: boolean) => push(GS, 0x21, on ? 0x11 : 0x00);
+
+  push(ESC, 0x40);
+  center(); dbl(true); bold(true);
+  line(data.station === 'KITCHEN' ? '*** KITCHEN ***' : '*** BAR ***');
+  dbl(false); bold(false);
+  left();
+  line('--------------------------------');
+  bold(true); line(`No: ${data.orderNumber}`); bold(false);
+  if (data.tableInfo) line(`Meja: ${data.tableInfo}`);
+  if (data.customerName) line(`Plg: ${data.customerName}`);
+  line(data.date);
+  line('--------------------------------');
+
+  for (const item of data.items) {
+    bold(true);
+    dbl(true);
+    line(`${item.qty}x ${item.name.slice(0, 14)}`);
+    dbl(false); bold(false);
+    if (item.notes) line(`   * ${item.notes}`);
+  }
+
+  line('--------------------------------');
+  feed(3);
+  push(GS, 0x56, 0x41, 0x00);
+  return new Uint8Array(cmds);
+}

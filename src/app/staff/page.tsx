@@ -6,14 +6,14 @@ import { useAuthStore } from '@/store';
 import { api } from '@/lib/fetch';
 import { formatCurrency } from '@/components/ui';
 import { getSavedPrinter, isConnected, pairAndConnect, printData } from '@/lib/bluetooth-printer';
-import { buildReceipt } from '@/lib/escpos';
+import { buildReceipt, buildKitchenTicket } from '@/lib/escpos';
 
 interface StockLevel { location: 'GUDANG' | 'BAR' | 'KITCHEN'; quantity: number }
 interface Ingredient {
   id: string; name: string; unit: string; type: 'RAW' | 'PREPPED';
   defaultLocation: 'GUDANG' | 'BAR' | 'KITCHEN' | null; minStock: number; stockLevels: StockLevel[];
 }
-type Mode = 'home' | 'batch' | 'take' | 'check' | 'waste' | 'receive' | 'opname' | 'menu' | 'expense' | 'printer';
+type Mode = 'home' | 'batch' | 'take' | 'check' | 'waste' | 'receive' | 'opname' | 'menu' | 'expense' | 'printer' | 'history';
 
 const LOC_LABEL: Record<string, string> = { GUDANG: 'Gudang', BAR: 'Bar', KITCHEN: 'Dapur' };
 
@@ -53,7 +53,7 @@ export default function StaffPage() {
 
   if (!user) return null;
 
-  const TITLES: Record<Mode, string> = { home: `Halo, ${user.name}`, batch: 'Bikin batch', take: 'Ambil bahan', check: 'Cek stok', waste: 'Buang', receive: 'Terima barang', opname: 'Stock opname', menu: 'Lihat menu', expense: 'Catat pengeluaran', printer: 'Pengaturan Printer' };
+  const TITLES: Record<Mode, string> = { home: `Halo, ${user.name}`, batch: 'Bikin batch', take: 'Ambil bahan', check: 'Cek stok', waste: 'Buang', receive: 'Terima barang', opname: 'Stock opname', menu: 'Lihat menu', expense: 'Catat pengeluaran', printer: 'Pengaturan Printer', history: 'Riwayat Transaksi' };
 
   const tiles: { mode: Mode; perm: string; color: string; label: string; desc: string; icon: string }[] = [
     { mode: 'batch', perm: 'batch', color: '#3B6D11', label: 'Bikin batch', desc: 'Racik stok olahan', icon: 'M12 8a4 4 0 100 8 4 4 0 000-8z' },
@@ -64,6 +64,7 @@ export default function StaffPage() {
     { mode: 'opname', perm: 'opname_input', color: '#0E7C6B', label: 'Opname', desc: 'Hitung stok fisik', icon: 'M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11' },
     { mode: 'menu', perm: 'view_menu', color: '#555', label: 'Lihat menu', desc: 'Daftar & resep', icon: 'M4 6h16M4 12h16M4 18h7' },
     { mode: 'expense', perm: 'expense', color: '#B45309', label: 'Pengeluaran', desc: 'Belanja kecil', icon: 'M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6' },
+    { mode: 'history', perm: 'view_menu', color: '#0369A1', label: 'Riwayat', desc: 'History transaksi', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
     { mode: 'printer', perm: 'view_menu', color: '#374151', label: 'Printer', desc: 'Setup Bluetooth printer', icon: 'M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z' },
   ];
   const visible = tiles.filter((t) => can(t.perm));
@@ -131,6 +132,7 @@ export default function StaffPage() {
         {mode === 'menu' && <MenuView />}
         {mode === 'expense' && <ExpenseForm busy={busy} setBusy={setBusy} onDone={(m) => { flash(m); setMode('home'); }} />}
         {mode === 'printer' && <PrinterSetup onBack={() => setMode('home')} />}
+        {mode === 'history' && <TransactionHistory onBack={() => setMode('home')} />}
       </main>
 
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-5 py-3 rounded-xl shadow-lg text-sm font-medium z-50">{toast}</div>}
@@ -609,6 +611,162 @@ function PrinterSetup({ onBack }: { onBack: () => void }) {
         <p>3. Kalau tab ditutup/refresh, pair ulang sekali lagi</p>
         <p>4. Pakai Chrome — Safari iOS tidak support</p>
       </div>
+    </div>
+  );
+}
+
+// ── TransactionHistory ────────────────────────────────────────────────────────
+function TransactionHistory({ onBack }: { onBack: () => void }) {
+  const [orders, setOrders]     = useState<any[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [selected, setSelected] = useState<any | null>(null);
+  const [printing, setPrinting] = useState(false);
+
+  useEffect(() => {
+    api.get<any>('/api/orders?limit=50&status=COMPLETED')
+      .then(r => setOrders(r.orders || r || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function reprintOrder(order: any) {
+    setPrinting(true);
+    try {
+      const full = await api.get<any>(`/api/orders?id=${order.id}`).catch(() => order);
+      const o = full.order || full;
+      const items = (o.items || []).map((i: any) => ({
+        name: i.product?.name || '',
+        qty: i.quantity,
+        price: i.unitPrice || i.price || 0,
+        subtotal: i.subtotal || 0,
+      }));
+
+      // Kitchen ticket
+      const kitchenItems = items.filter((_: any, idx: number) =>
+        (o.items?.[idx]?.product?.station || 'FOOD') === 'FOOD'
+      );
+      const barItems = items.filter((_: any, idx: number) =>
+        (o.items?.[idx]?.product?.station || 'DRINK') !== 'FOOD'
+      );
+
+      if (kitchenItems.length > 0) {
+        await printData(buildKitchenTicket({
+          orderNumber: o.orderNumber, date: new Date(o.createdAt).toLocaleString('id-ID'),
+          customerName: o.billName, items: kitchenItems, station: 'KITCHEN',
+        })).catch(() => {});
+      }
+      if (barItems.length > 0) {
+        await printData(buildKitchenTicket({
+          orderNumber: o.orderNumber, date: new Date(o.createdAt).toLocaleString('id-ID'),
+          customerName: o.billName, items: barItems, station: 'BAR',
+        })).catch(() => {});
+      }
+      await printData(buildReceipt({
+        orderNumber: o.orderNumber,
+        date: new Date(o.createdAt).toLocaleString('id-ID'),
+        customerName: o.billName || o.customer?.name,
+        items,
+        subtotal: o.subtotal, discount: o.discount,
+        tax: o.tax, serviceCharge: o.serviceCharge,
+        total: o.total,
+        payMethod: o.payment?.method || 'CASH',
+        received: o.payment?.received, change: o.payment?.change,
+      })).catch(() => {});
+
+      alert('✓ Struk dikirim ke printer');
+    } catch (e: any) { alert(`Gagal: ${e.message}`); }
+    finally { setPrinting(false); }
+  }
+
+  const fmtTime = (d: string) => new Date(d).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+  const fmtDate = (d: string) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-3 p-4 flex-shrink-0">
+        <button onClick={onBack} className="w-9 h-9 rounded-full border flex items-center justify-center" style={{ borderColor: 'var(--border)', background: 'var(--surface-2)' }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <h2 className="font-black text-lg" style={{ color: 'var(--text-1)' }}>Riwayat Transaksi</h2>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-10"><div className="w-6 h-6 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--brand)', borderTopColor: 'transparent' }}/></div>
+      ) : orders.length === 0 ? (
+        <div className="text-center py-12"><p className="text-3xl mb-2">📋</p><p style={{ color: 'var(--text-3)' }}>Belum ada transaksi</p></div>
+      ) : (
+        <div className="flex-1 overflow-y-auto px-4 space-y-2 pb-4">
+          {orders.map(o => (
+            <button key={o.id} onClick={() => setSelected(selected?.id === o.id ? null : o)}
+              className="w-full text-left rounded-xl border p-3 transition-all"
+              style={{ borderColor: selected?.id === o.id ? 'var(--brand)' : 'var(--border)', background: selected?.id === o.id ? 'var(--surface-2)' : 'white' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-sm" style={{ color: 'var(--text-1)' }}>#{o.orderNumber}</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-3)' }}>
+                    {fmtDate(o.createdAt)} {fmtTime(o.createdAt)}
+                    {o.billName ? ` · ${o.billName}` : ''}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-black text-sm" style={{ color: 'var(--brand)' }}>{formatCurrency(o.total)}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-3)' }}>{o.payment?.method || 'CASH'}</p>
+                </div>
+              </div>
+
+              {/* Expanded detail */}
+              {selected?.id === o.id && (
+                <div className="mt-3 pt-3 border-t" style={{ borderColor: 'var(--border)' }}>
+                  {/* Items */}
+                  <div className="space-y-1 mb-3">
+                    {(o.items || []).map((item: any, idx: number) => (
+                      <div key={idx} className="flex justify-between text-xs" style={{ color: 'var(--text-2)' }}>
+                        <span>{item.quantity}× {item.product?.name || item.name}</span>
+                        <span className="font-medium">{formatCurrency(item.subtotal)}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 3 section print buttons */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: '🍳 Kitchen', station: 'KITCHEN' as const },
+                      { label: '☕ Bar', station: 'BAR' as const },
+                      { label: '🧾 Customer', station: null },
+                    ].map(({ label, station }) => (
+                      <button key={label} disabled={printing}
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          setPrinting(true);
+                          try {
+                            const items = (o.items || []).map((i: any) => ({
+                              name: i.product?.name || '', qty: i.quantity,
+                              price: i.unitPrice || i.price || 0, subtotal: i.subtotal || 0,
+                            }));
+                            if (station === 'KITCHEN') {
+                              const ki = items.filter((_: any, idx: number) => (o.items?.[idx]?.product?.station||'FOOD')==='FOOD');
+                              await printData(buildKitchenTicket({ orderNumber: o.orderNumber, date: new Date(o.createdAt).toLocaleString('id-ID'), customerName: o.billName, items: ki, station: 'KITCHEN' }));
+                            } else if (station === 'BAR') {
+                              const bi = items.filter((_: any, idx: number) => (o.items?.[idx]?.product?.station||'DRINK')!=='FOOD');
+                              await printData(buildKitchenTicket({ orderNumber: o.orderNumber, date: new Date(o.createdAt).toLocaleString('id-ID'), customerName: o.billName, items: bi, station: 'BAR' }));
+                            } else {
+                              await printData(buildReceipt({ orderNumber: o.orderNumber, date: new Date(o.createdAt).toLocaleString('id-ID'), customerName: o.billName, items, subtotal: o.subtotal, discount: o.discount, tax: o.tax, serviceCharge: o.serviceCharge, total: o.total, payMethod: o.payment?.method||'CASH', received: o.payment?.received, change: o.payment?.change }));
+                            }
+                          } catch(e: any) { alert(`Gagal: ${e.message}`); }
+                          finally { setPrinting(false); }
+                        }}
+                        className="py-2 rounded-lg text-xs font-bold border disabled:opacity-50 transition-all"
+                        style={{ borderColor: 'var(--brand)', color: 'var(--brand)', background: 'white' }}>
+                        {printing ? '...' : label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
