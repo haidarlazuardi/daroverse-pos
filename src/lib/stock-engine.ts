@@ -201,11 +201,22 @@ export async function applyDeductionsInTx(
   for (const [location, ingredients] of deductions) {
     for (const [ingredientId, qty] of ingredients) {
       if (qty <= 0) continue;
-      const res = await tx.stockLevel.updateMany({
-        where: { ingredientId, location, quantity: { gte: qty } },
-        data: { quantity: { decrement: qty }, lastUpdated: new Date() },
+      // TRIAL MODE: skip stock check, allow negative stock
+      const currentLevel = await tx.stockLevel.findFirst({
+        where: { ingredientId, location },
       });
-      if (res.count === 0) {
+      if (currentLevel) {
+        await tx.stockLevel.updateMany({
+          where: { ingredientId, location },
+          data: { quantity: { decrement: qty }, lastUpdated: new Date() },
+        });
+      } else {
+        await tx.stockLevel.create({
+          data: { ingredientId, location, quantity: -qty, lastUpdated: new Date() },
+        });
+      }
+      const res = { count: 1 }; // always succeed
+      if (false) { // disabled for trial
         const ing = await tx.ingredient.findUnique({ where: { id: ingredientId }, select: { name: true } });
         throw new Error(`Stok tidak cukup: ${ing?.name || ingredientId} di ${location}`);
       }
