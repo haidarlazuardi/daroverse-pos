@@ -611,8 +611,21 @@ export default function POSPage() {
           paymentMethod: payMethod, paymentReference: payRef || undefined,
           received, taxEnabled: cart.taxEnabled, serviceEnabled: cart.serviceEnabled,
         });
-        // Fetch order lengkap untuk struk
-        order = await api.get<any>(`/api/orders?id=${activeBill.id}`);
+        // Fetch order lengkap untuk struk — pastikan dapat items+product
+        const fetched = await api.get<any>(`/api/orders?id=${activeBill.id}`);
+        order = fetched?.order || fetched;
+        // Fallback: kalau items kosong, rebuild dari cart
+        if (!order?.items?.length) {
+          order = { ...order, items: cart.lines.map((l, idx) => ({
+            id: `temp-${idx}`,
+            productId: l.productId,
+            product: { name: l.name, station: l.station },
+            quantity: l.quantity,
+            unitPrice: lineUnitPrice(l),
+            subtotal: l.quantity * lineUnitPrice(l),
+            modifiers: l.modifiers,
+          }))};
+        }
       } else {
         order = await api.post('/api/orders', { ...commonBody(), open: false, paymentMethod: payMethod, paymentReference: payRef || undefined, received });
       }
