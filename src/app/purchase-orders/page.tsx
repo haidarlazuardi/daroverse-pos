@@ -9,6 +9,7 @@ import { Toolbar } from '@/components/ui/Toolbar';
 import { api } from '@/lib/fetch';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
+import { isConnected, pairAndConnect, printData } from '@/lib/bluetooth-printer';
 
 interface POItem { id: string; quantity: number; unitPrice: number; totalPrice: number; ingredient: { id: string; name: string; unit: string; purchaseUnit: string | null; conversionRate: number | null } }
 interface PO { id: string; poNumber: string; status: string; totalAmount: number; notes: string | null; createdAt: string; completedAt: string | null; supplier: { id: string; name: string }; items: POItem[] }
@@ -157,14 +158,22 @@ export default function PurchaseOrdersPage() {
 
   async function printLabels(po: PO) {
     if (!po.items?.length) { alert('Tidak ada item'); return; }
+
+    // Pastikan printer connect
+    if (!isConnected()) {
+      try { await pairAndConnect(); } catch { alert('Printer belum terhubung'); return; }
+    }
+
+    const ESC = 0x1B, GS = 0x1D, LF = 0x0A;
     const batchDate = (po.completedAt || po.createdAt).slice(0, 10);
-    const lines: string[] = [];
+
     for (const item of po.items) {
       const convRate = item.ingredient.conversionRate || 1;
       const pu = item.ingredient.purchaseUnit || item.ingredient.unit;
       const numLabels = Math.ceil(item.quantity);
+
       for (let i = 0; i < numLabels; i++) {
-        const qrData = encodeURIComponent(JSON.stringify({
+        const qrData = JSON.stringify({
           ingredientId: item.ingredient.id,
           name: item.ingredient.name,
           qty: convRate,
@@ -172,25 +181,61 @@ export default function PurchaseOrdersPage() {
           purchaseUnit: pu,
           batchDate,
           poNumber: po.poNumber,
-        }));
-        const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + qrData;
-        lines.push(
-          '<div class="label">' +
-          '<div class="name">' + item.ingredient.name + '</div>' +
-          '<img src="' + qrUrl + '" class="qr"/>' +
-          '<div class="qty">' + convRate.toLocaleString('id-ID') + ' ' + item.ingredient.unit + '</div>' +
-          '<div class="sub">1 ' + pu + ' · ' + batchDate + '</div>' +
-          '<div class="po">' + po.poNumber + '</div>' +
-          '</div>'
-        );
+        });
+
+        const cmds: number[] = [];
+        const push = (...b: number[]) => cmds.push(...b);
+        const enc = (s: string) => Array.from(s.slice(0, 32)).map(c => Math.min(127, c.charCodeAt(0)));
+        const line = (s: string) => { cmds.push(...enc(s), LF); };
+        const center = () => push(ESC, 0x61, 0x01);
+        const left = () => push(ESC, 0x61, 0x00);
+        const bold = (on: boolean) => push(ESC, 0x45, on ? 1 : 0);
+        const dbl = (on: boolean) => push(GS, 0x21, on ? 0x11 : 0x00);
+
+        push(ESC, 0x40); // init
+        center();
+
+        // Nama bahan — bold double size
+        bold(true); dbl(true);
+        line(item.ingredient.name.slice(0, 14));
+        dbl(false); bold(false);
+
+        // QR Code via ESC/POS GS ( k command
+        const qrBytes = Array.from(qrData).map(c => c.charCodeAt(0));
+        const qrLen = qrBytes.length + 3;
+        const pL = qrLen & 0xFF;
+        const pH = (qrLen >> 8) & 0xFF;
+
+        // Set QR model
+        push(GS, 0x28, 0x6B, 4, 0, 0x31, 0x41, 0x32, 0); // model 2
+        // Set QR size (module size 6)
+        push(GS, 0x28, 0x6B, 3, 0, 0x31, 0x43, 8);
+        // Set error correction level M
+        push(GS, 0x28, 0x6B, 3, 0, 0x31, 0x45, 0x31);
+        // Store QR data
+        push(GS, 0x28, 0x6B, pL, pH, 0x31, 0x50, 0x30, ...qrBytes);
+        // Print QR
+        push(GS, 0x28, 0x6B, 3, 0, 0x31, 0x51, 0x30);
+
+        push(LF);
+
+        // Info
+        center(); bold(true);
+        line(convRate.toLocaleString('id-ID') + ' ' + item.ingredient.unit);
+        bold(false);
+        line('1 ' + pu);
+        line(batchDate);
+        left();
+        line('---');
+        line(po.poNumber.slice(-12));
+
+        // Feed + partial cut
+        push(LF, LF);
+        push(GS, 0x56, 0x42, 0x10);
+
+        await printData(new Uint8Array(cmds)).catch(() => {});
       }
     }
-    const css = '*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif}@media print{@page{size:58mm auto;margin:0}body{width:58mm}}.label{width:58mm;padding:3mm 2mm;border-bottom:1px dashed #ccc;text-align:center;page-break-inside:avoid}.name{font-size:11pt;font-weight:900;margin-bottom:2mm;line-height:1.2;color:#1a1a1a}.qr{width:40mm;height:40mm;margin:0 auto 2mm;display:block}.qty{font-size:13pt;font-weight:900;color:#48654D;margin-bottom:1mm}.sub{font-size:8pt;color:#666;margin-bottom:.5mm}.po{font-size:7pt;color:#aaa}';
-    const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Label</title><style>' + css + '</style></head><body>' + lines.join('') + '<script>var imgs=document.querySelectorAll("img"),n=0,t=imgs.length;if(!t){window.print();}else{imgs.forEach(function(i){if(i.complete){n++;if(n===t)window.print();}else{i.onload=function(){n++;if(n===t)window.print();};}});setTimeout(function(){window.print();},3000);}<\/script></body></html>';
-    const w = window.open('', '_blank');
-    if (!w) { alert('Izinkan pop-up'); return; }
-    w.document.write(html);
-    w.document.close();
   }
 
 
