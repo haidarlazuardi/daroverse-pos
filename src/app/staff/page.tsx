@@ -119,6 +119,18 @@ export default function StaffPage() {
                   <span className="text-xs text-gray-400 text-center">{t.desc}</span>
                 </button>
               ))}
+              {/* QR Scan Transfer — link tile */}
+              <a href="/scan-transfer" className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col items-center justify-center gap-2 aspect-square active:scale-95 transition-transform hover:border-gray-300 no-underline">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: '#7C3AED18', color: '#7C3AED' }}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/>
+                    <rect x="7" y="7" width="4" height="4" rx="1"/><rect x="13" y="7" width="4" height="4" rx="1"/>
+                    <rect x="7" y="13" width="4" height="4" rx="1"/><path d="M13 13h1v1M15 13h2v2M15 15h2v2M13 16h1v2"/>
+                  </svg>
+                </div>
+                <span className="font-bold text-gray-900 text-lg">Scan QR</span>
+                <span className="text-xs text-gray-400 text-center">Transfer via scan</span>
+              </a>
             </div>
           )
         )}

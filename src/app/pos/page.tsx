@@ -666,15 +666,16 @@ export default function POSPage() {
       cart.clear();
       // Rebuild cart dari order items
       for (const item of order.items || []) {
+        const addOnPrice = (item.modifiers || []).reduce((s: number, m: any) => s + (m.priceDelta || 0), 0);
         const lineData = {
           productId: item.productId,
           name: item.product?.name || item.name || '',
-          basePrice: item.unitPrice,
+          basePrice: item.unitPrice - addOnPrice, // product base price tanpa modifier
           station: item.product?.station || 'DRINK',
           takeawayCharge: item.product?.takeawayCharge || 0,
           modifiers: (item.modifiers || []).map((m: any) => ({
             groupName: m.groupName, optionName: m.optionName,
-            effect: m.effect, priceDelta: m.priceDelta,
+            effect: m.effect, priceDelta: m.priceDelta, // keep original
             targetIngredientId: m.targetIngredientId,
             multiplier: m.multiplier, addQty: m.addQty,
           })),
