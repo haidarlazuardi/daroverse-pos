@@ -174,3 +174,108 @@ export function buildKitchenTicket(data: {
   cut();
   return new Uint8Array(cmds);
 }
+
+// ── QR as raster bitmap ───────────────────────────────────────────────────────
+// Generate QR code as ESC/POS bitmap — compatible with all thermal printers
+export async function buildQRLabel(data: {
+  name: string;
+  qrText: string;
+  line1: string; // qty + unit
+  line2: string; // 1 karton · tanggal
+  line3: string; // PO number
+}): Promise<Uint8Array> {
+  const ESC = 0x1B, GS = 0x1D, LF = 0x0A;
+  const cmds: number[] = [];
+  const push = (...b: number[]) => cmds.push(...b);
+  const enc  = (s: string) => Array.from(s.slice(0, 32)).map(c => Math.min(127, c.charCodeAt(0)));
+  const line = (s: string) => { cmds.push(...enc(s), LF); };
+  const center = () => push(ESC, 0x61, 0x01);
+  const bold   = (on: boolean) => push(ESC, 0x45, on ? 1 : 0);
+  const dbl    = (on: boolean) => push(GS, 0x21, on ? 0x11 : 0x00);
+
+  push(ESC, 0x40); // init
+  center();
+
+  // Nama bahan
+  bold(true); dbl(true);
+  line(data.name.slice(0, 14));
+  dbl(false); bold(false);
+  push(LF);
+
+  // Generate QR bitmap via canvas
+  const qrBitmap = await generateQRBitmap(data.qrText, 200);
+  if (qrBitmap) {
+    cmds.push(...qrBitmap);
+  }
+
+  push(LF);
+  center(); bold(true);
+  line(data.line1);
+  bold(false);
+  line(data.line2);
+  line(data.line3);
+
+  push(LF, LF);
+  push(GS, 0x56, 0x42, 0x10); // partial cut
+  return new Uint8Array(cmds);
+}
+
+async function generateQRBitmap(text: string, size: number): Promise<number[]> {
+  try {
+    // Use QR server API to get QR image, then convert to ESC/POS bitmap
+    const url = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&format=png&data=${encodeURIComponent(text)}`;
+    const res  = await fetch(url);
+    const blob = await res.blob();
+    const img  = await createImageBitmap(blob);
+
+    const canvas = document.createElement('canvas');
+    const W = 384; // 58mm printer width in dots
+    canvas.width = W; canvas.height = W;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, W, W);
+
+    // Center QR on canvas
+    const qrSize = Math.min(W - 16, size);
+    const offset = Math.floor((W - qrSize) / 2);
+    ctx.drawImage(img, offset, offset, qrSize, qrSize);
+
+    const imageData = ctx.getImageData(0, 0, W, W);
+    return imageDataToESCPOS(imageData, W, W);
+  } catch {
+    return []; // skip QR jika gagal
+  }
+}
+
+function imageDataToESCPOS(imageData: ImageData, width: number, height: number): number[] {
+  const ESC = 0x1B, GS = 0x1D;
+  const cmds: number[] = [];
+
+  // ESC/POS raster bit image: GS v 0
+  const bytesPerRow = Math.ceil(width / 8);
+  const xL = bytesPerRow & 0xFF;
+  const xH = (bytesPerRow >> 8) & 0xFF;
+  const yL = height & 0xFF;
+  const yH = (height >> 8) & 0xFF;
+
+  cmds.push(GS, 0x76, 0x30, 0x00, xL, xH, yL, yH);
+
+  for (let y = 0; y < height; y++) {
+    for (let bx = 0; bx < bytesPerRow; bx++) {
+      let byte = 0;
+      for (let bit = 0; bit < 8; bit++) {
+        const x = bx * 8 + bit;
+        if (x < width) {
+          const idx = (y * width + x) * 4;
+          const r = imageData.data[idx];
+          const g = imageData.data[idx + 1];
+          const b = imageData.data[idx + 2];
+          const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+          if (gray < 128) byte |= (0x80 >> bit); // dark pixel = 1
+        }
+      }
+      cmds.push(byte);
+    }
+  }
+  return cmds;
+}
