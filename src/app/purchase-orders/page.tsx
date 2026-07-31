@@ -29,7 +29,8 @@ export default function PurchaseOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [slideOpen, setSlideOpen] = useState(false);
   const [detailPO, setDetailPO]   = useState<PO | null>(null);
-  const [saving, setSaving]       = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const [printingLabels, setPrintingLabels] = useState(false);
   const [formError, setFormError] = useState('');
 
   const [form, setForm] = useState({
@@ -159,6 +160,8 @@ export default function PurchaseOrdersPage() {
 
   async function printLabels(po: PO) {
     if (!po.items?.length) { alert('Tidak ada item'); return; }
+    setPrintingLabels(true);
+    try {
     if (!isConnected()) {
       try { await pairAndConnect(); } catch { alert('Printer belum terhubung'); return; }
     }
@@ -187,6 +190,7 @@ export default function PurchaseOrdersPage() {
         await printData(data).catch(() => {});
       }
     }
+    } finally { setPrintingLabels(false); }
   }
 
 
@@ -325,7 +329,7 @@ export default function PurchaseOrdersPage() {
           ) : (
             <div className="flex gap-3 justify-end">
               <button onClick={() => printPO(detailPO)} className="btn btn-secondary btn-md">🖨️ Print PDF</button>
-              <button onClick={() => printLabels(detailPO)} className="btn btn-primary btn-md">🏷️ Print Label QR</button>
+              <button onClick={() => printLabels(detailPO)} disabled={printingLabels} className="btn btn-primary btn-md">🏷️ Print Label QR</button>
             </div>
           )
         ) : (

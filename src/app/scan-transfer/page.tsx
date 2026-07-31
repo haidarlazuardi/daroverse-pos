@@ -98,7 +98,7 @@ export default function ScanTransferPage() {
     if (!scanned) return;
     setSubmitting(true);
     try {
-      const res = await fetch('/api/stock/transfer', {
+      const res = await fetch('/api/public/stock-transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

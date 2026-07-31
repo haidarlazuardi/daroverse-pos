@@ -220,30 +220,26 @@ export async function buildQRLabel(data: {
   return new Uint8Array(cmds);
 }
 
-async function generateQRBitmap(text: string, size: number): Promise<number[]> {
+async function generateQRBitmap(text: string, _size: number): Promise<number[]> {
   try {
-    // Use QR server API to get QR image, then convert to ESC/POS bitmap
-    const url = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&format=png&data=${encodeURIComponent(text)}`;
+    const W = 360; // full width 58mm = ~384 dots, leave small margin
+    // Fetch QR at full printer width for maximum readability
+    const url = `https://api.qrserver.com/v1/create-qr-code/?size=${W}x${W}&format=png&margin=4&data=${encodeURIComponent(text)}`;
     const res  = await fetch(url);
     const blob = await res.blob();
     const img  = await createImageBitmap(blob);
 
     const canvas = document.createElement('canvas');
-    const W = 384; // 58mm printer width in dots
     canvas.width = W; canvas.height = W;
     const ctx = canvas.getContext('2d')!;
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, W, W);
-
-    // Center QR on canvas
-    const qrSize = Math.min(W - 16, size);
-    const offset = Math.floor((W - qrSize) / 2);
-    ctx.drawImage(img, offset, offset, qrSize, qrSize);
+    ctx.drawImage(img, 0, 0, W, W);
 
     const imageData = ctx.getImageData(0, 0, W, W);
     return imageDataToESCPOS(imageData, W, W);
   } catch {
-    return []; // skip QR jika gagal
+    return [];
   }
 }
 

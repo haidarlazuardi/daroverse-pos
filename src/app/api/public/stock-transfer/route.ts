@@ -1,15 +1,9 @@
 export const dynamic = 'force-dynamic';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { success, error, withAuth } from '@/lib/api-helpers';
-import { ALL_ROLES } from '@/lib/auth';
+import { success, error } from '@/lib/api-helpers';
 
-// Auth version — untuk admin panel
-export const POST = withAuth(async (req: NextRequest, user) => {
-  return handleTransfer(req, user.userId);
-}, ALL_ROLES);
-
-async function handleTransfer(req: NextRequest, userId: string) {
+export async function POST(req: NextRequest) {
   const { ingredientId, fromLocation, toLocation, quantity, notes } = await req.json();
   if (!ingredientId || !fromLocation || !toLocation || !quantity) return error('Data tidak lengkap');
   if (fromLocation === toLocation) return error('Lokasi asal dan tujuan sama');
@@ -40,9 +34,9 @@ async function handleTransfer(req: NextRequest, userId: string) {
     await (tx as any).stockMovement.createMany({
       data: [
         { ingredientId, location: fromLocation, type: 'TRANSFER_OUT', quantity: -quantity,
-          notes: notes || `Transfer ke ${toLocation}`, createdBy: userId },
+          notes: notes || `Scan QR - Transfer ke ${toLocation}`, createdBy: 'SCAN_QR' },
         { ingredientId, location: toLocation, type: 'TRANSFER_IN', quantity,
-          notes: notes || `Transfer dari ${fromLocation}`, createdBy: userId },
+          notes: notes || `Scan QR - Transfer dari ${fromLocation}`, createdBy: 'SCAN_QR' },
       ],
     });
   });
