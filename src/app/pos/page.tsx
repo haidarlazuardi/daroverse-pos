@@ -605,6 +605,18 @@ export default function POSPage() {
         }
       } else {
         order = await api.post('/api/orders', { ...commonBody(), open: false, paymentMethod: payMethod, paymentReference: payRef || undefined, received });
+        // Enrich items dengan station dari cart (API response tidak include station)
+        if (order?.items?.length) {
+          const stationMap: Record<string, string> = {};
+          cart.lines.forEach(l => { stationMap[l.productId] = l.station; });
+          order = {
+            ...order,
+            items: order.items.map((i: any) => ({
+              ...i,
+              product: { ...i.product, station: stationMap[i.productId] || i.product?.station || 'DRINK' },
+            })),
+          };
+        }
       }
       setLastOrder(order); setStep('receipt'); cart.clear(); setActiveBill(null); setSelectedDiscount(''); loadData();
 
