@@ -87,6 +87,8 @@ export default function StaffDashboard() {
         {/* Kasbon */}
         {kasbons.length > 0 && <KasbonCard kasbons={kasbons}/>}
       </div>
+
+      <BottomNav/>
     </div>
   );
 }
