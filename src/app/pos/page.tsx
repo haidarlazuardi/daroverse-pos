@@ -659,14 +659,7 @@ export default function POSPage() {
 
   const loadBills = async () => {
     try {
-      // WIB UTC+7 — konversi ke range UTC yang benar
-      const now   = new Date();
-      const wibOffset = 7 * 60 * 60 * 1000;
-      const todayWIB  = new Date(now.getTime() + wibOffset);
-      const dateStr   = todayWIB.toISOString().slice(0, 10); // YYYY-MM-DD WIB
-      const fromUTC   = new Date(dateStr + 'T00:00:00+07:00').toISOString();
-      const toUTC     = new Date(dateStr + 'T23:59:59+07:00').toISOString();
-      const data = await api.get<any>(`/api/orders?status=OPEN&limit=30&from=${fromUTC}&to=${toUTC}`);
+      const data = await api.get<any>(`/api/orders?status=OPEN&limit=50`);
       setOpenBills(data.orders || []);
       setShowBills(true);
     } catch (e) { console.error(e); }
@@ -1011,8 +1004,21 @@ export default function POSPage() {
               ) : (
                 <div className="grid grid-cols-3 gap-2">
                   <button onClick={() => { cart.clear(); setSelectedDiscount(''); }} className="btn btn-md btn-danger text-sm">Hapus</button>
-                  <button onClick={() => { setBillName(''); setBillModal(true); }} className="btn btn-md btn-secondary text-sm text-amber-600">Simpan bill</button>
-                  <button onClick={() => setStep('payment')} className="btn btn-md btn-primary text-sm">Bayar</button>
+                  <button onClick={() => {
+                    if (!custName.trim()) {
+                      alert('Nama pelanggan wajib diisi');
+                      return;
+                    }
+                    setBillName(custName);
+                    setBillModal(true);
+                  }} className="btn btn-md btn-secondary text-sm text-amber-600">Simpan bill</button>
+                  <button onClick={() => {
+                    if (!custName.trim()) {
+                      alert('Nama pelanggan wajib diisi');
+                      return;
+                    }
+                    setStep('payment');
+                  }} className="btn btn-md btn-primary text-sm">Bayar</button>
                 </div>
               )}
             </div>
@@ -1022,6 +1028,22 @@ export default function POSPage() {
         {step === 'payment' && (
           <div className="flex-1 flex flex-col px-4 py-4 overflow-y-auto">
             <div className="text-center mb-6"><p className="text-gray-500 text-sm">Total</p><p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">{formatCurrency(cart.total())}</p></div>
+
+            {/* Nama pelanggan — WAJIB */}
+            <div className="mb-3">
+              <div className="flex items-center gap-2 mb-1">
+                <label className="text-xs font-bold text-gray-700">Nama Pelanggan <span className="text-red-500">*</span></label>
+                {custName && <span className="text-xs text-green-600 font-medium">✓</span>}
+              </div>
+              <input
+                type="text"
+                value={custName}
+                onChange={e => setCustName(e.target.value)}
+                placeholder="Masukkan nama pelanggan..."
+                className={`input text-sm w-full ${!custName ? 'border-amber-300 bg-amber-50' : 'border-green-300'}`}
+              />
+              {!custName && <p className="text-xs text-amber-600 mt-1">Wajib diisi sebelum bayar</p>}
+            </div>
 
             {/* Customer Search */}
             <div className="mb-4 border border-gray-200 rounded-xl p-3">
