@@ -62,20 +62,11 @@ export default function StaffSidebar() {
       <div className="flex flex-col h-screen border-r transition-all duration-200"
         style={{ background:'var(--surface-2, #f9fafb)', borderColor:'var(--border)', width: expanded ? 160 : 56, overflowY:'auto', overflowX:'hidden', flexShrink:0 }}>
 
-        {/* Logo + expand toggle */}
-        <div className="flex items-center border-b flex-shrink-0 px-2 py-3" style={{ borderColor:'var(--border)', justifyContent: expanded ? 'space-between' : 'center' }}>
+        {/* Logo */}
+        <div className="flex items-center justify-center border-b flex-shrink-0 px-2 py-3" style={{ borderColor:'var(--border)' }}>
           <div className="w-7 h-7 rounded-full flex items-center justify-center font-black text-white text-xs flex-shrink-0"
             style={{ background:'var(--brand)' }}>S</div>
           {expanded && <p className="text-xs font-black ml-2 flex-1 truncate" style={{ color:'var(--brand)' }}>Staff Hub</p>}
-          <button onClick={() => setExpanded(!expanded)}
-            className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all"
-            style={{ color:'#9CA3AF', background:'transparent' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              {expanded
-                ? <polyline points="15 18 9 12 15 6"/>
-                : <polyline points="9 18 15 12 9 6"/>}
-            </svg>
-          </button>
         </div>
 
         {/* Tiles */}
@@ -107,10 +98,24 @@ export default function StaffSidebar() {
 
         {/* Toast indicator */}
         {toast && (
-          <div className="mx-1 mb-2 rounded-lg p-1.5 text-center flex-shrink-0" style={{ background:'#16a34a' }}>
+          <div className="mx-1 mb-1 rounded-lg p-1.5 text-center flex-shrink-0" style={{ background:'#16a34a' }}>
             <span className="text-white text-xs">{expanded ? '✓ '+toast.slice(0,12) : '✓'}</span>
           </div>
         )}
+
+        {/* Expand / Collapse toggle — center bottom, always visible */}
+        <div className="flex justify-center border-t py-2 flex-shrink-0" style={{ borderColor:'var(--border)' }}>
+          <button onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-all"
+            style={{ background:'var(--brand)', color:'white', boxShadow:'0 2px 8px rgba(72,101,77,0.3)' }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              {expanded
+                ? <polyline points="15 18 9 12 15 6"/>
+                : <polyline points="9 18 15 12 9 6"/>}
+            </svg>
+            {expanded && <span>Tutup</span>}
+          </button>
+        </div>
       </div>
 
       {/* Expanded Panel — slides over content */}

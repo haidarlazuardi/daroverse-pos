@@ -714,7 +714,32 @@ export default function POSPage() {
   };
 
   const openShift = async () => { try { await api.post('/api/shifts', { action: 'open', openingCash: openingCash || '0' }); setOpeningCash(''); loadData(); setShowShift(false); } catch (e: any) { alert(e.message || 'Gagal'); } };
-  const closeShift = async () => { if (!activeShift) return; try { const r = await api.post<any>('/api/shifts', { action: 'close', shiftId: activeShift.id, closingCash: closingCash || '0' }); setActiveShift(null); setClosingCash(''); setShowShift(false); alert(`Shift ditutup. Selisih: ${formatCurrency(r.difference || 0)}`); } catch (e: any) { alert(e.message || 'Gagal'); } };
+  const closeShift = async () => {
+    if (!activeShift) return;
+    // Cek open bill yang belum ditutup
+    try {
+      const now = new Date();
+      const wibOffset = 7 * 60 * 60 * 1000;
+      const todayWIB = new Date(now.getTime() + wibOffset);
+      const dateStr = todayWIB.toISOString().slice(0, 10);
+      const fromUTC = new Date(dateStr + 'T00:00:00+07:00').toISOString();
+      const toUTC   = new Date(dateStr + 'T23:59:59+07:00').toISOString();
+      const data = await api.get<any>(`/api/orders?status=OPEN&limit=10&from=${fromUTC}&to=${toUTC}`);
+      const pending = data.orders || [];
+      if (pending.length > 0) {
+        const names = pending.map((o: any) => o.billName || o.orderNumber).join(', ');
+        const confirm = window.confirm(
+          `⚠️ Ada ${pending.length} open bill yang belum ditutup:\n${names}\n\nTutup shift tetap dilanjutkan?`
+        );
+        if (!confirm) return;
+      }
+    } catch {}
+    try {
+      const r = await api.post<any>('/api/shifts', { action: 'close', shiftId: activeShift.id, closingCash: closingCash || '0' });
+      setActiveShift(null); setClosingCash(''); setShowShift(false);
+      alert(`Shift ditutup. Selisih: ${formatCurrency(r.difference || 0)}`);
+    } catch (e: any) { alert(e.message || 'Gagal'); }
+  };
 
   const receiptLines = (o: any) => [
     '🧾 *Soeka House*', '', `Order: ${o.orderNumber}`, `Tanggal: ${new Date(o.createdAt).toLocaleString('id-ID')}`,
