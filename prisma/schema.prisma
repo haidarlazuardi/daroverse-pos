@@ -1169,35 +1169,3 @@ model PurchaseRequestItem {
 
 // ═══════════════════════════════════════════════════════
 //  PURCHASE REQUEST
-// ═══════════════════════════════════════════════════════
-
-enum PurchaseRequestStatus {
-  PENDING
-  FULFILLED
-  REJECTED
-}
-
-model PurchaseRequest {
-  id          String                @id @default(cuid())
-  status      PurchaseRequestStatus @default(PENDING)
-  notes       String?
-  requestedBy String
-  user        User                  @relation(fields: [requestedBy], references: [id])
-  items       PurchaseRequestItem[]
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
-
-  @@map("purchase_requests")
-}
-
-model PurchaseRequestItem {
-  id                String          @id @default(cuid())
-  purchaseRequestId String
-  request           PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
-  ingredientId      String
-  ingredient        Ingredient      @relation(fields: [ingredientId], references: [id])
-  quantity          Float
-  unit              String          // purchaseUnit
-
-  @@map("purchase_request_items")
-}
