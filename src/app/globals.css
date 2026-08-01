@@ -76,8 +76,9 @@ input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
 input[type="number"] { -moz-appearance: textfield; }
 
-.pos-grid { display: grid; grid-template-columns: 1fr 380px; height: 100vh; }
-@media (max-width: 1024px) { .pos-grid { grid-template-columns: 1fr; } }
+.pos-grid { display: grid; grid-template-columns: 56px 1fr 380px; height: 100vh; }
+@media (max-width: 1024px) { .pos-grid { grid-template-columns: 48px 1fr; } }
+@media (max-width: 640px) { .pos-grid { grid-template-columns: 1fr; } }
 
 @layer components {
   .btn {
