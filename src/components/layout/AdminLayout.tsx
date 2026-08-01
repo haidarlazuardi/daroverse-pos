@@ -3,14 +3,14 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store';
-import { ADMIN_ROLES, STAFF_ROLES, STOCK_ROLES, SENIOR_ROLES, CASHIER_ALL, ROLE_LABELS, ROLE_HOME, type Role } from '@/lib/auth';
+import { ADMIN_ROLES, STAFF_ROLES, STOCK_ROLES, SENIOR_ROLES, ROLE_LABELS, ROLE_HOME, type Role } from '@/lib/auth';
 import { LogbookBar } from '@/components/ui/LogbookBar';
 import clsx from 'clsx';
 
 type NavItem  = { href: string; label: string; icon: string; allow: Role[] | 'all' };
 type NavGroup = { section: string; allow: Role[] | 'all'; defaultOpen?: boolean | ((role: Role) => boolean); items: NavItem[] };
 
-const ALL_ROLES: Role[] = ['SUPER_ADMIN','OWNER','MANAGER','CASHIER','STAFF'];
+const ALL_ROLES: Role[] = ['SUPER_ADMIN','OWNER','MANAGER','STAFF'];
 
 const NAV_GROUPS: NavGroup[] = [
   { section: 'Operasional', allow: 'all', defaultOpen: (role) => false, items: [
@@ -24,7 +24,7 @@ const NAV_GROUPS: NavGroup[] = [
       icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
     { href: '/staff',      label: 'Staff Hub', allow: STAFF_ROLES,
       icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
-    { href: '/expenses-input', label: 'Input Pengeluaran', allow: ['CASHIER','STAFF'] as Role[],
+    { href: '/expenses-input', label: 'Input Pengeluaran', allow: ['STAFF'] as Role[],
       icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z' },
   ]},
   { section: 'Manajemen', allow: ADMIN_ROLES, defaultOpen: (role) => false, items: [
@@ -154,7 +154,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     }
     if (pathname === '/') router.replace(ROLE_HOME[user.role as Role] ?? '/pos');
 
-    if ((user?.role as string) === 'CASHIER') {
+    if ((user?.role as string) === 'STAFF') {
       const allowed = ['/pos', '/shift', '/expenses-input', '/staff', '/logbook'];
       if (!allowed.some(p => pathname.startsWith(p))) router.replace('/pos');
     }

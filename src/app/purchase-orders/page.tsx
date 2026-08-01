@@ -280,39 +280,107 @@ export default function PurchaseOrdersPage() {
     },
   ];
 
+  const [viewMode, setViewMode] = useState<'po'|'requests'>('po');
+  const [requests, setRequests] = useState<any[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  async function loadRequests() {
+    setLoadingRequests(true);
+    const r = await api.get<any[]>('/api/purchase-requests?status=PENDING').catch(() => []);
+    setRequests(Array.isArray(r) ? r : []);
+    setLoadingRequests(false);
+  }
+
+  useEffect(() => { if (viewMode === 'requests') loadRequests(); }, [viewMode]);
+
+  async function generatePO(requestId: string, supplierId: string) {
+    try {
+      const res = await api.patch<any>('/api/purchase-requests', { requestId, action: 'generate_po', supplierId });
+      alert(`✅ PO ${res.poNumber} berhasil dibuat sebagai Draft`);
+      loadRequests();
+    } catch (e: any) { alert(e.message); }
+  }
+
+  async function rejectRequest(requestId: string) {
+    if (!confirm('Tolak request ini?')) return;
+    await api.patch('/api/purchase-requests', { requestId, action: 'reject' });
+    loadRequests();
+  }
+
   return (
     <AdminLayout>
       <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-xl font-bold text-gray-900">Purchase Order</h1>
-          <p className="text-sm text-gray-500 mt-1">Kelola pembelian bahan dari supplier</p>
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">Purchase Order</h1>
+            <p className="text-sm text-gray-500 mt-1">Kelola pembelian bahan dari supplier</p>
+          </div>
+          <div className="flex gap-1 p-1 rounded-xl" style={{ background:'var(--surface-2)' }}>
+            <button onClick={() => setViewMode('po')}
+              className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
+              style={viewMode==='po' ? {background:'white',color:'var(--text-1)',boxShadow:'0 1px 3px rgba(0,0,0,0.1)'} : {color:'var(--text-3)'}}>
+              Purchase Orders
+            </button>
+            <button onClick={() => setViewMode('requests')}
+              className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all relative"
+              style={viewMode==='requests' ? {background:'white',color:'var(--text-1)',boxShadow:'0 1px 3px rgba(0,0,0,0.1)'} : {color:'var(--text-3)'}}>
+              Requests Staff
+              {requests.length > 0 && viewMode !== 'requests' && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-xs text-white flex items-center justify-center" style={{ background:'#DC2626' }}>{requests.length}</span>
+              )}
+            </button>
+          </div>
         </div>
 
-        <Toolbar
-          search={search} onSearch={setSearch} searchPlaceholder="Cari no PO atau supplier..."
-          filters={[{ key: 'status', label: 'Status', value: statusFilter, onChange: setStatusFilter,
-            options: Object.entries(STATUS_LABEL).map(([v,l]) => ({ value: v, label: l as string })) }]}
-          onAdd={openCreate} addLabel="Buat PO"
-          onExport={handleExport}
-        />
+        {viewMode === 'requests' && (
+          <div className="space-y-3">
+            {loadingRequests ? (
+              <div className="flex justify-center py-10"><div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor:'var(--brand)',borderTopColor:'transparent' }}/></div>
+            ) : requests.length === 0 ? (
+              <div className="card text-center py-12">
+                <p className="text-3xl mb-2">📋</p>
+                <p style={{ color:'var(--text-3)' }}>Tidak ada request pending dari staff</p>
+              </div>
+            ) : requests.map((req: any) => (
+              <RequestCard key={req.id} req={req} suppliers={suppliers} onGeneratePO={generatePO} onReject={rejectRequest}/>
+            ))}
+          </div>
+        )}
 
-        <DataTable
-          data={data.filter(po => !search || po.poNumber?.toLowerCase().includes(search.toLowerCase()) || po.supplier?.name?.toLowerCase().includes(search.toLowerCase()))} columns={columns} keyField="id" loading={loading}
-          emptyMessage="Belum ada purchase order."
-          onRowClick={openDetail}
-          rowActions={po => (
-            <div className="flex gap-1">
-              <button onClick={e => { e.stopPropagation(); printPO(po); }}
-                className="px-2 py-1 text-xs bg-gray-50 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">PDF</button>
-              {po.status === 'DRAFT' && <>
-                <button onClick={e => { e.stopPropagation(); handleAction(po, 'complete'); }}
-                  className="px-2 py-1 text-xs bg-brand-50 text-brand-700 hover:bg-brand-100 rounded-lg font-medium transition-colors">Terima</button>
-                <button onClick={e => { e.stopPropagation(); handleAction(po, 'cancel'); }}
-                  className="px-2 py-1 text-xs bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-medium transition-colors">Batal</button>
-              </>}
-            </div>
-          )}
-        />
+        {viewMode === 'po' && (
+          <div>
+            <Toolbar
+              search={search} onSearch={setSearch} searchPlaceholder="Cari no PO atau supplier..."
+              filters={[{ key: 'status', label: 'Status', value: statusFilter, onChange: setStatusFilter,
+                options: Object.entries(STATUS_LABEL).map(([v,l]) => ({ value: v, label: l as string })) }]}
+              onAdd={openCreate} addLabel="Buat PO"
+              onExport={handleExport}
+            />
+
+            <DataTable
+              data={data.filter(po => !search || po.poNumber?.toLowerCase().includes(search.toLowerCase()) || po.supplier?.name?.toLowerCase().includes(search.toLowerCase()))} columns={columns} keyField="id" loading={loading}
+              onRowClick={openDetail}
+              rowActions={po => (
+                <div className="flex gap-1">
+                  <button onClick={e => { e.stopPropagation(); printPO(po); }}
+                    className="px-2 py-1 text-xs bg-gray-50 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors">PDF</button>
+                  {po.status === 'COMPLETED' && (
+                    <button onClick={e => { e.stopPropagation(); printLabels(po); }}
+                      disabled={printingLabels}
+                      className="px-2 py-1 text-xs bg-green-50 text-green-700 hover:bg-green-100 rounded-lg font-medium transition-colors">
+                      {printingLabels ? '...' : '🏷️'}
+                    </button>
+                  )}
+                  {po.status === 'DRAFT' && <>
+                    <button onClick={e => { e.stopPropagation(); handleAction(po, 'complete'); }}
+                      className="px-2 py-1 text-xs bg-brand-50 text-brand-700 hover:bg-brand-100 rounded-lg font-medium transition-colors">Terima</button>
+                    <button onClick={e => { e.stopPropagation(); handleAction(po, 'cancel'); }}
+                      className="px-2 py-1 text-xs bg-red-50 text-red-600 hover:bg-red-100 rounded-lg font-medium transition-colors">Batal</button>
+                  </>}
+                </div>
+              )}
+            />
+          </div>
+        )}
       </div>
 
       <SlideOver
@@ -329,61 +397,61 @@ export default function PurchaseOrdersPage() {
           ) : (
             <div className="flex gap-3 justify-end">
               <button onClick={() => printPO(detailPO)} className="btn btn-secondary btn-md">🖨️ Print PDF</button>
-              <button onClick={() => printLabels(detailPO)} disabled={printingLabels} className="btn btn-primary btn-md">🏷️ Print Label QR</button>
+              <button onClick={() => printLabels(detailPO)} disabled={printingLabels} className="btn btn-primary btn-md">
+                {printingLabels ? '⏳ Generating QR...' : '🏷️ Print Label QR'}
+              </button>
             </div>
           )
         ) : (
           <div className="flex justify-end gap-3">
-            <Button variant="secondary" onClick={closeSlide} disabled={saving}>Batal</Button>
+            <Button variant="ghost" onClick={closeSlide}>Batal</Button>
             <Button onClick={handleCreate} disabled={saving}>{saving ? 'Menyimpan...' : 'Buat PO'}</Button>
           </div>
         )}
       >
-        {/* Detail view */}
         {detailPO ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div><p className="text-gray-400 text-xs">Status</p><Badge variant={STATUS_VARIANT[detailPO.status]}>{STATUS_LABEL[detailPO.status]}</Badge></div>
-              <div><p className="text-gray-400 text-xs">Total</p><p className="font-bold text-gray-900">{formatCurrency(detailPO.totalAmount)}</p></div>
-              <div><p className="text-gray-400 text-xs">Dibuat</p><p className="text-gray-700">{new Date(detailPO.createdAt).toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' })}</p></div>
-              {detailPO.completedAt && <div><p className="text-gray-400 text-xs">Diterima</p><p className="text-gray-700">{new Date(detailPO.completedAt).toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' })}</p></div>}
-              {detailPO.notes && <div className="col-span-2"><p className="text-gray-400 text-xs">Catatan</p><p className="text-gray-700">{detailPO.notes}</p></div>}
+            <div className="grid grid-cols-2 gap-4">
+              <div><p className="text-gray-400 text-xs">Status</p><p className="font-medium">{STATUS_LABEL[detailPO.status] || detailPO.status}</p></div>
+              <div><p className="text-gray-400 text-xs">Total</p><p className="font-bold text-lg">{formatCurrency(detailPO.totalAmount)}</p></div>
+              <div><p className="text-gray-400 text-xs">Dibuat</p><p className="font-medium">{new Date(detailPO.createdAt).toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' })}</p></div>
+              {detailPO.completedAt && <div><p className="text-gray-400 text-xs">Diterima</p><p className="font-medium">{new Date(detailPO.completedAt).toLocaleDateString('id-ID', { day:'2-digit', month:'long', year:'numeric' })}</p></div>}
             </div>
-            <div className="border border-gray-100 rounded-xl overflow-hidden">
-              <table className="w-full text-sm">
-                <thead><tr className="bg-gray-50 border-b border-gray-100"><th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500">Bahan</th><th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">Qty</th><th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">Harga</th><th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500">Total</th></tr></thead>
-                <tbody className="divide-y divide-gray-100">
-                  {detailPO.items.map(item => (
-                    <tr key={item.id}>
-                      <td className="px-4 py-3 font-medium text-gray-900">{item.ingredient.name}</td>
-                      <td className="px-4 py-3 text-right text-gray-600">
-                        {item.quantity} {item.ingredient.purchaseUnit || item.ingredient.unit}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-600">{formatCurrency(item.unitPrice)}</td>
-                      <td className="px-4 py-3 text-right font-medium">{formatCurrency(item.totalPrice)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot><tr className="border-t border-gray-200 bg-gray-50"><td colSpan={3} className="px-4 py-3 text-sm font-semibold text-gray-700">Total</td><td className="px-4 py-3 text-right font-bold text-gray-900">{formatCurrency(detailPO.totalAmount)}</td></tr></tfoot>
-              </table>
-            </div>
+            {detailPO.notes && <div><p className="text-gray-400 text-xs">Catatan</p><p className="text-sm">{detailPO.notes}</p></div>}
+            <table className="w-full text-sm border-collapse">
+              <thead><tr className="bg-gray-50"><th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Bahan</th><th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Qty</th><th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Harga</th><th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th></tr></thead>
+              <tbody>
+                {(detailPO.items || []).map((item: any) => (
+                  <tr key={item.id} className="border-t border-gray-100">
+                    <td className="px-4 py-3 font-medium">{item.ingredient.name}</td>
+                    <td className="px-4 py-3 text-right text-gray-600">
+                      {item.quantity} {item.ingredient.purchaseUnit || item.ingredient.unit}
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-600">{formatCurrency(item.unitPrice)}</td>
+                    <td className="px-4 py-3 text-right font-medium">{formatCurrency(item.totalPrice)}</td>
+                  </tr>
+                ))}
+                <tr className="border-t-2 border-gray-200 bg-gray-50"><td colSpan={3} className="px-4 py-2.5 text-right font-semibold">Total</td><td className="px-4 py-2.5 text-right font-bold">{formatCurrency(detailPO.totalAmount)}</td></tr>
+              </tbody>
+            </table>
           </div>
         ) : (
-          /* Create form */
           <div className="space-y-4">
-            {formError && <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">{formError}</div>}
             <div>
-              <label className="label">Supplier <span className="text-red-400">*</span></label>
-              <select className="select w-full" value={form.supplierId} onChange={e => setForm({ ...form, supplierId: e.target.value })}>
-                <option value="">— Pilih supplier —</option>
+              <label className="label">Supplier *</label>
+              <select value={form.supplierId} onChange={e => setForm({ ...form, supplierId: e.target.value })} className="select w-full">
+                <option value="">Pilih supplier</option>
                 {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
-
+            <div>
+              <label className="label">Catatan</label>
+              <input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="input w-full" placeholder="Opsional"/>
+            </div>
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="label mb-0">Item Pembelian <span className="text-red-400">*</span></label>
-                <button onClick={addItem} className="text-sm text-brand-600 font-medium hover:underline">+ Tambah item</button>
+                <label className="label mb-0">Item Pembelian *</label>
+                <button type="button" onClick={addItem} className="text-sm text-brand-600 font-medium hover:text-brand-700">+ Tambah item</button>
               </div>
               <div className="space-y-2">
                 {form.items.map((item, i) => {
@@ -419,16 +487,9 @@ export default function PurchaseOrdersPage() {
                   );
                 })}
               </div>
-              {form.items.length > 0 && (
-                <div className="flex justify-end mt-3 pt-3 border-t border-gray-100">
-                  <span className="text-sm font-semibold text-gray-900">Total: {formatCurrency(formTotal)}</span>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label className="label">Catatan</label>
-              <textarea className="input w-full" rows={2} placeholder="Catatan tambahan..." value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <div className="flex justify-between font-semibold"><span>Total</span><span>{formatCurrency(formTotal)}</span></div>
+              </div>
             </div>
             <div className="flex items-center gap-3 p-3 bg-brand-50 rounded-xl">
               <input type="checkbox" id="markComplete" checked={form.markComplete} onChange={e => setForm({ ...form, markComplete: e.target.checked })} className="rounded border-gray-300 text-brand-600" />
@@ -438,5 +499,92 @@ export default function PurchaseOrdersPage() {
         )}
       </SlideOver>
     </AdminLayout>
+  );
+}
+
+function RequestCard({ req, suppliers, onGeneratePO, onReject }: any) {
+  const [supplierId, setSupplierId] = useState('');
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="card overflow-hidden">
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <p className="font-bold text-sm" style={{ color:'var(--text-1)' }}>
+              Request dari {req.user?.name}
+            </p>
+            <p className="text-xs mt-0.5" style={{ color:'var(--text-3)' }}>
+              {new Date(req.createdAt).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+              {req.notes && ` · ${req.notes}`}
+            </p>
+          </div>
+          <button onClick={() => setExpanded(!expanded)} className="text-xs font-medium" style={{ color:'var(--brand)' }}>
+            {expanded ? 'Tutup' : `Lihat ${req.items.length} bahan`}
+          </button>
+        </div>
+
+        {/* Item summary */}
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {req.items.map((item: any) => (
+            <span key={item.id} className="text-xs px-2 py-1 rounded-full font-medium"
+              style={{ background:'var(--surface-2)', color:'var(--text-2)' }}>
+              {item.ingredient.name} × {item.quantity} {item.unit}
+            </span>
+          ))}
+        </div>
+
+        {/* Expanded detail */}
+        {expanded && (
+          <div className="mb-3 rounded-xl overflow-hidden border" style={{ borderColor:'var(--border)' }}>
+            <table className="w-full text-xs">
+              <thead>
+                <tr style={{ background:'var(--surface-2)' }}>
+                  <th className="px-3 py-2 text-left font-bold" style={{ color:'var(--text-3)' }}>Bahan</th>
+                  <th className="px-3 py-2 text-right font-bold" style={{ color:'var(--text-3)' }}>Qty</th>
+                  <th className="px-3 py-2 text-right font-bold" style={{ color:'var(--text-3)' }}>Est. Harga</th>
+                </tr>
+              </thead>
+              <tbody>
+                {req.items.map((item: any) => {
+                  const estPrice = (item.ingredient.latestPrice||0) * (item.ingredient.conversionRate||1) * item.quantity;
+                  return (
+                    <tr key={item.id} className="border-t" style={{ borderColor:'var(--border)' }}>
+                      <td className="px-3 py-2" style={{ color:'var(--text-1)' }}>
+                        <p className="font-medium">{item.ingredient.name}</p>
+                        {item.notes && <p className="text-gray-400">{item.notes}</p>}
+                      </td>
+                      <td className="px-3 py-2 text-right font-bold" style={{ color:'var(--text-1)' }}>
+                        {item.quantity} {item.unit}
+                      </td>
+                      <td className="px-3 py-2 text-right" style={{ color:'var(--text-2)' }}>
+                        {estPrice > 0 ? `Rp ${Math.round(estPrice).toLocaleString('id-ID')}` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Generate PO */}
+        <div className="flex gap-2">
+          <select value={supplierId} onChange={e => setSupplierId(e.target.value)}
+            className="input text-sm flex-1">
+            <option value="">Pilih supplier...</option>
+            {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <button onClick={() => onGeneratePO(req.id, supplierId)} disabled={!supplierId}
+            className="btn btn-primary btn-sm px-4 disabled:opacity-50">
+            Buat PO
+          </button>
+          <button onClick={() => onReject(req.id)}
+            className="btn btn-sm px-3 text-red-500 border border-red-200 hover:bg-red-50">
+            Tolak
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

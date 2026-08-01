@@ -12,16 +12,16 @@ import * as XLSX from 'xlsx';
 interface User { id: string; name: string; email: string; role: string; active: boolean; createdAt: string; }
 
 const ROLES = [
-  { value:'CASHIER',     label:'Kasir' },
+  { value:'STAFF',     label:'Kasir' },
   { value:'STAFF',    label:'Staff' },
   { value:'INVENTORY',   label:'Inventory' },
   { value:'MANAGER',     label:'Manager' },
   { value:'OWNER',       label:'Owner' },
   { value:'SUPER_ADMIN', label:'Super Admin' },
 ];
-const ROLE_LABEL: Record<string,string> = { SUPER_ADMIN:'Super Admin', OWNER:'Owner', MANAGER:'Manager', CASHIER:'Kasir', KITCHEN:'Dapur', INVENTORY:'Inventory' };
-const ROLE_VARIANT: Record<string,any> = { SUPER_ADMIN:'danger', OWNER:'info', MANAGER:'success', CASHIER:'default', KITCHEN:'warning', INVENTORY:'default' };
-const EMPTY_FORM = { name:'', email:'', password:'', role:'CASHIER' };
+const ROLE_LABEL: Record<string,string> = { SUPER_ADMIN:'Super Admin', OWNER:'Owner', MANAGER:'Manager', STAFF:'Staff', KITCHEN:'Dapur', INVENTORY:'Inventory' };
+const ROLE_VARIANT: Record<string,any> = { SUPER_ADMIN:'danger', OWNER:'info', MANAGER:'success', STAFF:'default', KITCHEN:'warning', INVENTORY:'default' };
+const EMPTY_FORM = { name:'', email:'', password:'', role:'STAFF' };
 
 export default function UsersPage() {
   const [users, setUsers]     = useState<User[]>([]);
@@ -156,7 +156,7 @@ export default function UsersPage() {
               {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
             <p className="text-xs text-gray-400 mt-1">
-              {form.role === 'CASHIER' ? 'Hanya bisa akses POS' :
+              {form.role === 'STAFF' ? 'Hanya bisa akses POS' :
                form.role === 'STAFF' ? 'Akses Staff Hub + Logbook' :
                form.role === 'INVENTORY' ? 'Akses POS + Stok & Transfer' :
                form.role === 'MANAGER' ? 'Semua akses kecuali Settings' :

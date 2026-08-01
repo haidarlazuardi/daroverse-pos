@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const user = authenticate(req);
   if (!user) return error('Unauthorized', 401);
 
-  const where = user.role === 'CASHIER' ? { active: true } : {};
+  const where = user.role === 'STAFF' ? { active: true } : {};
 
   const discounts = await prisma.discount.findMany({
     where,
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
   // Filter expired for cashier
   const now = new Date();
-  const filtered = user.role === 'CASHIER'
+  const filtered = user.role === 'STAFF'
     ? discounts.filter(d => {
         if (d.validFrom && d.validFrom > now) return false;
         if (d.validTo && d.validTo < now) return false;

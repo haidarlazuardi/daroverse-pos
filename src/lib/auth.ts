@@ -1,71 +1,69 @@
-import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { NextRequest } from 'next/server';
+import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'daroverse-fallback-secret';
-
-export type Role = 'SUPER_ADMIN' | 'OWNER' | 'MANAGER' | 'STAFF' | 'CASHIER';
+export type Role = 'SUPER_ADMIN' | 'OWNER' | 'MANAGER' | 'STAFF';
 
 export const ADMIN_ROLES: Role[]   = ['SUPER_ADMIN', 'OWNER', 'MANAGER'];
 export const SENIOR_ROLES: Role[]  = ['SUPER_ADMIN', 'OWNER'];
-export const ALL_ROLES: Role[]     = ['SUPER_ADMIN', 'OWNER', 'MANAGER', 'STAFF', 'CASHIER'];
+export const ALL_ROLES: Role[]     = ['SUPER_ADMIN', 'OWNER', 'MANAGER', 'STAFF'];
 export const STOCK_ROLES: Role[]   = ['SUPER_ADMIN', 'OWNER', 'MANAGER'];
-export const CASHIER_ALL: Role[]   = ['SUPER_ADMIN', 'OWNER', 'MANAGER', 'CASHIER'];
-export const STAFF_ROLES: Role[]   = ['SUPER_ADMIN', 'OWNER', 'MANAGER', 'STAFF', 'CASHIER'];
+export const STAFF_ROLES: Role[]   = ['SUPER_ADMIN', 'OWNER', 'MANAGER', 'STAFF'];
 
 export const ROLE_LABELS: Record<Role, string> = {
   SUPER_ADMIN: 'Super Admin',
   OWNER:       'Owner',
   MANAGER:     'Manager',
   STAFF:       'Staff',
-  CASHIER:     'Kasir',
 };
 
 export const ROLE_HOME: Record<Role, string> = {
   SUPER_ADMIN: '/dashboard',
   OWNER:       '/dashboard',
   MANAGER:     '/dashboard',
-  STAFF:       '/staff',
-  CASHIER:     '/pos',
+  STAFF:       '/staff-dashboard',
 };
 
-export interface TokenPayload {
+export type TokenPayload = {
   userId: string;
+  name:   string;
   email:  string;
   role:   Role;
-  name:   string;
+};
+
+export class AuthError extends Error {
+  status: number;
+  constructor(message: string, status = 401) {
+    super(message);
+    this.status = status;
+    this.name = 'AuthError';
+  }
 }
 
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
 }
+
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   return bcrypt.compare(password, hash);
 }
+
+const JWT_SECRET = process.env.JWT_SECRET || 'soeka-secret-key';
+
 export function signToken(payload: TokenPayload): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' });
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: '30d' });
 }
-export function verifyToken(token: string): TokenPayload | null {
-  try { return jwt.verify(token, JWT_SECRET) as TokenPayload; }
-  catch { return null; }
+
+export function requireAuth(token: string | undefined): TokenPayload {
+  if (!token) throw new AuthError('No token');
+  try {
+    return jwt.verify(token, JWT_SECRET) as TokenPayload;
+  } catch {
+    throw new AuthError('Invalid token');
+  }
 }
-export function getTokenFromRequest(req: NextRequest): string | null {
-  const authHeader = req.headers.get('authorization');
-  if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7);
-  return req.cookies.get('token')?.value || null;
-}
-export function authenticate(req: NextRequest): TokenPayload | null {
-  const token = getTokenFromRequest(req);
-  if (!token) return null;
-  return verifyToken(token);
-}
-export function requireAuth(req: NextRequest, allowedRoles?: Role[]): TokenPayload {
-  const user = authenticate(req);
-  if (!user) throw new AuthError('Unauthorized', 401);
-  if (allowedRoles && !allowedRoles.includes(user.role)) throw new AuthError('Forbidden', 403);
-  return user;
-}
-export class AuthError extends Error {
-  status: number;
-  constructor(message: string, status: number) { super(message); this.status = status; }
+
+export function authenticate(req: { headers: { get: (k: string) => string | null } }): TokenPayload | null {
+  const auth = req.headers.get('authorization') || req.headers.get('Authorization');
+  if (!auth?.startsWith('Bearer ')) return null;
+  try { return requireAuth(auth.slice(7)); } catch { return null; }
 }

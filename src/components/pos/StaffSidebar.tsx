@@ -6,7 +6,7 @@ import { formatCurrency } from '@/components/ui';
 import { getSavedPrinter, isConnected, pairAndConnect, printData } from '@/lib/bluetooth-printer';
 import { buildReceipt, buildKitchenTicket } from '@/lib/escpos';
 
-type Mode = 'batch'|'take'|'check'|'waste'|'receive'|'opname'|'menu'|'expense'|'printer'|'history';
+type Mode = 'batch'|'take'|'check'|'waste'|'receive'|'opname'|'menu'|'expense'|'printer'|'history'|'request';
 type Ingredient = { id:string;name:string;unit:string;type:string;stockLevels?:{location:string;quantity:number}[] };
 
 const TILES: { mode:Mode;perm:string;color:string;label:string;icon:string }[] = [
@@ -158,6 +158,8 @@ export default function StaffSidebar() {
               {active==='menu'    && <MenuView/>}
               {active==='expense' && <ExpenseForm busy={busy} setBusy={setBusy} onDone={onDone}/>}
               {active==='printer' && <PrinterSetup/>}
+              {active==='request' && <RequestForm ingredients={ingredients} busy={busy} setBusy={setBusy} onDone={onDone}/>}
+        {active==='request' && <RequestForm ingredients={ingredients} onDone={onDone}/>}
               {active==='history' && <TxHistory/>}
             </div>
           </div>
@@ -454,4 +456,98 @@ function TxHistory() {
       </button>
     ))}
   </div>;
+}
+
+function RequestForm({ ingredients, onDone }: any) {
+  const raw = ingredients.filter((i: any) => i.type === 'RAW');
+  const [items, setItems] = useState([{ ingredientId: '', quantity: '', notes: '' }]);
+  const [globalNotes, setGlobalNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const addItem = () => setItems(p => [...p, { ingredientId: '', quantity: '', notes: '' }]);
+  const removeItem = (i: number) => setItems(p => p.filter((_, j) => j !== i));
+  const updItem = (i: number, k: string, v: string) => setItems(p => p.map((e, j) => j === i ? { ...e, [k]: v } : e));
+
+  async function submit() {
+    const valid = items.filter(i => i.ingredientId && i.quantity);
+    if (!valid.length) { alert('Minimal 1 bahan harus diisi'); return; }
+    setSaving(true);
+    try {
+      const ing = (id: string) => raw.find((i: any) => i.id === id);
+      await api.post('/api/purchase-requests', {
+        notes: globalNotes || null,
+        items: valid.map(i => ({
+          ingredientId: i.ingredientId,
+          quantity: parseFloat(i.quantity),
+          unit: ing(i.ingredientId)?.purchaseUnit || ing(i.ingredientId)?.unit || 'unit',
+          notes: i.notes || null,
+        })),
+      });
+      onDone('Request terkirim ke manager');
+    } catch (e: any) { alert(e.message); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <div className="p-3 space-y-3">
+      <p className="text-xs text-gray-400">Pilih bahan yang perlu di-restock. Manager akan terima notifikasi dan buat PO.</p>
+
+      {items.map((item, i) => {
+        const ing = raw.find((r: any) => r.id === item.ingredientId);
+        return (
+          <div key={i} className="rounded-lg border border-gray-100 p-2.5 space-y-2 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-gray-500">Bahan {i + 1}</span>
+              {items.length > 1 && (
+                <button onClick={() => removeItem(i)} className="text-red-400 text-xs">Hapus</button>
+              )}
+            </div>
+            <select value={item.ingredientId} onChange={e => updItem(i, 'ingredientId', e.target.value)}
+              className="input w-full text-sm">
+              <option value="">Pilih bahan...</option>
+              {raw.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+            {ing && (
+              <div className="flex gap-2 items-center">
+                <input
+                  type="number"
+                  value={item.quantity}
+                  onChange={e => updItem(i, 'quantity', e.target.value)}
+                  className="input text-sm flex-1"
+                  placeholder="Qty"
+                />
+                <span className="text-xs font-bold text-gray-500 flex-shrink-0">
+                  {ing.purchaseUnit || ing.unit}
+                </span>
+              </div>
+            )}
+            <input
+              value={item.notes}
+              onChange={e => updItem(i, 'notes', e.target.value)}
+              className="input text-sm w-full"
+              placeholder="Catatan (opsional)"
+            />
+          </div>
+        );
+      })}
+
+      <button onClick={addItem} className="btn btn-secondary btn-sm w-full text-xs">
+        + Tambah Bahan
+      </button>
+
+      <textarea
+        value={globalNotes}
+        onChange={e => setGlobalNotes(e.target.value)}
+        className="input text-sm w-full"
+        rows={2}
+        placeholder="Catatan tambahan untuk manager..."
+      />
+
+      <button onClick={submit} disabled={saving}
+        className="btn btn-primary btn-sm w-full"
+        style={{ background: '#DC2626' }}>
+        {saving ? 'Mengirim...' : '📋 Kirim Request'}
+      </button>
+    </div>
+  );
 }

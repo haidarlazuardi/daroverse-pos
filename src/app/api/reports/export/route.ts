@@ -20,7 +20,9 @@ function toCsv(headers: string[], rows: string[][]): string {
 
 export async function GET(req: NextRequest) {
   try {
-    const user = requireAuth(req, ['SUPER_ADMIN']);
+    const authHeader = req.headers.get('authorization') || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+    const user = requireAuth(token);
     const { searchParams } = new URL(req.url);
     const type = searchParams.get('type') || 'daily';
     const from = searchParams.get('from');
