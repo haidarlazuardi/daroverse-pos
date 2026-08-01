@@ -299,7 +299,7 @@ export async function POST(req: NextRequest) {
           customerId: finalCustomerId,
           discountId: discountId || null,
           status: open ? 'OPEN' : 'COMPLETED',
-          billName: billName || null,
+          billName: billName || customerName || null,
           subtotal,
           taxEnabled, taxRate: settings.taxRate, tax,
           serviceEnabled, serviceRate: settings.serviceRate, serviceCharge,
