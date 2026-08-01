@@ -275,3 +275,66 @@ function imageDataToESCPOS(imageData: ImageData, width: number, height: number):
   }
   return cmds;
 }
+
+// ── Staff Receipt — Bar + Kitchen dalam 1 struk ───────────────────────────────
+export function buildStaffReceipt(data: {
+  orderNumber: string;
+  date: string;
+  customerName?: string;
+  barItems: { name: string; qty: number }[];
+  kitchenItems: { name: string; qty: number }[];
+}): Uint8Array {
+  const ESC = 0x1B, GS = 0x1D, LF = 0x0A;
+  const cmds: number[] = [];
+  const push = (...b: number[]) => cmds.push(...b);
+  const enc  = (s: string) => Array.from(s.slice(0, 32)).map(c => Math.min(127, c.charCodeAt(0)));
+  const line = (s: string) => { cmds.push(...enc(s), LF); };
+  const center = () => push(ESC, 0x61, 0x01);
+  const left   = () => push(ESC, 0x61, 0x00);
+  const bold   = (on: boolean) => push(ESC, 0x45, on ? 1 : 0);
+  const dbl    = (on: boolean) => push(GS, 0x21, on ? 0x11 : 0x00);
+  const feed   = (n = 1) => { for (let i = 0; i < n; i++) push(LF); };
+
+  push(ESC, 0x40); // init
+
+  // Header
+  center(); bold(true);
+  line('STAFF RECEIPT');
+  bold(false);
+  line(`#${data.orderNumber}`);
+  if (data.customerName) line(data.customerName.slice(0, 20));
+  line(data.date);
+  left(); line('--------------------------------');
+
+  // BAR section
+  if (data.barItems.length > 0) {
+    center(); bold(true); dbl(true);
+    line('BAR');
+    dbl(false); bold(false); left();
+    line('- - - - - - - - - - - - - - - -');
+    for (const item of data.barItems) {
+      bold(true);
+      line(`${item.qty}x ${item.name.slice(0, 28)}`);
+      bold(false);
+    }
+    line('--------------------------------');
+  }
+
+  // KITCHEN section
+  if (data.kitchenItems.length > 0) {
+    center(); bold(true); dbl(true);
+    line('KITCHEN');
+    dbl(false); bold(false); left();
+    line('- - - - - - - - - - - - - - - -');
+    for (const item of data.kitchenItems) {
+      bold(true);
+      line(`${item.qty}x ${item.name.slice(0, 28)}`);
+      bold(false);
+    }
+    line('--------------------------------');
+  }
+
+  feed(2);
+  push(GS, 0x56, 0x42, 0x10); // partial cut
+  return new Uint8Array(cmds);
+}

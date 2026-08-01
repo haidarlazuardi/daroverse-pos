@@ -7,7 +7,7 @@ import { api } from '@/lib/fetch';
 import { formatCurrency, Modal, Button, Input } from '@/components/ui';
 import clsx from 'clsx';
 import { getSavedPrinter, isConnected, pairAndConnect, printData, disconnect } from '@/lib/bluetooth-printer';
-import { buildReceipt, buildKitchenTicket } from '@/lib/escpos';
+import { buildReceipt, buildKitchenTicket, buildStaffReceipt } from '@/lib/escpos';
 import StaffSidebar from '@/components/pos/StaffSidebar';
 
 interface ModOption {
@@ -1169,6 +1169,7 @@ export default function POSPage() {
               <button onClick={sendWhatsApp} className="btn btn-sm btn-primary w-full bg-green-600">Kirim WhatsApp</button>
             </div>
             <div className="mt-auto space-y-2">
+              {/* 1. Customer Receipt — semua item, 1 copy */}
               <button onClick={async () => {
                 const o = lastOrder;
                 const data = buildReceipt({
@@ -1176,7 +1177,7 @@ export default function POSPage() {
                   date: new Date().toLocaleString('id-ID'),
                   tableInfo: o.notes?.replace('[QR Menu] ', '') || undefined,
                   cashierName: user?.name || undefined,
-                  customerName: o.billName || o.customer?.name || undefined,
+                  customerName: o.billName || o.customer?.name || custName || undefined,
                   customerPoints: o.customer?.points ?? undefined,
                   pointsEarned: o.pointsEarned ?? undefined,
                   items: (o.items || []).map((i: any) => ({
@@ -1185,30 +1186,56 @@ export default function POSPage() {
                     price: i.unitPrice || i.price || 0,
                     subtotal: i.subtotal || 0,
                   })),
-                  subtotal: o.subtotal,
-                  discount: o.discount,
-                  tax: o.tax,
-                  serviceCharge: o.serviceCharge,
-                  total: o.total,
-                  payMethod: o.payment?.method || 'CASH',
-                  received: o.payment?.received,
-                  change: o.payment?.change,
+                  subtotal: o.subtotal, discount: o.discount,
+                  tax: o.tax, serviceCharge: o.serviceCharge,
+                  total: o.total, payMethod: o.payment?.method || 'CASH',
+                  received: o.payment?.received, change: o.payment?.change,
                 });
-                try {
-                  await printData(data);
-                  setPrinterReady(true);
-                } catch(e: any) {
+                try { await printData(data); setPrinterReady(true); }
+                catch(e: any) {
                   if (e.message === 'NO_DEVICE') {
-                    try {
-                      const info = await pairAndConnect();
-                      setPrinterName(info.name); setPrinterReady(true);
-                      await printData(data);
-                    } catch(e2: any) { if (e2.name !== 'NotFoundError') alert(`Gagal: ${e2.message}`); }
+                    try { const info = await pairAndConnect(); setPrinterName(info.name); setPrinterReady(true); await printData(data); }
+                    catch(e2: any) { if (e2.name !== 'NotFoundError') alert(`Gagal: ${e2.message}`); }
                   } else { alert(`Gagal print: ${e.message}`); }
                 }
               }} className="btn btn-md btn-secondary w-full">
-                🖨 Cetak Struk {printerReady ? `(${printerName})` : '(BT)'}
+                🧾 Customer Receipt
               </button>
+
+              {/* 2. Staff Receipt — Bar section + Kitchen section terpisah */}
+              <button onClick={async () => {
+                const o = lastOrder;
+                const allItems = (o.items || []).map((i: any) => ({
+                  name: i.product?.name || i.name || '',
+                  qty: i.quantity,
+                  price: i.unitPrice || i.price || 0,
+                  subtotal: i.subtotal || 0,
+                  station: i.product?.station || 'DRINK',
+                }));
+                const barItems     = allItems.filter((i: any) => i.station === 'DRINK');
+                const kitchenItems = allItems.filter((i: any) => i.station === 'FOOD');
+                const date = new Date().toLocaleString('id-ID');
+
+                // Build combined staff receipt dengan 2 section
+                const staffReceipt = buildStaffReceipt({
+                  orderNumber: o.orderNumber,
+                  date,
+                  customerName: o.billName || o.customer?.name || custName || undefined,
+                  barItems,
+                  kitchenItems,
+                });
+
+                try { await printData(staffReceipt); setPrinterReady(true); }
+                catch(e: any) {
+                  if (e.message === 'NO_DEVICE') {
+                    try { const info = await pairAndConnect(); setPrinterName(info.name); setPrinterReady(true); await printData(staffReceipt); }
+                    catch(e2: any) { if (e2.name !== 'NotFoundError') alert(`Gagal: ${e2.message}`); }
+                  } else { alert(`Gagal print: ${e.message}`); }
+                }
+              }} className="btn btn-md btn-secondary w-full">
+                👨‍🍳 Staff Receipt (Bar + Kitchen)
+              </button>
+
               <button onClick={resetCheckout} className="btn btn-lg btn-primary w-full text-lg">Order baru</button>
             </div>
           </div>
