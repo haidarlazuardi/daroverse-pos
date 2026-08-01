@@ -981,6 +981,16 @@ export default function POSPage() {
 
           {cart.lines.length > 0 && (
             <div className="border-t border-gray-200 px-4 py-3 flex-shrink-0 space-y-3">
+              {/* Nama pelanggan — WAJIB */}
+              <div>
+                <input
+                  type="text"
+                  value={custName}
+                  onChange={e => setCustName(e.target.value)}
+                  placeholder="Nama pelanggan *"
+                  className={`input text-sm w-full ${!custName ? 'border-amber-300 bg-amber-50 placeholder-amber-400' : 'border-green-300'}`}
+                />
+              </div>
               {!activeBill && (
                 <select value={selectedDiscount} onChange={(e) => setSelectedDiscount(e.target.value)} className="select text-sm">
                   <option value="">Tanpa diskon</option>
@@ -1028,22 +1038,6 @@ export default function POSPage() {
         {step === 'payment' && (
           <div className="flex-1 flex flex-col px-4 py-4 overflow-y-auto">
             <div className="text-center mb-6"><p className="text-gray-500 text-sm">Total</p><p className="text-2xl sm:text-3xl font-bold text-gray-900 mt-1">{formatCurrency(cart.total())}</p></div>
-
-            {/* Nama pelanggan — WAJIB */}
-            <div className="mb-3">
-              <div className="flex items-center gap-2 mb-1">
-                <label className="text-xs font-bold text-gray-700">Nama Pelanggan <span className="text-red-500">*</span></label>
-                {custName && <span className="text-xs text-green-600 font-medium">✓</span>}
-              </div>
-              <input
-                type="text"
-                value={custName}
-                onChange={e => setCustName(e.target.value)}
-                placeholder="Masukkan nama pelanggan..."
-                className={`input text-sm w-full ${!custName ? 'border-amber-300 bg-amber-50' : 'border-green-300'}`}
-              />
-              {!custName && <p className="text-xs text-amber-600 mt-1">Wajib diisi sebelum bayar</p>}
-            </div>
 
             {/* Customer Search */}
             <div className="mb-4 border border-gray-200 rounded-xl p-3">
