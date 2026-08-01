@@ -29,6 +29,7 @@ export default function StaffSidebar() {
   const [active, setActive] = useState<Mode|null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState('');
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => { hydrate(); }, [hydrate]);
   useEffect(() => {
@@ -57,53 +58,68 @@ export default function StaffSidebar() {
 
   return (
     <>
-      {/* Icon Rail — always visible */}
-      <div className="flex flex-col h-screen border-r"
-        style={{ background:'var(--surface-2, #f9fafb)', borderColor:'var(--border)', width:'100%', overflowY:'auto' }}>
+      {/* Icon Rail — always visible, collapsible */}
+      <div className="flex flex-col h-screen border-r transition-all duration-200"
+        style={{ background:'var(--surface-2, #f9fafb)', borderColor:'var(--border)', width: expanded ? 160 : 56, overflowY:'auto', overflowX:'hidden', flexShrink:0 }}>
 
-        {/* Logo / brand mark */}
-        <div className="flex items-center justify-center py-3 border-b flex-shrink-0" style={{ borderColor:'var(--border)' }}>
-          <div className="w-7 h-7 rounded-full flex items-center justify-center font-black text-white text-xs"
+        {/* Logo + expand toggle */}
+        <div className="flex items-center border-b flex-shrink-0 px-2 py-3" style={{ borderColor:'var(--border)', justifyContent: expanded ? 'space-between' : 'center' }}>
+          <div className="w-7 h-7 rounded-full flex items-center justify-center font-black text-white text-xs flex-shrink-0"
             style={{ background:'var(--brand)' }}>S</div>
+          {expanded && <p className="text-xs font-black ml-2 flex-1 truncate" style={{ color:'var(--brand)' }}>Staff Hub</p>}
+          <button onClick={() => setExpanded(!expanded)}
+            className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 transition-all"
+            style={{ color:'#9CA3AF', background:'transparent' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              {expanded
+                ? <polyline points="15 18 9 12 15 6"/>
+                : <polyline points="9 18 15 12 9 6"/>}
+            </svg>
+          </button>
         </div>
 
-        {/* Icons */}
-        <div className="flex flex-col items-center gap-1 py-2 flex-1">
+        {/* Tiles */}
+        <div className="flex flex-col gap-0.5 py-2 flex-1 px-1">
           {visible.map(t => (
             <button key={t.mode}
               onClick={() => setActive(active === t.mode ? null : t.mode)}
-              title={t.label}
-              className="w-10 h-10 rounded-xl flex items-center justify-center transition-all relative group"
+              title={!expanded ? t.label : undefined}
+              className="rounded-xl flex items-center gap-2.5 transition-all relative"
               style={{
-                background: active === t.mode ? t.color + '20' : 'transparent',
+                padding: expanded ? '8px 10px' : '10px',
+                justifyContent: expanded ? 'flex-start' : 'center',
+                background: active === t.mode ? t.color + '15' : 'transparent',
                 color: active === t.mode ? t.color : '#9CA3AF',
+                minHeight: 36,
               }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d={t.icon}/>
-              </svg>
-              {/* Active indicator */}
+              {/* Active bar */}
               {active === t.mode && (
                 <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r-full" style={{ background: t.color }}/>
               )}
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink:0 }}>
+                <path d={t.icon}/>
+              </svg>
+              {expanded && <span className="text-xs font-semibold truncate">{t.label}</span>}
             </button>
           ))}
 
           {/* Scan QR */}
-          <a href="/scan-transfer" title="Scan QR Transfer"
-            className="w-10 h-10 rounded-xl flex items-center justify-center transition-all"
-            style={{ color:'#9CA3AF' }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <a href="/scan-transfer" title={!expanded ? 'Scan QR' : undefined}
+            className="rounded-xl flex items-center gap-2.5 transition-all no-underline"
+            style={{ padding: expanded ? '8px 10px' : '10px', justifyContent: expanded ? 'flex-start' : 'center', color:'#9CA3AF', minHeight:36 }}>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink:0 }}>
               <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/>
               <rect x="7" y="7" width="4" height="4" rx="1"/><rect x="13" y="7" width="4" height="4" rx="1"/>
               <rect x="7" y="13" width="4" height="4" rx="1"/><path d="M13 13h1v1M15 13h2v2M15 15h2v2M13 16h1v2"/>
             </svg>
+            {expanded && <span className="text-xs font-semibold">Scan QR</span>}
           </a>
         </div>
 
         {/* Toast indicator */}
         {toast && (
           <div className="mx-1 mb-2 rounded-lg p-1.5 text-center flex-shrink-0" style={{ background:'#16a34a' }}>
-            <span className="text-white text-xs">✓</span>
+            <span className="text-white text-xs">{expanded ? '✓ '+toast.slice(0,12) : '✓'}</span>
           </div>
         )}
       </div>
