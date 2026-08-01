@@ -351,13 +351,12 @@ export default function POSPage() {
   const [printerReady, setPrinterReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // ── Auto print 3 struk ───────────────────────────────────────────────────
+  // ── Auto print saat checkout ─────────────────────────────────────────────
   async function autoPrint(order: any, isOpenBill = false) {
     if (!order) return;
     try {
-      // Pastikan printer terhubung dulu
       if (!isConnected()) {
-        try { await pairAndConnect(); } catch { return; } // user cancel pair = skip print
+        try { await pairAndConnect(); } catch { return; }
       }
 
       const items = (order.items || []).map((i: any) => ({
@@ -365,58 +364,34 @@ export default function POSPage() {
         qty: i.quantity,
         subtotal: i.subtotal || 0,
         price: i.unitPrice || i.price || 0,
+        station: i.product?.station || 'DRINK',
       }));
-      const kitchenItems = items.filter((_: any, idx: number) =>
-        (order.items[idx]?.product?.station || 'DRINK') === 'FOOD'
-      );
-      const barItems = items.filter((_: any, idx: number) =>
-        (order.items[idx]?.product?.station || 'DRINK') === 'DRINK'
-      );
       const date = new Date().toLocaleString('id-ID');
+      const customerName = order.billName || order.customer?.name || undefined;
 
       if (isOpenBill) {
-        // Open bill — hanya kitchen + bar ticket, customer receipt dengan status OPEN BILL
-        const openBillReceipt = buildReceipt({
-          orderNumber: order.orderNumber,
-          date,
-          cashierName: user?.name || undefined,
-          customerName: order.billName || order.customer?.name || undefined,
-          items,
-          subtotal: order.subtotal,
-          discount: order.discount,
-          tax: order.tax,
-          serviceCharge: order.serviceCharge,
-          total: order.total,
-          payMethod: 'OPEN BILL',
-        });
-        if (kitchenItems.length > 0) await printData(buildKitchenTicket({ orderNumber: order.orderNumber, date, customerName: order.billName, items: kitchenItems, station: 'KITCHEN' })).catch(() => {});
-        if (barItems.length > 0)     await printData(buildKitchenTicket({ orderNumber: order.orderNumber, date, customerName: order.billName, items: barItems, station: 'BAR' })).catch(() => {});
-        await printData(openBillReceipt).catch(() => {});
+        // Open bill: kitchen + bar ticket + open bill receipt
+        const barItems     = items.filter((i: any) => i.station === 'DRINK');
+        const kitchenItems = items.filter((i: any) => i.station === 'FOOD');
+        if (kitchenItems.length > 0) await printData(buildKitchenTicket({ orderNumber: order.orderNumber, date, customerName, items: kitchenItems, station: 'KITCHEN' })).catch(() => {});
+        if (barItems.length > 0)     await printData(buildKitchenTicket({ orderNumber: order.orderNumber, date, customerName, items: barItems, station: 'BAR' })).catch(() => {});
+        await printData(buildReceipt({ orderNumber: order.orderNumber, date, cashierName: user?.name || undefined, customerName, items, subtotal: order.subtotal, discount: order.discount, tax: order.tax, serviceCharge: order.serviceCharge, total: order.total, payMethod: 'OPEN BILL' })).catch(() => {});
         return;
       }
 
-      // Regular checkout — 3 struk
-      const customerReceipt = buildReceipt({
-        orderNumber: order.orderNumber,
-        date,
+      // Regular checkout — auto print customer receipt saja
+      await printData(buildReceipt({
+        orderNumber: order.orderNumber, date,
         cashierName: user?.name || undefined,
-        customerName: order.billName || order.customer?.name || undefined,
+        customerName,
         customerPoints: order.customer?.points,
         pointsEarned: order.pointsEarned,
-        items,
-        subtotal: order.subtotal,
-        discount: order.discount,
-        tax: order.tax,
-        serviceCharge: order.serviceCharge,
-        total: order.total,
+        items, subtotal: order.subtotal,
+        discount: order.discount, tax: order.tax,
+        serviceCharge: order.serviceCharge, total: order.total,
         payMethod: order.payment?.method || 'CASH',
-        received: order.payment?.received,
-        change: order.payment?.change,
-      });
-
-      if (kitchenItems.length > 0) await printData(buildKitchenTicket({ orderNumber: order.orderNumber, date, customerName: order.billName, items: kitchenItems, station: 'KITCHEN' })).catch(() => {});
-      if (barItems.length > 0)     await printData(buildKitchenTicket({ orderNumber: order.orderNumber, date, customerName: order.billName, items: barItems, station: 'BAR' })).catch(() => {});
-      await printData(customerReceipt).catch(() => {});
+        received: order.payment?.received, change: order.payment?.change,
+      })).catch(() => {});
 
       setPrinterReady(true);
     } catch { /* silent */ }
@@ -1169,62 +1144,23 @@ export default function POSPage() {
               <button onClick={sendWhatsApp} className="btn btn-sm btn-primary w-full bg-green-600">Kirim WhatsApp</button>
             </div>
             <div className="mt-auto space-y-2">
-              {/* 1. Customer Receipt — semua item, 1 copy */}
-              <button onClick={async () => {
-                const o = lastOrder;
-                const data = buildReceipt({
-                  orderNumber: o.orderNumber,
-                  date: new Date().toLocaleString('id-ID'),
-                  tableInfo: o.notes?.replace('[QR Menu] ', '') || undefined,
-                  cashierName: user?.name || undefined,
-                  customerName: o.billName || o.customer?.name || custName || undefined,
-                  customerPoints: o.customer?.points ?? undefined,
-                  pointsEarned: o.pointsEarned ?? undefined,
-                  items: (o.items || []).map((i: any) => ({
-                    name: i.product?.name || i.name || '',
-                    qty: i.quantity,
-                    price: i.unitPrice || i.price || 0,
-                    subtotal: i.subtotal || 0,
-                  })),
-                  subtotal: o.subtotal, discount: o.discount,
-                  tax: o.tax, serviceCharge: o.serviceCharge,
-                  total: o.total, payMethod: o.payment?.method || 'CASH',
-                  received: o.payment?.received, change: o.payment?.change,
-                });
-                try { await printData(data); setPrinterReady(true); }
-                catch(e: any) {
-                  if (e.message === 'NO_DEVICE') {
-                    try { const info = await pairAndConnect(); setPrinterName(info.name); setPrinterReady(true); await printData(data); }
-                    catch(e2: any) { if (e2.name !== 'NotFoundError') alert(`Gagal: ${e2.message}`); }
-                  } else { alert(`Gagal print: ${e.message}`); }
-                }
-              }} className="btn btn-md btn-secondary w-full">
-                🧾 Customer Receipt
-              </button>
-
-              {/* 2. Staff Receipt — Bar section + Kitchen section terpisah */}
+              {/* Staff Receipt — Bar + Kitchen terpisah */}
               <button onClick={async () => {
                 const o = lastOrder;
                 const allItems = (o.items || []).map((i: any) => ({
                   name: i.product?.name || i.name || '',
                   qty: i.quantity,
-                  price: i.unitPrice || i.price || 0,
-                  subtotal: i.subtotal || 0,
                   station: i.product?.station || 'DRINK',
                 }));
                 const barItems     = allItems.filter((i: any) => i.station === 'DRINK');
                 const kitchenItems = allItems.filter((i: any) => i.station === 'FOOD');
-                const date = new Date().toLocaleString('id-ID');
-
-                // Build combined staff receipt dengan 2 section
                 const staffReceipt = buildStaffReceipt({
                   orderNumber: o.orderNumber,
-                  date,
+                  date: new Date().toLocaleString('id-ID'),
                   customerName: o.billName || o.customer?.name || custName || undefined,
                   barItems,
                   kitchenItems,
                 });
-
                 try { await printData(staffReceipt); setPrinterReady(true); }
                 catch(e: any) {
                   if (e.message === 'NO_DEVICE') {
