@@ -157,12 +157,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     if (pathname === '/') router.replace(ROLE_HOME[user.role as Role] ?? '/pos');
 
     if ((user?.role as string) === 'STAFF') {
-      const allowed = ['/pos', '/shift', '/expenses-input', '/staff', '/logbook'];
-      if (!allowed.some(p => pathname.startsWith(p))) router.replace('/pos');
-    }
-    if ((user?.role as string) === 'STAFF') {
-      const allowed = ['/pos', '/shift', '/production', '/menu-view', '/staff', '/logbook', '/expenses-input'];
-      if (!allowed.some(p => pathname.startsWith(p))) router.replace('/production');
+      const allowed = ['/staff-dashboard', '/pos', '/shift', '/expenses-input', '/staff', '/logbook', '/scan-transfer', '/absensi'];
+      if (!allowed.some(p => pathname.startsWith(p))) router.replace('/staff-dashboard');
     }
     // Enforce DB permissions for configurable roles
     if (!['SUPER_ADMIN','OWNER'].includes(user?.role || '') && Object.keys(rolePerms).length > 0) {

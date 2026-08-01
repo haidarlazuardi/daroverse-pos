@@ -5,6 +5,68 @@ import { useAuthStore } from '@/store';
 import { api } from '@/lib/fetch';
 import { formatCurrency } from '@/components/ui';
 
+// ── QR Scan Hook ─────────────────────────────────────────────────────────────
+function useQRScan(onScan: (data: any) => void) {
+  const [scanning, setScanning] = useState(false);
+  const activeRef = useRef(false);
+  const streamRef = useRef<MediaStream|null>(null);
+
+  async function startScan() {
+    setScanning(true);
+    activeRef.current = true;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment' } });
+      streamRef.current = stream;
+      const video = document.createElement('video');
+      video.srcObject = stream; video.playsInline = true; video.muted = true;
+      await video.play();
+      scanLoop(video);
+    } catch { stopScan(); }
+  }
+
+  async function scanLoop(video: HTMLVideoElement) {
+    if (!activeRef.current) return;
+    const BD = (window as any).BarcodeDetector;
+    if (!BD) { stopScan(); alert('Browser tidak support scan QR'); return; }
+    const detector = new BD({ formats: ['qr_code'] });
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth||640; canvas.height = video.videoHeight||480;
+    canvas.getContext('2d')!.drawImage(video, 0, 0);
+    try {
+      const codes = await detector.detect(canvas);
+      if (codes.length > 0) {
+        try { onScan(JSON.parse(codes[0].rawValue)); stopScan(); return; } catch {}
+      }
+    } catch {}
+    if (activeRef.current) requestAnimationFrame(() => scanLoop(video));
+  }
+
+  function stopScan() {
+    activeRef.current = false; setScanning(false);
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+  }
+
+  return { scanning, startScan, stopScan };
+}
+
+function QRBtn({ onScan }: { onScan:(d:any)=>void }) {
+  const { scanning, startScan, stopScan } = useQRScan(onScan);
+  return (
+    <button onClick={scanning ? stopScan : startScan}
+      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border"
+      style={{ borderColor: scanning?'#dc2626':GREEN, color: scanning?'#dc2626':GREEN, background: scanning?'#fef2f2':'#e8f5e9' }}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/>
+        <rect x="7" y="7" width="4" height="4" rx="1"/><rect x="13" y="7" width="4" height="4" rx="1"/>
+        <rect x="7" y="13" width="4" height="4" rx="1"/>
+      </svg>
+      {scanning ? 'Stop' : 'Scan QR'}
+    </button>
+  );
+}
+
+
 const GREEN = '#48654D';
 const CREAM = '#F6EDDB';
 const DAYS  = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
@@ -456,8 +518,10 @@ function StokTransfer({ ingredients, stockAt }: any) {
   const raw = ingredients.filter((i:any) => i.type==='RAW');
   const [id,setId]=useState('');const [qty,setQty]=useState('');const [from,setFrom]=useState('GUDANG');const [to,setTo]=useState('BAR');const [busy,setBusy]=useState(false);
   const ing = raw.find((i:any) => i.id===id);
+  function onQR(data:any){ if(data.ingredientId){setId(data.ingredientId);if(data.qty)setQty(String(data.qty));} }
   async function submit(){if(!id||!qty)return;setBusy(true);try{await api.post('/api/stock/transfer',{ingredientId:id,fromLocation:from,toLocation:to,quantity:parseFloat(qty)});alert('Transfer berhasil');setQty('');}catch(e:any){alert(e.message);}finally{setBusy(false);}}
   return <div className="space-y-3">
+    <div className="flex justify-between items-center"><span className="text-xs font-bold text-gray-500">Bahan</span><QRBtn onScan={onQR}/></div>
     <select value={id} onChange={e=>setId(e.target.value)} className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm bg-white"><option value="">Pilih bahan</option>{raw.map((i:any)=><option key={i.id} value={i.id}>{i.name}</option>)}</select>
     {ing && <p className="text-xs text-gray-400 px-1">Stok {from}: {stockAt(id,from)} {ing.unit}</p>}
     <div><p className="text-xs font-bold text-gray-500 mb-1.5">Dari</p><div className="flex gap-2">{['GUDANG','BAR','KITCHEN'].map(l=><button key={l} onClick={()=>setFrom(l)} className="flex-1 py-2 rounded-xl text-sm font-bold border" style={{ borderColor:from===l?GREEN:'#e5e7eb',color:from===l?GREEN:'#6b7280',background:from===l?GREEN+'10':'white' }}>{l}</button>)}</div></div>
@@ -481,8 +545,10 @@ function StokBatch({ prepped }: any) {
 function StokWaste({ ingredients, stockAt }: any) {
   const [id,setId]=useState('');const [qty,setQty]=useState('');const [loc,setLoc]=useState('BAR');const [reason,setReason]=useState('');const [busy,setBusy]=useState(false);
   const ing = ingredients.find((i:any)=>i.id===id);
+  function onQR(data:any){ if(data.ingredientId){setId(data.ingredientId);if(data.qty)setQty(String(data.qty));} }
   async function submit(){if(!id||!qty)return;setBusy(true);try{await api.post('/api/stock/waste',{ingredientId:id,quantity:parseFloat(qty),location:loc,reason});alert('Waste dicatat');setQty('');setReason('');}catch(e:any){alert(e.message);}finally{setBusy(false);}}
   return <div className="space-y-3">
+    <div className="flex justify-between items-center"><span className="text-xs font-bold text-gray-500">Bahan</span><QRBtn onScan={onQR}/></div>
     <select value={id} onChange={e=>setId(e.target.value)} className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm bg-white"><option value="">Pilih bahan</option>{ingredients.map((i:any)=><option key={i.id} value={i.id}>{i.name}</option>)}</select>
     {ing && <p className="text-xs text-gray-400 px-1">Stok {loc}: {stockAt(id,loc)} {ing.unit}</p>}
     <div className="flex gap-2">{['BAR','KITCHEN','GUDANG'].map(l=><button key={l} onClick={()=>setLoc(l)} className="flex-1 py-2 rounded-xl text-sm font-bold border" style={{ borderColor:loc===l?'#dc2626':'#e5e7eb',color:loc===l?'#dc2626':'#6b7280' }}>{l}</button>)}</div>
@@ -496,8 +562,10 @@ function StokOpname({ ingredients }: any) {
   const [entries,setEntries]=useState([{ingredientId:'',location:'BAR',actualQty:''}]);
   const [busy,setBusy]=useState(false);
   const upd=(i:number,k:string,v:string)=>setEntries(p=>p.map((e,j)=>j===i?{...e,[k]:v}:e));
+  function onQR(data:any){ if(data.ingredientId){setEntries(p=>{const last=p[p.length-1];if(!last.ingredientId)return p.map((e,i)=>i===p.length-1?{...e,ingredientId:data.ingredientId}:e);return [...p,{ingredientId:data.ingredientId,location:'BAR',actualQty:''}];});} }
   async function submit(){const valid=entries.filter(e=>e.ingredientId&&e.actualQty);if(!valid.length)return;setBusy(true);try{await api.post('/api/stock/opname',{entries:valid.map(e=>({...e,actualQty:parseFloat(e.actualQty)})),apply:false});alert('Opname dicatat');}catch(e:any){alert(e.message);}finally{setBusy(false);}}
   return <div className="space-y-3">
+    <div className="flex justify-between items-center"><span className="text-xs font-bold text-gray-500">Bahan ({entries.length})</span><QRBtn onScan={onQR}/></div>
     {entries.map((e,i)=>(<div key={i} className="rounded-xl bg-white p-3 space-y-2">
       <select value={e.ingredientId} onChange={ev=>upd(i,'ingredientId',ev.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"><option value="">Pilih bahan</option>{ingredients.map((ing:any)=><option key={ing.id} value={ing.id}>{ing.name}</option>)}</select>
       <div className="flex gap-1.5">{['GUDANG','BAR','KITCHEN'].map(l=><button key={l} onClick={()=>upd(i,'location',l)} className="flex-1 py-1.5 rounded-lg text-xs font-bold border" style={{ borderColor:e.location===l?GREEN:'#e5e7eb',color:e.location===l?GREEN:'#9ca3af' }}>{l}</button>)}</div>
