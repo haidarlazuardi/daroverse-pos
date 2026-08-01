@@ -129,8 +129,9 @@ export async function GET(req: NextRequest) {
   if (!ADMIN_ROLES.includes(user.role)) where.userId = user.userId;
   if (from || to) {
     where.createdAt = {};
-    if (from) where.createdAt.gte = new Date(from);
-    if (to) where.createdAt.lte = new Date(to + 'T23:59:59.999Z');
+    // Support both plain date (YYYY-MM-DD) and full ISO string
+    if (from) where.createdAt.gte = new Date(from.includes('T') ? from : from + 'T00:00:00.000Z');
+    if (to)   where.createdAt.lte = new Date(to.includes('T')   ? to   : to   + 'T23:59:59.999Z');
   }
 
   const [orders, total] = await Promise.all([

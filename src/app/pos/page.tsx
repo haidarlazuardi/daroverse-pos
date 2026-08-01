@@ -656,7 +656,18 @@ export default function POSPage() {
   };
 
   const loadBills = async () => {
-    try { const data = await api.get<any>('/api/orders?status=OPEN&limit=30'); setOpenBills(data.orders || []); setShowBills(true); } catch (e) { console.error(e); }
+    try {
+      // WIB UTC+7 — konversi ke range UTC yang benar
+      const now   = new Date();
+      const wibOffset = 7 * 60 * 60 * 1000;
+      const todayWIB  = new Date(now.getTime() + wibOffset);
+      const dateStr   = todayWIB.toISOString().slice(0, 10); // YYYY-MM-DD WIB
+      const fromUTC   = new Date(dateStr + 'T00:00:00+07:00').toISOString();
+      const toUTC     = new Date(dateStr + 'T23:59:59+07:00').toISOString();
+      const data = await api.get<any>(`/api/orders?status=OPEN&limit=30&from=${fromUTC}&to=${toUTC}`);
+      setOpenBills(data.orders || []);
+      setShowBills(true);
+    } catch (e) { console.error(e); }
   };
   const startAddingToBill = (bill: any) => { cart.clear(); setActiveBill({ id: bill.id, name: bill.billName || bill.orderNumber }); setShowBills(false); };
   const closeBill = async (bill: any) => {
@@ -666,15 +677,16 @@ export default function POSPage() {
       cart.clear();
       // Rebuild cart dari order items
       for (const item of order.items || []) {
+        const addOnPrice = (item.modifiers || []).reduce((s: number, m: any) => s + (m.priceDelta || 0), 0);
         const lineData = {
           productId: item.productId,
           name: item.product?.name || item.name || '',
-          basePrice: item.unitPrice,
+          basePrice: item.unitPrice - addOnPrice, // product base price tanpa modifier
           station: item.product?.station || 'DRINK',
           takeawayCharge: item.product?.takeawayCharge || 0,
           modifiers: (item.modifiers || []).map((m: any) => ({
             groupName: m.groupName, optionName: m.optionName,
-            effect: m.effect, priceDelta: m.priceDelta,
+            effect: m.effect, priceDelta: m.priceDelta, // keep original
             targetIngredientId: m.targetIngredientId,
             multiplier: m.multiplier, addQty: m.addQty,
           })),
