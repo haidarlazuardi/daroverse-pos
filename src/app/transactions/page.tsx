@@ -17,6 +17,7 @@ export default function TransactionsPage() {
   const [loading, setLoading]   = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [page, setPage]         = useState(0);
   const [search, setSearch]     = useState('');
@@ -154,9 +155,11 @@ export default function TransactionsPage() {
                 ) : filtered.length === 0 ? (
                   <tr><td colSpan={9} className="text-center py-10 text-gray-400">Tidak ada transaksi</td></tr>
                 ) : filtered.map(o => (
-                  <tr key={o.id} className="hover:bg-gray-50 transition-colors"
+                  <>
+                  <tr key={o.id} onClick={() => setExpanded(expanded === o.id ? null : o.id)}
+                    className="hover:bg-gray-50 transition-colors cursor-pointer"
                     style={{ background: selected.has(o.id) ? 'var(--brand)08' : undefined }}>
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
                       <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggleSelect(o.id)}/>
                     </td>
                     <td className="px-3 py-3 font-mono text-xs font-bold" style={{ color: 'var(--text-1)' }}>
@@ -180,9 +183,14 @@ export default function TransactionsPage() {
                     <td className="px-3 py-3">
                       <Badge variant={STATUS_COLOR[o.status] as any}>{o.status}</Badge>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3 flex items-center gap-2">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                        className="text-gray-300 flex-shrink-0 transition-transform"
+                        style={{ transform: expanded === o.id ? 'rotate(180deg)' : 'none' }}>
+                        <polyline points="6 9 12 15 18 9"/>
+                      </svg>
                       <button
-                        onClick={() => deleteOrder(o.id)}
+                        onClick={e => { e.stopPropagation(); deleteOrder(o.id); }}
                         disabled={deleting === o.id}
                         className="px-2.5 py-1 rounded-lg text-xs font-bold text-red-500 border border-red-200 hover:bg-red-50 disabled:opacity-40 transition-colors"
                       >
@@ -190,6 +198,78 @@ export default function TransactionsPage() {
                       </button>
                     </td>
                   </tr>
+                  {expanded === o.id && (
+                    <tr key={`${o.id}-detail`} style={{ background: 'var(--surface-2)' }}>
+                      <td colSpan={9} className="px-6 py-4">
+                        <div className="space-y-3">
+                          {/* Items */}
+                          <div>
+                            <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--text-3)' }}>Item Pesanan</p>
+                            <div className="rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr style={{ background: 'var(--surface-1)' }}>
+                                    {['Produk','Modifier','Qty','Harga Satuan','Subtotal'].map(h => (
+                                      <th key={h} className="px-3 py-2 text-left text-xs font-bold" style={{ color:'var(--text-3)' }}>{h}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y" style={{ borderColor: 'var(--border)' }}>
+                                  {(o.items || []).map((item: any, idx: number) => (
+                                    <tr key={idx} className="bg-white">
+                                      <td className="px-3 py-2.5 font-semibold text-sm" style={{ color:'var(--text-1)' }}>{item.product?.name || item.name || '—'}</td>
+                                      <td className="px-3 py-2.5 text-xs" style={{ color:'var(--text-3)' }}>
+                                        {item.modifiers?.length > 0
+                                          ? item.modifiers.map((m: any) => m.name || m.optionName).join(', ')
+                                          : <span className="text-gray-200">—</span>}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-sm" style={{ color:'var(--text-2)' }}>{item.quantity}×</td>
+                                      <td className="px-3 py-2.5 text-sm" style={{ color:'var(--text-2)' }}>{formatCurrency(item.unitPrice || 0)}</td>
+                                      <td className="px-3 py-2.5 font-bold text-sm" style={{ color:'var(--brand)' }}>{formatCurrency(item.subtotal || 0)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+
+                          {/* Summary */}
+                          <div className="flex gap-6 flex-wrap">
+                            <div className="rounded-xl p-3 text-sm space-y-1.5" style={{ background: 'white', border: '1px solid var(--border)', minWidth: 200 }}>
+                              {[
+                                ['Subtotal', formatCurrency(o.subtotal)],
+                                o.discount > 0 && ['Diskon', `−${formatCurrency(o.discount)}`],
+                                o.tax > 0 && ['Pajak', formatCurrency(o.tax)],
+                                o.serviceCharge > 0 && ['Service', formatCurrency(o.serviceCharge)],
+                                ['Total', formatCurrency(o.total)],
+                              ].filter(Boolean).map((row: any) => (
+                                <div key={row[0]} className="flex justify-between gap-8">
+                                  <span style={{ color: 'var(--text-3)' }}>{row[0]}</span>
+                                  <span className={`font-bold ${row[0]==='Total' ? 'text-base' : ''}`} style={{ color: row[0]==='Total' ? 'var(--brand)' : 'var(--text-1)' }}>{row[1]}</span>
+                                </div>
+                              ))}
+                            </div>
+                            {o.payment && (
+                              <div className="rounded-xl p-3 text-sm space-y-1.5" style={{ background: 'white', border: '1px solid var(--border)', minWidth: 200 }}>
+                                <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: 'var(--text-3)' }}>Pembayaran</p>
+                                {[
+                                  ['Metode', PAY_LABEL[o.payment.method] || o.payment.method],
+                                  o.payment.received && ['Diterima', formatCurrency(o.payment.received)],
+                                  o.payment.change > 0 && ['Kembalian', formatCurrency(o.payment.change)],
+                                ].filter(Boolean).map((row: any) => (
+                                  <div key={row[0]} className="flex justify-between gap-8">
+                                    <span style={{ color: 'var(--text-3)' }}>{row[0]}</span>
+                                    <span className="font-semibold" style={{ color: 'var(--text-1)' }}>{row[1]}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </>
                 ))}
               </tbody>
             </table>
