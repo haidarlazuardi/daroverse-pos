@@ -118,7 +118,7 @@ export default function StaffDashboard() {
             <p className="text-white font-black text-lg leading-tight">{user.name}</p>
           </div>
           <div className="flex items-center gap-3">
-            {data?.user?.hasPosAccess && (
+            {data?.user?.role === 'STAFF' && (
               <button onClick={() => router.push('/pos')}
                 className="px-3 py-1.5 rounded-xl text-xs font-bold text-white border border-white/30"
                 style={{ background: 'rgba(255,255,255,0.15)' }}>
