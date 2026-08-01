@@ -11,11 +11,25 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   const limit  = parseInt(searchParams.get('limit') || '20');
 
   if (active === 'true') {
-    // Return array for backward compat with POS (checks shifts.length > 0)
+    // Shift adalah global per café — ambil shift OPEN terakhir
     const shift = await prisma.shift.findFirst({
-      where: { userId: user.userId, status: 'OPEN' },
+      where: { status: 'OPEN' },
       include: { user: { select: { name: true } } },
+      orderBy: { openedAt: 'desc' },
     });
+
+    // Auto-close shift yang sudah lebih dari 24 jam (stale shift)
+    if (shift) {
+      const ageHours = (Date.now() - new Date(shift.openedAt).getTime()) / (1000 * 60 * 60);
+      if (ageHours > 24) {
+        await prisma.shift.update({
+          where: { id: shift.id },
+          data: { status: 'CLOSED', closedAt: new Date(), notes: 'Auto-closed: shift melebihi 24 jam' },
+        });
+        return success([]);
+      }
+    }
+
     return success(shift ? [shift] : []);
   }
 
@@ -58,11 +72,12 @@ export const POST = withAuth(async (req: NextRequest, user) => {
     return success({ ...updated, difference: updated.difference });
   }
 
-  // Open shift (action === 'open' OR no action)
+  // Open shift — cek global, tidak boleh ada shift OPEN dari siapapun
   const existing = await prisma.shift.findFirst({
-    where: { userId: user.userId, status: 'OPEN' },
+    where: { status: 'OPEN' },
+    include: { user: { select: { name: true } } },
   });
-  if (existing) return error('Kamu sudah punya shift yang sedang berjalan', 400);
+  if (existing) return error(`Sudah ada shift aktif yang dibuka oleh ${existing.user?.name || 'staff lain'}`, 400);
 
   const shift = await prisma.shift.create({
     data: { userId: user.userId, openingCash, status: 'OPEN' },

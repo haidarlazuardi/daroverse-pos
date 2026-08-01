@@ -405,6 +405,9 @@ export default function POSPage() {
   const [billModal, setBillModal] = useState(false);
   const [billName, setBillName] = useState('');
   const [showShift, setShowShift] = useState(false);
+  const [shiftWarning, setShiftWarning] = useState<'approaching'|'overdue'|null>(null);
+  const [shiftTemplates, setShiftTemplates] = useState<any[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState('');
   const [activeShift, setActiveShift] = useState<any>(null);
   const [openingCash, setOpeningCash] = useState('');
   const [closingCash, setClosingCash] = useState('');
@@ -522,12 +525,44 @@ export default function POSPage() {
         parseFloat(settings.service_rate || '0.05') || 0.05,
         parseFloat(settings.loyalty_redeem_value || '100') || 100,
       );
-      try { const shifts = await api.get<any[]>('/api/shifts?active=true'); if (shifts.length > 0) setActiveShift(shifts[0]); } catch {}
+      try {
+        const shifts = await api.get<any[]>('/api/shifts?active=true');
+        if (shifts.length > 0) setActiveShift(shifts[0]);
+        else setActiveShift(null);
+      } catch {}
+      try {
+        const templates = await api.get<any>('/api/shift-templates');
+        setShiftTemplates(templates?.templates || templates || []);
+      } catch {}
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { if (user) loadData(); }, [user, loadData]);
+
+  // Shift warning — cek tiap menit
+  useEffect(() => {
+    function checkShiftWarning() {
+      if (!activeShift) { setShiftWarning(null); return; }
+      const wib = new Date(Date.now() + 7 * 60 * 60 * 1000);
+      const h = wib.getHours(), m = wib.getMinutes();
+      const totalMin = h * 60 + m;
+      // Shift pagi close 17:00, shift sore close 23:30
+      const warningTimes = [
+        { warn: 16 * 60 + 30, overdue: 17 * 60 },      // Pagi: warning 16:30, overdue 17:00
+        { warn: 23 * 60,      overdue: 23 * 60 + 30 },  // Sore: warning 23:00, overdue 23:30
+      ];
+      let warning: 'approaching'|'overdue'|null = null;
+      for (const t of warningTimes) {
+        if (totalMin >= t.overdue) { warning = 'overdue'; break; }
+        if (totalMin >= t.warn)    { warning = 'approaching'; break; }
+      }
+      setShiftWarning(warning);
+    }
+    checkShiftWarning();
+    const interval = setInterval(checkShiftWarning, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [activeShift]);
 
   useEffect(() => {
     if (!selectedDiscount) { cart.setDiscount(0, null, null); return; }
@@ -790,6 +825,36 @@ export default function POSPage() {
     <div className="pos-grid bg-gray-50">
       {/* LEFT: Staff Icon Rail */}
       <StaffSidebar />
+
+      {/* Shift Warning Banner */}
+      {shiftWarning && activeShift && (
+        <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-2.5 text-sm font-bold"
+          style={{ background: shiftWarning === 'overdue' ? '#DC2626' : '#F59E0B', color: 'white' }}>
+          <span>
+            {shiftWarning === 'overdue'
+              ? '🚨 Shift sudah melewati waktu tutup! Segera close shift.'
+              : '⚠️ Shift akan segera berakhir. Siapkan untuk close shift.'}
+          </span>
+          <button onClick={() => setShowShift(true)}
+            className="px-3 py-1 rounded-lg text-xs font-black"
+            style={{ background: 'rgba(255,255,255,0.25)' }}>
+            Close Shift →
+          </button>
+        </div>
+      )}
+
+      {/* No Shift Banner */}
+      {!activeShift && !loading && (
+        <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-2.5 text-sm font-bold"
+          style={{ background: '#1D4ED8', color: 'white' }}>
+          <span>📋 Belum ada shift aktif. Buka shift untuk mulai transaksi.</span>
+          <button onClick={() => setShowShift(true)}
+            className="px-3 py-1 rounded-lg text-xs font-black"
+            style={{ background: 'rgba(255,255,255,0.25)' }}>
+            Buka Shift →
+          </button>
+        </div>
+      )}
       {/* LEFT: products */}
       <div className="flex flex-col h-screen overflow-hidden">
         <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-2 flex-shrink-0">
@@ -1014,6 +1079,15 @@ export default function POSPage() {
                       alert('Nama pelanggan wajib diisi');
                       return;
                     }
+                    if (!activeShift) {
+                      alert('⚠️ Shift belum dibuka. Buka shift dulu sebelum transaksi.');
+                      setShowShift(true);
+                      return;
+                    }
+                    if (shiftWarning === 'overdue') {
+                      const ok = window.confirm('⚠️ Shift sudah melewati waktu tutup. Lanjutkan transaksi?');
+                      if (!ok) return;
+                    }
                     setStep('payment');
                   }} className="btn btn-md btn-primary text-sm">Bayar</button>
                 </div>
@@ -1236,18 +1310,54 @@ export default function POSPage() {
       </Modal>
 
       {/* Shift */}
-      <Modal open={showShift} onClose={() => setShowShift(false)} title={activeShift ? 'Shift aktif' : 'Buka shift'}>
+      <Modal open={showShift} onClose={() => setShowShift(false)} title={activeShift ? 'Shift Aktif' : 'Buka Shift'}>
         {!activeShift ? (
           <div className="space-y-4">
-            <p className="text-sm text-gray-600">Masukkan kas awal untuk memulai shift.</p>
-            <Input label="Kas awal (Rp)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} placeholder="cth. 500000" />
-            <Button onClick={openShift} className="w-full">Buka shift</Button>
+            <p className="text-sm text-gray-600">Pilih shift dan masukkan kas awal untuk memulai.</p>
+            {shiftTemplates.length > 0 && (
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Tipe Shift</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {shiftTemplates.map((t: any) => (
+                    <button key={t.id} onClick={() => setSelectedTemplate(t.id)}
+                      className="p-3 rounded-xl border text-sm font-bold text-left transition-all"
+                      style={{
+                        borderColor: selectedTemplate === t.id ? 'var(--brand)' : '#e5e7eb',
+                        background: selectedTemplate === t.id ? 'var(--brand)10' : 'white',
+                        color: selectedTemplate === t.id ? 'var(--brand)' : '#374151',
+                      }}>
+                      <p>{t.name}</p>
+                      <p className="font-normal text-xs text-gray-400 mt-0.5">{t.startTime} – {t.endTime}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <Input label="Kas awal (Rp)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} placeholder="cth. 500000"/>
+            <Button onClick={openShift} className="w-full">🟢 Buka Shift</Button>
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="success-box"><p>Dibuka: {new Date(activeShift.openedAt).toLocaleString('id-ID')}</p><p>Kas awal: <strong>{formatCurrency(activeShift.openingCash)}</strong></p></div>
-            <Input label="Kas akhir (hitung laci)" type="number" value={closingCash} onChange={(e) => setClosingCash(e.target.value)} />
-            <Button onClick={closeShift} variant="danger" className="w-full">Tutup shift</Button>
+            <div className="rounded-xl p-4 space-y-2" style={{ background: 'var(--brand)08', border: '1px solid var(--brand)20' }}>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Dibuka oleh</span>
+                <span className="font-bold">{activeShift.user?.name || '—'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Waktu buka</span>
+                <span className="font-bold">{new Date(activeShift.openedAt).toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Kas awal</span>
+                <span className="font-bold">{formatCurrency(activeShift.openingCash)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Durasi</span>
+                <span className="font-bold">{Math.round((Date.now() - new Date(activeShift.openedAt).getTime()) / 60000)} menit</span>
+              </div>
+            </div>
+            <Input label="Kas akhir (hitung laci)" type="number" value={closingCash} onChange={(e) => setClosingCash(e.target.value)} placeholder="Jumlah uang di laci"/>
+            <Button onClick={closeShift} variant="danger" className="w-full">🔴 Tutup Shift</Button>
           </div>
         )}
       </Modal>
