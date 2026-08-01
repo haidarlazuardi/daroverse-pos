@@ -247,7 +247,7 @@ function QueueCard({ order: o, onServed }: { order: any; onServed: () => void })
     } catch { setServing(false); }
   }
 
-  const name  = o.customer?.name || o.customerName || null;
+  const name  = o.billName || o.customer?.name || o.customerName || null;
   const count = (o.items || []).reduce((s: number, i: any) => s + (i.quantity || 1), 0);
   const elapsed = Math.floor((Date.now() - new Date(o.createdAt).getTime()) / 60000);
   const urgent  = elapsed >= 10;
