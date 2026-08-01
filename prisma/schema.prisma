@@ -174,9 +174,10 @@ model User {
   shifts           Shift[]
   productionOrders ProductionOrder[]
   attendances      Attendance[]
-  workSchedules    WorkSchedule[]
-  kasbons          Kasbon[]
-  payrollRecords   PayrollRecord[]
+  workSchedules      WorkSchedule[]
+  kasbons            Kasbon[]
+  payrollRecords     PayrollRecord[]
+  purchaseRequests   PurchaseRequest[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -1128,4 +1129,75 @@ model PayrollRecord {
 
   @@unique([periodId, userId])
   @@map("payroll_records")
+}
+
+// ═══════════════════════════════════════════════════════
+//  PURCHASE REQUEST
+// ═══════════════════════════════════════════════════════
+
+enum PurchaseRequestStatus {
+  PENDING
+  FULFILLED
+  REJECTED
+}
+
+model PurchaseRequest {
+  id          String                @id @default(cuid())
+  status      PurchaseRequestStatus @default(PENDING)
+  notes       String?
+  requestedBy String
+  user        User                  @relation(fields: [requestedBy], references: [id])
+  items       PurchaseRequestItem[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@map("purchase_requests")
+}
+
+model PurchaseRequestItem {
+  id                String          @id @default(cuid())
+  requestId         String
+  request           PurchaseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  ingredientId      String
+  ingredient        Ingredient      @relation(fields: [ingredientId], references: [id])
+  quantity          Float
+  unit              String          // purchase unit
+  notes             String?
+
+  @@map("purchase_request_items")
+}
+
+// ═══════════════════════════════════════════════════════
+//  PURCHASE REQUEST
+// ═══════════════════════════════════════════════════════
+
+enum PurchaseRequestStatus {
+  PENDING
+  FULFILLED
+  REJECTED
+}
+
+model PurchaseRequest {
+  id          String                @id @default(cuid())
+  status      PurchaseRequestStatus @default(PENDING)
+  notes       String?
+  requestedBy String
+  user        User                  @relation(fields: [requestedBy], references: [id])
+  items       PurchaseRequestItem[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@map("purchase_requests")
+}
+
+model PurchaseRequestItem {
+  id                String          @id @default(cuid())
+  purchaseRequestId String
+  request           PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  ingredientId      String
+  ingredient        Ingredient      @relation(fields: [ingredientId], references: [id])
+  quantity          Float
+  unit              String          // purchaseUnit
+
+  @@map("purchase_request_items")
 }
