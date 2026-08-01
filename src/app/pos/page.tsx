@@ -659,14 +659,7 @@ export default function POSPage() {
 
   const loadBills = async () => {
     try {
-      // WIB UTC+7 — konversi ke range UTC yang benar
-      const now   = new Date();
-      const wibOffset = 7 * 60 * 60 * 1000;
-      const todayWIB  = new Date(now.getTime() + wibOffset);
-      const dateStr   = todayWIB.toISOString().slice(0, 10); // YYYY-MM-DD WIB
-      const fromUTC   = new Date(dateStr + 'T00:00:00+07:00').toISOString();
-      const toUTC     = new Date(dateStr + 'T23:59:59+07:00').toISOString();
-      const data = await api.get<any>(`/api/orders?status=OPEN&limit=30&from=${fromUTC}&to=${toUTC}`);
+      const data = await api.get<any>(`/api/orders?status=OPEN&limit=50`);
       setOpenBills(data.orders || []);
       setShowBills(true);
     } catch (e) { console.error(e); }
