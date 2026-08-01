@@ -38,12 +38,14 @@ export const GET = withAuth(async (_req: NextRequest, user) => {
         include: { shift: true }, orderBy: { date: 'asc' },
       });
     })(),
+    // SC Pool dari order yang benar-benar ada SC-nya
     (async () => {
       const orders = await prisma.order.findMany({
         where: { status: 'COMPLETED', createdAt: { gte: monthStart, lte: monthEnd } },
-        select: { subtotal: true },
+        select: { serviceCharge: true },
       });
-      const scPool = orders.reduce((s,o) => s + o.subtotal, 0) * 0.05;
+      // SC pool = total service charge yang dikumpulkan dari customer
+      const scPool = orders.reduce((s,o) => s + (o.serviceCharge || 0), 0);
       const allAtt = await (prisma as any).attendance.findMany({
         where: { type: 'CHECK_IN', createdAt: { gte: monthStart, lte: monthEnd } },
         select: { userId: true },

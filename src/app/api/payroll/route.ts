@@ -39,13 +39,14 @@ export const POST = withAuth(async (req: NextRequest) => {
   const to   = new Date(new Date(from).setMonth(from.getMonth()+1)-1);
   to.setHours(23,59,59);
 
-  // Get total revenue from POS
+  // Get total revenue and actual SC dari POS
   const orders = await prisma.order.findMany({
     where: { status: 'COMPLETED' as any, createdAt: { gte: from, lte: to } },
-    select: { total: true },
+    select: { total: true, serviceCharge: true },
   });
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
-  const serviceChargePool = totalRevenue * 0.05;
+  // SC pool = total service charge yang benar-benar dikumpulkan dari customer
+  const serviceChargePool = orders.reduce((s, o) => s + (o.serviceCharge || 0), 0);
 
   // Get all active users with employeeType
   const users = await prisma.user.findMany({
