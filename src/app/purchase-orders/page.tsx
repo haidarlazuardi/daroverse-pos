@@ -293,16 +293,39 @@ export default function PurchaseOrdersPage() {
   useEffect(() => { if (viewMode === 'requests') loadRequests(); }, [viewMode]);
 
   async function generatePO(requestId: string, supplierId: string) {
+    if (!supplierId) { alert('Pilih supplier dulu'); return; }
     try {
-      const res = await api.patch<any>('/api/purchase-requests', { requestId, action: 'generate_po', supplierId });
-      alert(`✅ PO ${res.poNumber} berhasil dibuat sebagai Draft`);
+      // 1. Ambil detail request
+      const reqs = await api.get<any[]>(`/api/purchase-requests?status=PENDING`).catch(() => []);
+      const req = Array.isArray(reqs) ? reqs.find((r: any) => r.id === requestId) : null;
+      if (!req) { alert('Request tidak ditemukan'); return; }
+
+      // 2. Buat PO dari items request
+      const items = req.items.map((item: any) => ({
+        ingredientId: item.ingredientId,
+        quantity: item.quantity,
+        unitPrice: item.ingredient?.latestPrice && item.ingredient?.conversionRate
+          ? item.ingredient.latestPrice * item.ingredient.conversionRate
+          : 0,
+      }));
+
+      const po = await api.post<any>('/api/purchase-orders', {
+        supplierId,
+        notes: `Dari request staff: ${req.user?.name} — ${new Date(req.createdAt).toLocaleDateString('id-ID')}`,
+        items,
+      });
+
+      // 3. Mark request as FULFILLED
+      await api.patch('/api/purchase-requests', { id: requestId, status: 'FULFILLED' }).catch(() => {});
+
+      alert(`✅ PO ${po.poNumber || po.po?.poNumber || ''} berhasil dibuat sebagai Draft`);
       loadRequests();
     } catch (e: any) { alert(e.message); }
   }
 
   async function rejectRequest(requestId: string) {
     if (!confirm('Tolak request ini?')) return;
-    await api.patch('/api/purchase-requests', { requestId, action: 'reject' });
+    await api.patch('/api/purchase-requests', { id: requestId, status: 'REJECTED' });
     loadRequests();
   }
 
