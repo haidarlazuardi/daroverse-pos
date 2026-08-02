@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       orderBy: { name: 'asc' },
     });
 
-    return success(user.role === 'STAFF' ? products.map(({ cost, recipe, ...p }: any) => p) : products);
+    return success(user.role === 'STAFF' ? products.map(({ cost, ...p }: any) => p) : products);
   } catch (e: any) {
     console.error('Products GET error:', e);
     return error(e.message || 'Failed', 500);

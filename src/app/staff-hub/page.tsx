@@ -33,7 +33,6 @@ export default function StaffHub() {
   useEffect(() => { hydrate(); }, [hydrate]);
   useEffect(() => {
     if (!user) return;
-    if (['OWNER','MANAGER','SUPER_ADMIN'].includes(user.role)) { router.replace('/dashboard'); return; }
     api.get<any[]>('/api/ingredients?active=1')
       .then(r => setIngredients(Array.isArray(r) ? r : []))
       .finally(() => setLoadingIngs(false));
@@ -92,7 +91,7 @@ export default function StaffHub() {
         </BottomSheet>
       )}
 
-      <BottomNav hasPosAccess={false}/>
+      <BottomNav hasPosAccess={['OWNER','MANAGER','SUPER_ADMIN'].includes(user.role)}/>
     </div>
   );
 }
@@ -242,7 +241,7 @@ const SubmitBtn = ({ busy, label, onClick, disabled, color=G }: any) => (
 );
 
 function TransferForm({ ingredients, stockAt, onDone }: any) {
-  const raw = ingredients.filter((i:any)=>i.type==='RAW');
+  const raw = ingredients; // semua bahan bisa ditransfer
   const [id,setId]=useState('');const [qty,setQty]=useState('');const [from,setFrom]=useState('GUDANG');const [to,setTo]=useState('BAR');const [busy,setBusy]=useState(false);
   const ing = raw.find((i:any)=>i.id===id);
   function onQR(d:any){ if(d.ingredientId){setId(d.ingredientId);if(d.qty)setQty(String(d.qty));} }
