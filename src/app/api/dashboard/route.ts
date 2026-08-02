@@ -37,10 +37,26 @@ export const GET = withAuth(async (req, user) => {
   // Core metrics
   const orders = await prisma.order.findMany({ where });
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
-  const totalCOGS = orders.reduce((s, o) => s + o.costTotal, 0);
-  const totalProfit = orders.reduce((s, o) => s + o.profit, 0);
+  const totalCOGS    = orders.reduce((s, o) => s + o.costTotal, 0);
+  const grossProfit  = totalRevenue - totalCOGS;
+  const totalProfit  = orders.reduce((s, o) => s + o.profit, 0);
   const totalTransactions = orders.length;
   const avgOrderValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
+
+  // Expenses breakdown (WIB range)
+  const wibOffset = 7 * 60 * 60 * 1000;
+  const fromWIB = new Date(from.getTime() - wibOffset);
+  const toWIB   = new Date(now.getTime() - wibOffset);
+  const expenses = await prisma.expense.findMany({
+    where: { createdAt: { gte: fromWIB, lte: toWIB } },
+    select: { amount: true, category: true },
+  });
+  const totalExpenses     = expenses.reduce((s, e) => s + e.amount, 0);
+  const purchaseExpenses  = expenses.filter(e => e.category === 'PURCHASE').reduce((s, e) => s + e.amount, 0);
+  const opExpenses        = expenses.filter(e => e.category !== 'PURCHASE' && e.category !== 'SALARY').reduce((s, e) => s + e.amount, 0);
+  const salaryExpenses    = expenses.filter(e => e.category === 'SALARY').reduce((s, e) => s + e.amount, 0);
+  const operatingProfit   = grossProfit - opExpenses;
+  const netProfit         = operatingProfit - salaryExpenses;
 
   // Product performance
   const orderItems = await prisma.orderItem.findMany({
@@ -127,10 +143,17 @@ export const GET = withAuth(async (req, user) => {
     summary: {
       totalRevenue,
       totalCOGS,
+      grossProfit,
+      totalExpenses,
+      purchaseExpenses,
+      opExpenses,
+      salaryExpenses,
+      operatingProfit,
+      netProfit,
       totalProfit,
       totalTransactions,
       avgOrderValue,
-      profitMargin: totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0,
+      profitMargin: totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0,
     },
     productPerformance: productPerformance.slice(0, 20),
     menuEngineering,

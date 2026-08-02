@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
-import { success, withAuth } from '@/lib/api-helpers';
+import { success, error, withAuth } from '@/lib/api-helpers';
 import { ADMIN_ROLES } from '@/lib/auth';
 
 const TZ_OFFSET = 7 * 60 * 60 * 1000; // WIB UTC+7
@@ -73,4 +73,42 @@ export const GET = withAuth(async (req: NextRequest) => {
   }
 
   return success([]);
+}, ADMIN_ROLES);
+
+// ── PATCH — attendance correction (manager) ───────────────────────────────────
+export const PATCH = withAuth(async (req: NextRequest, user) => {
+  const { id, action, type, createdAt, note } = await req.json();
+
+  if (action === 'delete') {
+    await (prisma as any).attendance.delete({ where: { id } });
+    return success({ deleted: true });
+  }
+
+  if (action === 'add') {
+    // Manual add attendance
+    const att = await (prisma as any).attendance.create({
+      data: {
+        userId: id, // id here is userId
+        type: type || 'CHECK_IN',
+        photo: 'manual-correction',
+        createdAt: createdAt ? new Date(createdAt) : new Date(),
+        notes: note || `Koreksi manual oleh ${user.name}`,
+      },
+    });
+    return success(att);
+  }
+
+  if (action === 'edit') {
+    const att = await (prisma as any).attendance.update({
+      where: { id },
+      data: {
+        type,
+        ...(createdAt ? { createdAt: new Date(createdAt) } : {}),
+        notes: note || `Diedit oleh ${user.name}`,
+      },
+    });
+    return success(att);
+  }
+
+  return error('Action tidak valid');
 }, ADMIN_ROLES);

@@ -169,6 +169,33 @@ export default function AttendancePage() {
                       ) : <p className="text-sm" style={{ color:'#9CA3AF' }}>Belum pulang</p>}
                     </div>
                   </div>
+                  {/* Correction buttons */}
+                  <div className="mt-3 pt-3 border-t flex flex-wrap gap-2" style={{ borderColor:'var(--border)' }}>
+                    {checkIn && (
+                      <button onClick={async()=>{ if(!confirm('Hapus data absen masuk?'))return; await api.patch('/api/attendance',{id:checkIn.id,action:'delete'}); setRecords(p=>p.filter((r:any)=>r.id!==checkIn.id)); }}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50">
+                        🗑 Hapus Masuk
+                      </button>
+                    )}
+                    {checkOut && (
+                      <button onClick={async()=>{ if(!confirm('Hapus data absen pulang?'))return; await api.patch('/api/attendance',{id:checkOut.id,action:'delete'}); setRecords(p=>p.filter((r:any)=>r.id!==checkOut.id)); }}
+                        className="text-xs px-2.5 py-1 rounded-lg border border-red-200 text-red-500 hover:bg-red-50">
+                        🗑 Hapus Pulang
+                      </button>
+                    )}
+                    {!checkIn && (
+                      <button onClick={async()=>{ const t=prompt('Jam masuk (HH:MM):','08:00'); if(!t)return; const [h,m]=t.split(':'); const dt=new Date(date+'T'+h.padStart(2,'0')+':'+m.padStart(2,'0')+':00+07:00'); const r=await api.patch<any>('/api/attendance',{id:(checkOut?.userId||checkIn?.userId||''),action:'add',type:'CHECK_IN',createdAt:dt.toISOString()}); setRecords((p:any[])=>[...p,r]); }}
+                        className="text-xs px-2.5 py-1 rounded-lg border text-green-600 border-green-200 hover:bg-green-50">
+                        ＋ Tambah Masuk
+                      </button>
+                    )}
+                    {checkIn && !checkOut && (
+                      <button onClick={async()=>{ const t=prompt('Jam pulang (HH:MM):','17:00'); if(!t)return; const [h,m]=t.split(':'); const dt=new Date(date+'T'+h.padStart(2,'0')+':'+m.padStart(2,'0')+':00+07:00'); const r=await api.patch<any>('/api/attendance',{id:checkIn.userId,action:'add',type:'CHECK_OUT',createdAt:dt.toISOString()}); setRecords((p:any[])=>[...p,r]); }}
+                        className="text-xs px-2.5 py-1 rounded-lg border text-amber-600 border-amber-200 hover:bg-amber-50">
+                        ＋ Tambah Pulang
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

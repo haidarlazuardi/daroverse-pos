@@ -169,6 +169,7 @@ model User {
   bankAccount      String?
   bankAccountName  String?
   joinDate         DateTime?
+  hasPosAccess     Boolean           @default(false)
 
   orders           Order[]
   shifts           Shift[]
@@ -178,6 +179,8 @@ model User {
   kasbons            Kasbon[]
   payrollRecords     PayrollRecord[]
   purchaseRequests   PurchaseRequest[]
+  voidRequests       VoidRequest[]    @relation("VoidRequests")
+  leaves             Leave[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -1170,3 +1173,57 @@ model PurchaseRequestItem {
 
 // ═══════════════════════════════════════════════════════
 //  PURCHASE REQUEST
+// ── VOID REQUEST ──────────────────────────────────────────────────────────────
+enum VoidRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model VoidRequest {
+  id          String            @id @default(cuid())
+  orderId     String
+  order       Order             @relation(fields: [orderId], references: [id])
+  requestedBy String
+  user        User              @relation("VoidRequests", fields: [requestedBy], references: [id])
+  reason      String
+  status      VoidRequestStatus @default(PENDING)
+  reviewedBy  String?
+  reviewNote  String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@map("void_requests")
+}
+
+// ── LEAVE ─────────────────────────────────────────────────────────────────────
+enum LeaveType {
+  SICK
+  PERMISSION
+  ANNUAL
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Leave {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id])
+  type        LeaveType
+  startDate   DateTime
+  endDate     DateTime
+  reason      String
+  status      LeaveStatus @default(PENDING)
+  approvedBy  String?
+  approvedAt  DateTime?
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("leaves")
+}

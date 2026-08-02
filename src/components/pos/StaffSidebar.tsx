@@ -422,8 +422,15 @@ function PrinterSetup() {
   return <FW><div className="rounded-lg p-3 border border-gray-100 bg-gray-50 text-center"><div className="text-2xl mb-1">{connected?'🖨️':'📵'}</div><p className="font-bold text-sm text-gray-900">{connected?'Terhubung':'Tidak terhubung'}</p>{name&&<p className="text-xs mt-0.5 text-gray-400 truncate">{name}</p>}</div><button onClick={pair} className="btn btn-primary btn-sm w-full">🔗 {connected?'Ganti':'Pair Printer'}</button>{connected&&<button onClick={testPrint} className="btn btn-secondary btn-sm w-full">🖨️ Test Print</button>}</FW>;
 }
 function TxHistory() {
-  const [orders,setOrders]=useState<any[]>([]);const [loading,setLoading]=useState(true);const [selected,setSelected]=useState<any>(null);const [printing,setPrinting]=useState(false);
+  const [orders,setOrders]=useState<any[]>([]);const [loading,setLoading]=useState(true);const [selected,setSelected]=useState<any>(null);const [printing,setPrinting]=useState(false);const [voidReason,setVoidReason]=useState<Record<string,string>>({});const [voidSending,setVoidSending]=useState<string|null>(null);
   useEffect(()=>{ api.get<any>('/api/orders?limit=30&status=COMPLETED').then(r=>setOrders(r.orders||r||[])).catch(()=>{}).finally(()=>setLoading(false)); },[]);
+  async function requestVoid(orderId:string){
+    const reason=voidReason[orderId];
+    if(!reason?.trim()){alert('Isi alasan void dulu');return;}
+    setVoidSending(orderId);
+    try{await api.post('/api/void-requests',{orderId,reason});alert('Request void terkirim ke manager');setSelected(null);}
+    catch(e:any){alert(e.message);}finally{setVoidSending(null);}
+  }
   async function printTicket(o:any,type:'kitchen'|'bar'|'customer'){
     setPrinting(true);
     try{

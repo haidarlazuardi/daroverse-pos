@@ -16,6 +16,10 @@ const VOID_REASONS = [
 ];
 
 export default function VoidPage() {
+  const [tab, setTab]           = useState<'requests'|'manual'>('requests');
+  const [voidRequests, setVoidReqs] = useState<any[]>([]);
+  const [reviewing, setReviewing]   = useState<any>(null);
+  const [reviewNote, setReviewNote] = useState('');
   const [search, setSearch]     = useState('');
   const [orderNo, setOrderNo]   = useState('');
   const [found, setFound]       = useState<any>(null);

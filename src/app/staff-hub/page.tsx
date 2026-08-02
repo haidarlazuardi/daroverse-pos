@@ -8,7 +8,7 @@ import BottomNav from '@/components/staff/BottomNav';
 
 const G = '#48654D';
 
-type Sheet = 'transfer'|'batch'|'waste'|'opname'|'receive'|'request'|'expense'|'printer'|'menu'|null;
+type Sheet = 'transfer'|'batch'|'waste'|'opname'|'receive'|'request'|'expense'|'printer'|'menu'|'leave'|null;
 
 const TILES = [
   { id:'transfer' as Sheet, icon:'🔀', label:'Transfer', desc:'Pindah bahan', color:'#7C3AED' },
@@ -19,6 +19,7 @@ const TILES = [
   { id:'request'  as Sheet, icon:'📩', label:'Request', desc:'Minta ke manager', color:'#EA580C' },
   { id:'expense'  as Sheet, icon:'💸', label:'Pengeluaran', desc:'Catat belanja', color:'#B45309' },
   { id:'menu'     as Sheet, icon:'📖', label:'Menu', desc:'Lihat resep', color:'#059669' },
+  { id:'leave'    as Sheet, icon:'🏖️', label:'Izin/Cuti', desc:'Ajukan izin', color:'#6366F1' },
   { id:'printer'  as Sheet, icon:'🖨️', label:'Printer', desc:'Setup BT', color:'#374151' },
 ];
 
@@ -87,6 +88,7 @@ export default function StaffHub() {
           {sheet==='expense'   && <ExpenseForm   onDone={() => setSheet(null)}/>}
           {sheet==='menu'      && <MenuView      ingredients={ingredients}/>}
           {sheet==='printer'   && <PrinterForm/>}
+          {sheet==='leave'     && <LeaveForm onDone={() => setSheet(null)}/>}
         </BottomSheet>
       )}
 
@@ -406,5 +408,64 @@ function PrinterForm() {
     </div>
     <SubmitBtn busy={false} label={`🔗 ${connected?'Ganti Printer':'Pair Printer'}`} onClick={pair} disabled={false}/>
     {connected&&<button onClick={test} className="w-full py-3.5 rounded-xl font-black text-sm border" style={{ borderColor:'#E8E2D9', color:'#666' }}>🖨️ Test Print</button>}
+  </div>;
+}
+
+function LeaveForm({ onDone }: any) {
+  const [type,setType]=useState('SICK');
+  const [start,setStart]=useState('');
+  const [end,setEnd]=useState('');
+  const [reason,setReason]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [myLeaves,setMyLeaves]=useState<any[]>([]);
+
+  useEffect(()=>{
+    api.get<any[]>('/api/leaves').then(r=>setMyLeaves(Array.isArray(r)?r:[])).catch(()=>{});
+  },[]);
+
+  async function submit(){
+    if(!start||!end||!reason)return;
+    setBusy(true);
+    try{
+      await api.post('/api/leaves',{type,startDate:start,endDate:end,reason});
+      alert('Pengajuan terkirim');
+      setReason('');setStart('');setEnd('');
+      onDone();
+    }catch(e:any){alert(e.message);}
+    finally{setBusy(false);}
+  }
+
+  const STATUS_COLOR: Record<string,string> = { PENDING:'#F59E0B', APPROVED:'#16A34A', REJECTED:'#DC2626' };
+  const TYPE_LABEL: Record<string,string> = { SICK:'Sakit', PERMISSION:'Izin', ANNUAL:'Cuti Tahunan', OTHER:'Lainnya' };
+
+  return <div className="space-y-4">
+    <Field label="JENIS">
+      <Select value={type} onChange={(e:any)=>setType(e.target.value)}>
+        <option value="SICK">🤒 Sakit</option>
+        <option value="PERMISSION">✋ Izin</option>
+        <option value="ANNUAL">🏖️ Cuti Tahunan</option>
+        <option value="OTHER">📝 Lainnya</option>
+      </Select>
+    </Field>
+    <div className="grid grid-cols-2 gap-3">
+      <Field label="DARI"><Input type="date" value={start} onChange={e=>setStart(e.target.value)}/></Field>
+      <Field label="SAMPAI"><Input type="date" value={end} onChange={e=>setEnd(e.target.value)}/></Field>
+    </div>
+    <Field label="ALASAN"><Input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Keterangan..."/></Field>
+    <SubmitBtn busy={busy} label="Kirim Pengajuan" onClick={submit} disabled={!start||!end||!reason} color="#6366F1"/>
+
+    {myLeaves.length > 0 && <>
+      <p className="text-xs font-bold tracking-widest uppercase pt-2" style={{ color:'#A0A0A0' }}>Pengajuan Saya</p>
+      {myLeaves.slice(0,5).map((l:any)=>(
+        <div key={l.id} className="rounded-xl p-3 flex justify-between items-start" style={{ background:'#F7F5F2' }}>
+          <div>
+            <p className="text-sm font-bold" style={{ color:'#1a1a1a' }}>{TYPE_LABEL[l.type]}</p>
+            <p className="text-xs" style={{ color:'#A0A0A0' }}>{new Date(l.startDate).toLocaleDateString('id-ID')} – {new Date(l.endDate).toLocaleDateString('id-ID')}</p>
+            <p className="text-xs" style={{ color:'#888' }}>{l.reason}</p>
+          </div>
+          <span className="text-xs px-2 py-0.5 rounded-full font-bold text-white" style={{ background:STATUS_COLOR[l.status] }}>{l.status}</span>
+        </div>
+      ))}
+    </>}
   </div>;
 }

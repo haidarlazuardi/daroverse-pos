@@ -76,6 +76,13 @@ export default function UsersPage() {
     finally { setDeleting(false); }
   }
 
+  async function togglePosAccess(u: any) {
+    try {
+      await api.patch('/api/users', { id: u.id, hasPosAccess: !u.hasPosAccess });
+      setUsers((prev: any[]) => prev.map(x => x.id === u.id ? { ...x, hasPosAccess: !u.hasPosAccess } : x));
+    } catch(e: any) { alert(e.message); }
+  }
+
   async function toggleActive(u: User) {
     try { await api.patch('/api/users', { id: u.id, active: !u.active }); load(); }
     catch (e) { console.error(e); }
@@ -127,6 +134,13 @@ export default function UsersPage() {
         <DataTable data={filtered} columns={columns} keyField="id" loading={loading} emptyMessage="Belum ada pengguna"
           rowActions={u => (
             <div className="flex gap-1">
+              {(u as any).role === 'STAFF' && (
+                <button onClick={() => togglePosAccess(u)}
+                  title={(u as any).hasPosAccess ? 'Cabut akses POS' : 'Beri akses POS'}
+                  className={`p-1.5 rounded-lg text-xs font-bold transition-colors ${(u as any).hasPosAccess ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400 hover:bg-green-50 hover:text-green-500'}`}>
+                  POS
+                </button>
+              )}
               <button onClick={() => toggleActive(u)} title={u.active ? 'Nonaktifkan' : 'Aktifkan'}
                 className={`p-1.5 rounded-lg text-gray-400 transition-colors ${u.active ? 'hover:bg-red-50 hover:text-red-500' : 'hover:bg-emerald-50 hover:text-emerald-600'}`}>
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
