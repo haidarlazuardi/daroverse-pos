@@ -356,6 +356,7 @@ model Ingredient {
   stockMovements  StockMovement[]
   purchaseItems        PurchaseOrderItem[]
   purchaseRequestItems PurchaseRequestItem[]
+  units                IngredientUnit[]
   opnameItems     StockOpnameItem[]
   productionMade  ProductionOrder[]     @relation("ProducedIngredient") // PREPPED produced by these orders
   productionUsed  ProductionOrderItem[] @relation("ConsumedIngredient") // raw consumed in production
