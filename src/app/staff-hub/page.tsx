@@ -254,11 +254,36 @@ function TransferForm({ ingredients, stockAt, onDone }: any) {
 }
 
 function BatchForm({ prepped, onDone }: any) {
-  const [id,setId]=useState('');const [mult,setMult]=useState('1');const [loc,setLoc]=useState('BAR');const [busy,setBusy]=useState(false);
-  async function submit(){if(!id)return;setBusy(true);try{await api.post('/api/stock/batch',{ingredientId:id,multiplier:parseFloat(mult),location:loc});onDone();}catch(e:any){alert(e.message);}finally{setBusy(false);}}
+  const [id,setId]=useState('');const [mult,setMult]=useState('1');const [loc,setLoc]=useState('BAR');const [actualYield,setActualYield]=useState('');const [busy,setBusy]=useState(false);
+  const selected = prepped.find((i:any)=>i.id===id);
+  const stdYield = selected ? ((selected.prepRecipe?.yieldQty || selected.conversionRate || 1) * parseFloat(mult||'1')) : 0;
+  async function submit(){
+    if(!id)return;
+    setBusy(true);
+    try{
+      const res = await api.post<any>('/api/stock/batch',{
+        ingredientId:id,
+        multiplier:parseFloat(mult),
+        location:loc,
+        ...(actualYield ? { actualYield: parseFloat(actualYield) } : {}),
+      });
+      alert(res.message || 'Batch selesai');
+      onDone();
+    }catch(e:any){alert(e.message);}finally{setBusy(false);}
+  }
   return <div className="space-y-4">
     <Field label="OLAHAN"><Select value={id} onChange={(e:any)=>setId(e.target.value)}><option value="">Pilih olahan</option>{prepped.map((i:any)=><option key={i.id} value={i.id}>{i.name}</option>)}</Select></Field>
     <Field label="MULTIPLIER (1 = 1x resep)"><Input type="number" value={mult} onChange={e=>setMult(e.target.value)}/></Field>
+    {selected && stdYield > 0 && (
+      <div className="rounded-xl px-4 py-3 text-sm" style={{ background:'#F7F5F2' }}>
+        <span style={{ color:'#A0A0A0' }}>Yield standar: </span>
+        <strong style={{ color:G }}>{stdYield.toLocaleString('id-ID')} {selected.unit}</strong>
+      </div>
+    )}
+    <Field label={`YIELD AKTUAL (${selected?.unit||'unit'}) — opsional`}>
+      <Input type="number" value={actualYield} onChange={e=>setActualYield(e.target.value)}
+        placeholder={stdYield > 0 ? `Default: ${stdYield.toLocaleString('id-ID')}` : 'Kosongkan = pakai standar resep'}/>
+    </Field>
     <Field label="SIMPAN KE"><LocPicker value={loc} set={setLoc}/></Field>
     <SubmitBtn busy={busy} label="Buat Batch" onClick={submit} disabled={!id} color="#0891B2"/>
   </div>;
