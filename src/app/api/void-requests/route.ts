@@ -30,7 +30,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return error('Order tidak ditemukan', 404);
-  if (order.status === 'VOID') return error('Order sudah di-void');
+  if (['VOIDED','VOID'].includes(order.status as string)) return error('Order sudah di-void');
 
   // Cek sudah ada pending request
   const existing = await (prisma as any).voidRequest.findFirst({
@@ -69,7 +69,7 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
   if (action === 'approve') {
     await prisma.$transaction(async (tx) => {
       // Update order status
-      await tx.order.update({ where: { id: vr.orderId }, data: { status: 'VOID' as any } });
+      await tx.order.update({ where: { id: vr.orderId }, data: { status: 'VOIDED' as any } });
 
       // Reverse stok — lookup resep per product
       for (const item of vr.order?.items || []) {
