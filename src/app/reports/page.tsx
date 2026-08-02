@@ -10,7 +10,7 @@ const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustu
 export default function ReportsPage() {
   const { user } = useAuthStore();
   const now = new Date();
-  const [tab, setTab]             = useState<'ringkasan'|'bahan_baku'|'target'>('ringkasan');
+  const [tab, setTab]             = useState<'ringkasan'|'bahan_baku'|'target'|'transaksi'|'produk'|'pembayaran'|'pengeluaran'>('ringkasan');
   const [period, setPeriod]       = useState<'weekly'|'monthly'>('monthly');
   const [selMonth, setSelMonth]   = useState(now.getMonth() + 1);
   const [selYear, setSelYear]     = useState(now.getFullYear());
@@ -274,7 +274,7 @@ export default function ReportsPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 border-b" style={{ borderColor: 'var(--border)' }}>
-          {[['ringkasan','📊 Ringkasan'],['bahan_baku','🥬 Bahan Baku'],['target','🎯 Target']].map(([key, label]) => (
+          {[['ringkasan','📊 Ringkasan'],['bahan_baku','🥬 Bahan Baku'],['target','🎯 Target'],['transaksi','🧾 Transaksi'],['produk','🍵 Produk'],['pembayaran','💳 Pembayaran'],['pengeluaran','💸 Pengeluaran']].map(([key, label]) => (
             <button key={key} onClick={() => setTab(key as any)}
               className={`px-4 py-2 text-sm font-semibold border-b-2 transition-all ${tab === key ? 'border-brand-600 text-brand-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
               style={tab === key ? { borderColor: 'var(--brand)', color: 'var(--brand)' } : {}}>
@@ -437,6 +437,26 @@ export default function ReportsPage() {
                 )}
               </div>
             )}
+
+            {/* Tab Transaksi */}
+            {tab === 'transaksi' && (
+              <TransaksiTab year={selYear} month={selMonth}/>
+            )}
+
+            {/* Tab Produk */}
+            {tab === 'produk' && (
+              <ProdukTab year={selYear} month={selMonth}/>
+            )}
+
+            {/* Tab Pembayaran */}
+            {tab === 'pembayaran' && (
+              <PembayaranTab year={selYear} month={selMonth}/>
+            )}
+
+            {/* Tab Pengeluaran */}
+            {tab === 'pengeluaran' && (
+              <PengeluaranTab year={selYear} month={selMonth}/>
+            )}
           </>
         )}
       </div>
@@ -494,5 +514,178 @@ export default function ReportsPage() {
         </div>
       </Modal>
     </AdminLayout>
+  );
+}
+
+// ── Report Tab Components ─────────────────────────────────────────────────────
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+
+function useReportData(year: number, month: number, type: string) {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const from = `${year}-${String(month).padStart(2,'0')}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const to = `${year}-${String(month).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+    setLoading(true);
+    api.get<any>(`/api/analytics?type=${type}&from=${from}&to=${to}`)
+      .then(setData).catch(() => {}).finally(() => setLoading(false));
+  }, [year, month, type]);
+  return { data, loading };
+}
+
+function TabLoader() {
+  return <div className="flex justify-center py-10"><div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor:'var(--brand)', borderTopColor:'transparent' }}/></div>;
+}
+
+function TransaksiTab({ year, month }: { year: number; month: number }) {
+  const { data, loading } = useReportData(year, month, 'transactions');
+  if (loading) return <TabLoader/>;
+  if (!data) return <p className="text-center py-8 text-gray-400">Tidak ada data</p>;
+  const orders = data.orders || [];
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          ['Total Order', orders.length],
+          ['Revenue', formatCurrency(data.revenue || 0)],
+          ['Avg Order', formatCurrency(data.avgOrder || 0)],
+          ['Void', (orders.filter((o: any) => o.status === 'VOIDED').length)],
+        ].map(([label, value]) => (
+          <div key={label as string} className="card p-4 text-center">
+            <p className="text-xs text-gray-400 mb-1">{label}</p>
+            <p className="font-black text-lg" style={{ color: 'var(--brand)' }}>{value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="card overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr style={{ background: 'var(--surface-2)' }}>
+            {['Tanggal','Order #','Customer','Total','Metode','Status'].map(h => (
+              <th key={h} className="px-3 py-2.5 text-left text-xs font-bold text-gray-400 uppercase">{h}</th>
+            ))}
+          </tr></thead>
+          <tbody className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {orders.slice(0,50).map((o: any) => (
+              <tr key={o.id} className="hover:bg-gray-50">
+                <td className="px-3 py-2 text-xs text-gray-500">{new Date(o.createdAt).toLocaleDateString('id-ID')}</td>
+                <td className="px-3 py-2 text-xs font-mono font-bold">#{o.orderNumber}</td>
+                <td className="px-3 py-2 text-xs">{o.billName || o.customer?.name || '—'}</td>
+                <td className="px-3 py-2 text-xs font-bold" style={{ color: 'var(--brand)' }}>{formatCurrency(o.total)}</td>
+                <td className="px-3 py-2 text-xs text-gray-500">{o.payment?.method || '—'}</td>
+                <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full font-bold ${o.status==='COMPLETED'?'bg-green-100 text-green-700':o.status==='VOIDED'?'bg-red-100 text-red-700':'bg-yellow-100 text-yellow-700'}`}>{o.status}</span></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ProdukTab({ year, month }: { year: number; month: number }) {
+  const { data, loading } = useReportData(year, month, 'products');
+  if (loading) return <TabLoader/>;
+  if (!data) return <p className="text-center py-8 text-gray-400">Tidak ada data</p>;
+  const products = data.products || [];
+  return (
+    <div className="card overflow-hidden">
+      <table className="w-full text-sm">
+        <thead><tr style={{ background: 'var(--surface-2)' }}>
+          {['#','Produk','Kategori','Terjual','Revenue','% Revenue'].map(h => (
+            <th key={h} className="px-3 py-2.5 text-left text-xs font-bold text-gray-400 uppercase">{h}</th>
+          ))}
+        </tr></thead>
+        <tbody className="divide-y" style={{ borderColor: 'var(--border)' }}>
+          {products.map((p: any, i: number) => (
+            <tr key={p.productId} className="hover:bg-gray-50">
+              <td className="px-3 py-2.5 text-xs text-gray-400">{i+1}</td>
+              <td className="px-3 py-2.5 text-sm font-semibold" style={{ color: 'var(--text-1)' }}>{p.name}</td>
+              <td className="px-3 py-2.5 text-xs text-gray-500">{p.category || '—'}</td>
+              <td className="px-3 py-2.5 text-sm font-bold" style={{ color: 'var(--brand)' }}>{p.qty?.toLocaleString('id-ID')}</td>
+              <td className="px-3 py-2.5 text-sm font-bold">{formatCurrency(p.revenue)}</td>
+              <td className="px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-1.5 rounded-full bg-gray-100"><div className="h-full rounded-full" style={{ width: `${p.revenuePct}%`, background: 'var(--brand)' }}/></div>
+                  <span className="text-xs text-gray-500">{p.revenuePct?.toFixed(1)}%</span>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PembayaranTab({ year, month }: { year: number; month: number }) {
+  const { data, loading } = useReportData(year, month, 'payments');
+  if (loading) return <TabLoader/>;
+  if (!data) return <p className="text-center py-8 text-gray-400">Tidak ada data</p>;
+  const methods = data.methods || [];
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-3">
+        {methods.map((m: any) => (
+          <div key={m.method} className="card p-4">
+            <p className="text-xs text-gray-400 mb-1">{m.method}</p>
+            <p className="font-black text-base" style={{ color: 'var(--brand)' }}>{formatCurrency(m.total)}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{m.count} transaksi</p>
+          </div>
+        ))}
+      </div>
+      <div className="card p-4">
+        <p className="font-bold text-sm mb-3" style={{ color: 'var(--text-1)' }}>Distribusi</p>
+        {methods.map((m: any) => (
+          <div key={m.method} className="flex items-center gap-3 mb-2">
+            <p className="text-sm w-20 text-gray-600">{m.method}</p>
+            <div className="flex-1 h-2.5 rounded-full bg-gray-100">
+              <div className="h-full rounded-full" style={{ width: `${m.pct}%`, background: 'var(--brand)' }}/>
+            </div>
+            <p className="text-sm font-bold w-12 text-right" style={{ color: 'var(--brand)' }}>{m.pct?.toFixed(0)}%</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PengeluaranTab({ year, month }: { year: number; month: number }) {
+  const { data, loading } = useReportData(year, month, 'expenses');
+  if (loading) return <TabLoader/>;
+  if (!data) return <p className="text-center py-8 text-gray-400">Tidak ada data</p>;
+  const categories = data.categories || [];
+  const items = data.items || [];
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {categories.map((c: any) => (
+          <div key={c.category} className="card p-4">
+            <p className="text-xs text-gray-400 mb-1">{c.category}</p>
+            <p className="font-black text-base" style={{ color: 'var(--brand)' }}>{formatCurrency(c.total)}</p>
+            <p className="text-xs text-gray-400 mt-0.5">{c.count} item</p>
+          </div>
+        ))}
+      </div>
+      <div className="card overflow-hidden">
+        <table className="w-full text-sm">
+          <thead><tr style={{ background: 'var(--surface-2)' }}>
+            {['Tanggal','Kategori','Keterangan','Jumlah'].map(h => (
+              <th key={h} className="px-3 py-2.5 text-left text-xs font-bold text-gray-400 uppercase">{h}</th>
+            ))}
+          </tr></thead>
+          <tbody className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {items.map((e: any) => (
+              <tr key={e.id} className="hover:bg-gray-50">
+                <td className="px-3 py-2.5 text-xs text-gray-500">{new Date(e.createdAt).toLocaleDateString('id-ID')}</td>
+                <td className="px-3 py-2.5"><span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">{e.category}</span></td>
+                <td className="px-3 py-2.5 text-sm text-gray-700">{e.description}</td>
+                <td className="px-3 py-2.5 text-sm font-bold text-red-500">{formatCurrency(e.amount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

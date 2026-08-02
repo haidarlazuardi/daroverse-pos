@@ -4,34 +4,27 @@ import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, withAuth } from '@/lib/api-helpers';
 import { getLowStockAlerts } from '@/lib/stock-engine';
+import { nowWIB, startOfDayWIB, startOfMonthWIB, startOfYearWIB } from '@/lib/wib';
 
 export const GET = withAuth(async (req, user) => {
   const { searchParams } = new URL(req.url);
   const period = searchParams.get('period') || 'today';
 
   // Date range
-  const now = new Date();
+  const now = nowWIB();
   let from: Date;
   switch (period) {
-    case 'today':
-      from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      break;
-    case 'week':
-      from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      break;
-    case 'month':
-      from = new Date(now.getFullYear(), now.getMonth(), 1);
-      break;
-    case 'year':
-      from = new Date(now.getFullYear(), 0, 1);
-      break;
-    default:
-      from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    case 'today':  from = startOfDayWIB(now); break;
+    case 'week':   from = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); break;
+    case 'month':  from = startOfMonthWIB(); break;
+    case 'year':   from = startOfYearWIB(); break;
+    default:       from = startOfDayWIB(now);
   }
+  const to = new Date(); // UTC now for query upper bound
 
   const where: Record<string, unknown> = {
     status: 'COMPLETED',
-    createdAt: { gte: from, lte: now },
+    createdAt: { gte: from, lte: to },
   };
 
   // Core metrics
@@ -44,11 +37,8 @@ export const GET = withAuth(async (req, user) => {
   const avgOrderValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0;
 
   // Expenses breakdown (WIB range)
-  const wibOffset = 7 * 60 * 60 * 1000;
-  const fromWIB = new Date(from.getTime() - wibOffset);
-  const toWIB   = new Date(now.getTime() - wibOffset);
   const expenses = await prisma.expense.findMany({
-    where: { createdAt: { gte: fromWIB, lte: toWIB } },
+    where: { createdAt: { gte: from, lte: to } },
     select: { amount: true, category: true },
   });
   const totalExpenses     = expenses.reduce((s, e) => s + e.amount, 0);

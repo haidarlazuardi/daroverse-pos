@@ -92,7 +92,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
   } catch {}
 
   return success(shift, 201);
-}, ALL_ROLES);
+}, ADMIN_ROLES);
 
 export const PATCH = withAuth(async (req: NextRequest, user) => {
   const { id, action, closingCash, notes } = await req.json();

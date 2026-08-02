@@ -1,4 +1,5 @@
 export const dynamic = 'force-dynamic';
+import { dateRangeWIB } from '@/lib/wib';
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, withAuth } from '@/lib/api-helpers';
@@ -159,6 +160,84 @@ export const GET = withAuth(async (req: NextRequest) => {
       expense:     Math.round(expense),
       purchase:    Math.round(purchase),
     });
+  }
+
+  // ── Transactions list ──────────────────────────────────────────────────────
+  if (type === 'transactions') {
+    const orders = await prisma.order.findMany({
+      where: { createdAt: { gte: from, lte: to } },
+      include: {
+        payment: { select: { method: true } },
+        customer: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+    const revenue = orders.filter(o => o.status === 'COMPLETED').reduce((s, o) => s + o.total, 0);
+    const avgOrder = orders.filter(o => o.status === 'COMPLETED').length > 0
+      ? revenue / orders.filter(o => o.status === 'COMPLETED').length : 0;
+    return success({ orders, revenue: Math.round(revenue), avgOrder: Math.round(avgOrder) });
+  }
+
+  // ── Products performance ───────────────────────────────────────────────────
+  if (type === 'products') {
+    const items = await prisma.orderItem.findMany({
+      where: { order: { status: 'COMPLETED', createdAt: { gte: from, lte: to } } },
+      include: { product: { include: { category: true } } },
+    });
+    const map = new Map<string, { name: string; category: string; qty: number; revenue: number }>();
+    for (const item of items) {
+      const key = item.productId;
+      const ex = map.get(key) || { name: item.product?.name || '—', category: item.product?.category?.name || '—', qty: 0, revenue: 0 };
+      ex.qty += item.quantity;
+      ex.revenue += item.subtotal;
+      map.set(key, ex);
+    }
+    const totalRevenue = [...map.values()].reduce((s, p) => s + p.revenue, 0);
+    const products = [...map.entries()]
+      .map(([productId, p]) => ({ productId, ...p, revenuePct: totalRevenue > 0 ? (p.revenue / totalRevenue) * 100 : 0 }))
+      .sort((a, b) => b.revenue - a.revenue);
+    return success({ products, totalRevenue: Math.round(totalRevenue) });
+  }
+
+  // ── Payment methods ────────────────────────────────────────────────────────
+  if (type === 'payments') {
+    const payments = await prisma.payment.findMany({
+      where: { order: { status: 'COMPLETED', createdAt: { gte: from, lte: to } } },
+      select: { method: true, amount: true },
+    });
+    const map = new Map<string, { total: number; count: number }>();
+    for (const p of payments) {
+      const ex = map.get(p.method) || { total: 0, count: 0 };
+      ex.total += p.amount;
+      ex.count += 1;
+      map.set(p.method, ex);
+    }
+    const grandTotal = [...map.values()].reduce((s, m) => s + m.total, 0);
+    const methods = [...map.entries()].map(([method, m]) => ({
+      method, total: Math.round(m.total), count: m.count,
+      pct: grandTotal > 0 ? (m.total / grandTotal) * 100 : 0,
+    })).sort((a, b) => b.total - a.total);
+    return success({ methods, grandTotal: Math.round(grandTotal) });
+  }
+
+  // ── Expenses ───────────────────────────────────────────────────────────────
+  if (type === 'expenses') {
+    const items = await prisma.expense.findMany({
+      where: { createdAt: { gte: from, lte: to } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const catMap = new Map<string, { total: number; count: number }>();
+    for (const e of items) {
+      const ex = catMap.get(e.category) || { total: 0, count: 0 };
+      ex.total += e.amount;
+      ex.count += 1;
+      catMap.set(e.category, ex);
+    }
+    const categories = [...catMap.entries()].map(([category, c]) => ({ category, ...c, total: Math.round(c.total) }))
+      .sort((a, b) => b.total - a.total);
+    const grandTotal = items.reduce((s, e) => s + e.amount, 0);
+    return success({ categories, items, grandTotal: Math.round(grandTotal) });
   }
 
   return error('type tidak valid');

@@ -15,7 +15,7 @@ export const GET = withAuth(async (_req: NextRequest, user) => {
     prisma.user.findUnique({
       where: { id: user.userId },
       select: { id:true, name:true, role:true, employeeType:true, dailyRate:true,
-                bankName:true, bankAccount:true, joinDate:true },
+                bankName:true, bankAccount:true, hasPosAccess:true, joinDate:true },
     }),
     (prisma as any).attendance.findMany({
       where: { userId: user.userId, type: 'CHECK_IN', createdAt: { gte: monthStart, lte: monthEnd } },

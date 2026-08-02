@@ -1228,3 +1228,22 @@ model Leave {
 
   @@map("leaves")
 }
+
+// ── MULTI-LEVEL UNIT ──────────────────────────────────────────────────────────
+// Contoh: Susu Freshmilk → base: ml
+//   Level 1: pack  = 946 ml    (toBase: 946)
+//   Level 2: karton = 12 pack  (toBase: 946 × 12 = 11352)
+model IngredientUnit {
+  id           String     @id @default(cuid())
+  ingredientId String
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  name         String     // "pack", "karton", "kg", "sak"
+  toBase       Float      // berapa base unit per 1 unit ini (ml/gram/pcs)
+  parentUnit   String?    // nama unit parent, null jika langsung ke base
+  parentQty    Float?     // berapa unit parent per 1 unit ini
+  sortOrder    Int        @default(0) // 0=terkecil, ascending
+  createdAt    DateTime   @default(now())
+
+  @@unique([ingredientId, name])
+  @@map("ingredient_units")
+}

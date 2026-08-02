@@ -92,7 +92,7 @@ export default function StaffHub() {
         </BottomSheet>
       )}
 
-      <BottomNav/>
+      <BottomNav hasPosAccess={false}/>
     </div>
   );
 }

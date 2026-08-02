@@ -565,6 +565,17 @@ export default function BahanBakuPage() {
               className="rounded border-gray-300" />
             <label htmlFor="isPackaging" className="text-sm" style={{ color: 'var(--text-1)' }}>Packaging (cup, box, dll)</label>
           </div>
+
+          {/* Multi-level unit — only show when editing existing ingredient */}
+          {editingRaw && (
+            <div className="pt-4 border-t" style={{ borderColor: 'var(--border)' }}>
+              <p className="font-bold text-sm mb-1" style={{ color: 'var(--text-1)' }}>Satuan Tambahan</p>
+              <p className="text-xs mb-3" style={{ color: 'var(--text-3)' }}>
+                Definisikan satuan beli yang berbeda (maks 3 level). Contoh: pack → karton
+              </p>
+              <UnitManager ingredientId={editingRaw.id} baseUnit={rawForm.unit}/>
+            </div>
+          )}
         </div>
       </SlideOver>
 
@@ -748,5 +759,122 @@ export default function BahanBakuPage() {
         </div>
       </Modal>
     </AdminLayout>
+  );
+}
+
+// ── Unit Manager Component ────────────────────────────────────────────────────
+function UnitManager({ ingredientId, baseUnit }: { ingredientId: string; baseUnit: string }) {
+  const [units, setUnits] = useState<any[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ name: '', parentUnit: '', parentQty: '' });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.get<any[]>(`/api/ingredient-units?ingredientId=${ingredientId}`)
+      .then(r => setUnits(Array.isArray(r) ? r : [])).catch(() => {});
+  }, [ingredientId]);
+
+  async function addUnit() {
+    if (!form.name || !form.parentQty) return;
+    setSaving(true);
+    try {
+      const u = await api.post<any>('/api/ingredient-units', {
+        ingredientId,
+        name: form.name,
+        parentUnit: form.parentUnit || null,
+        parentQty: parseFloat(form.parentQty),
+      });
+      setUnits(p => [...p, u]);
+      setForm({ name: '', parentUnit: '', parentQty: '' });
+      setAdding(false);
+    } catch(e: any) { alert(e.message); }
+    finally { setSaving(false); }
+  }
+
+  async function deleteUnit(id: string) {
+    if (!confirm('Hapus satuan ini?')) return;
+    await api.delete(`/api/ingredient-units?id=${id}`);
+    setUnits(p => p.filter(u => u.id !== id));
+  }
+
+  return (
+    <div className="space-y-2">
+      {/* Existing units */}
+      {units.length > 0 && (
+        <div className="rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
+          <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase" style={{ background: 'var(--surface-2)' }}>
+            Satuan yang terdaftar
+          </div>
+          {units.map((u, i) => (
+            <div key={u.id} className="flex items-center justify-between px-3 py-2.5 border-t text-sm"
+              style={{ borderColor: 'var(--border)' }}>
+              <div>
+                <span className="font-bold" style={{ color: 'var(--text-1)' }}>1 {u.name}</span>
+                <span className="text-gray-400 mx-1">=</span>
+                {u.parentUnit
+                  ? <span className="text-gray-600">{u.parentQty} {u.parentUnit} = {u.toBase.toLocaleString('id-ID')} {baseUnit}</span>
+                  : <span className="text-gray-600">{u.toBase.toLocaleString('id-ID')} {baseUnit}</span>
+                }
+              </div>
+              <button onClick={() => deleteUnit(u.id)} className="text-red-400 hover:text-red-600 text-xs px-2 py-1 rounded hover:bg-red-50">
+                Hapus
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Add form */}
+      {adding ? (
+        <div className="rounded-xl border p-3 space-y-2.5" style={{ borderColor: 'var(--border)' }}>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="label text-xs">Nama Satuan</label>
+              <input value={form.name} onChange={e => setForm(p => ({...p, name: e.target.value}))}
+                className="input w-full" placeholder="cth. pack, karton, sak"/>
+            </div>
+            <div>
+              <label className="label text-xs">
+                {form.parentUnit ? `Jumlah ${form.parentUnit}` : `Isi (${baseUnit})`}
+              </label>
+              <input type="number" value={form.parentQty} onChange={e => setForm(p => ({...p, parentQty: e.target.value}))}
+                className="input w-full" placeholder="cth. 12"/>
+            </div>
+          </div>
+          {units.length > 0 && (
+            <div>
+              <label className="label text-xs">Satuan Parent (opsional — kosongkan jika langsung ke {baseUnit})</label>
+              <select value={form.parentUnit} onChange={e => setForm(p => ({...p, parentUnit: e.target.value}))}
+                className="select w-full">
+                <option value="">Langsung ke {baseUnit}</option>
+                {units.map(u => <option key={u.id} value={u.name}>{u.name}</option>)}
+              </select>
+            </div>
+          )}
+          {form.name && form.parentQty && (
+            <p className="text-xs font-medium" style={{ color: 'var(--brand)' }}>
+              Preview: 1 {form.name} = {form.parentUnit
+                ? `${form.parentQty} ${form.parentUnit} = ${((units.find(u=>u.name===form.parentUnit)?.toBase||1)*parseFloat(form.parentQty||'0')).toLocaleString('id-ID')} ${baseUnit}`
+                : `${parseFloat(form.parentQty||'0').toLocaleString('id-ID')} ${baseUnit}`
+              }
+            </p>
+          )}
+          <div className="flex gap-2">
+            <button onClick={() => { setAdding(false); setForm({ name:'',parentUnit:'',parentQty:'' }); }}
+              className="btn btn-secondary btn-sm flex-1">Batal</button>
+            <button onClick={addUnit} disabled={saving || !form.name || !form.parentQty}
+              className="btn btn-primary btn-sm flex-1">{saving ? 'Menyimpan...' : 'Tambah'}</button>
+          </div>
+        </div>
+      ) : (
+        units.length < 3 && (
+          <button onClick={() => setAdding(true)}
+            className="w-full py-2 rounded-xl border border-dashed text-sm font-medium"
+            style={{ borderColor: 'var(--border)', color: 'var(--text-3)' }}>
+            + Tambah Satuan {units.length === 0 ? '(mis. pack, karton)' : 'Level ' + (units.length + 1)}
+          </button>
+        )
+      )}
+    </div>
   );
 }
