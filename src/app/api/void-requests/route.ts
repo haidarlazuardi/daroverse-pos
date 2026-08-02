@@ -86,7 +86,7 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
             update: { quantity: { increment: qty } },
           });
           await (tx as any).stockMovement.create({
-            data: { ingredientId: ri.ingredientId, location: 'BAR', type: 'VOID_REVERSE', quantity: qty,
+            data: { ingredientId: ri.ingredientId, location: 'BAR', type: 'VOID_RETURN', quantity: qty,
               notes: `Void order #${vr.order?.orderNumber}`, createdBy: user.userId },
           });
         }

@@ -42,7 +42,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
           data: {
             ingredientId: item.ingredientId,
             location: srcLoc,
-            type: 'PRODUCTION_USE',
+            type: 'PRODUCTION',
             quantity: -needed,
             notes: `Batch ${ing.name} ×${mult}`,
             createdBy: user.userId,
@@ -60,7 +60,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
         data: {
           ingredientId,
           location,
-          type: 'PRODUCTION_MAKE',
+          type: 'PRODUCTION',
           quantity: produced,
           notes: actualYield
             ? `Batch ×${mult} (yield aktual: ${produced} ${ing.unit})`

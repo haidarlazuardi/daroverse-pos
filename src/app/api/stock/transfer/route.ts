@@ -39,9 +39,9 @@ async function handleTransfer(req: NextRequest, userId: string) {
     });
     await (tx as any).stockMovement.createMany({
       data: [
-        { ingredientId, location: fromLocation, type: 'TRANSFER_OUT', quantity: -quantity,
+        { ingredientId, location: fromLocation, type: 'TRANSFER', quantity: -quantity,
           notes: notes || `Transfer ke ${toLocation}`, createdBy: userId },
-        { ingredientId, location: toLocation, type: 'TRANSFER_IN', quantity,
+        { ingredientId, location: toLocation, type: 'TRANSFER', quantity,
           notes: notes || `Transfer dari ${fromLocation}`, createdBy: userId },
       ],
     });

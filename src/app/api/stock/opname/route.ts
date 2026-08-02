@@ -36,7 +36,7 @@ export const POST = withAuth(async (req: NextRequest, user) => {
           await (tx as any).stockMovement.create({
             data: {
               ingredientId, location,
-              type: diff > 0 ? 'OPNAME_PLUS' : 'OPNAME_MINUS',
+              type: 'OPNAME',
               quantity: diff,
               notes: `Opname adjustment by ${user.name}`,
               createdBy: user.userId,
