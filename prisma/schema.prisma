@@ -548,6 +548,7 @@ model Order {
   stockReturned Boolean  @default(false)
   items        OrderItem[]
   payment      Payment?
+  voidRequests VoidRequest[]
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
