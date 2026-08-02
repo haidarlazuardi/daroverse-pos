@@ -355,18 +355,7 @@ export default function PurchaseOrdersPage() {
         </div>
 
         {viewMode === 'requests' && (
-          <div className="space-y-3">
-            {loadingRequests ? (
-              <div className="flex justify-center py-10"><div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor:'var(--brand)',borderTopColor:'transparent' }}/></div>
-            ) : requests.length === 0 ? (
-              <div className="card text-center py-12">
-                <p className="text-3xl mb-2">📋</p>
-                <p style={{ color:'var(--text-3)' }}>Tidak ada request pending dari staff</p>
-              </div>
-            ) : requests.map((req: any) => (
-              <RequestCard key={req.id} req={req} suppliers={suppliers} onGeneratePO={generatePO} onReject={rejectRequest}/>
-            ))}
-          </div>
+          <RequestsView requests={requests} suppliers={suppliers} loading={loadingRequests} onRefresh={loadRequests}/>
         )}
 
         {viewMode === 'po' && (
@@ -525,88 +514,220 @@ export default function PurchaseOrdersPage() {
   );
 }
 
-function RequestCard({ req, suppliers, onGeneratePO, onReject }: any) {
-  const [supplierId, setSupplierId] = useState('');
-  const [expanded, setExpanded] = useState(false);
+// ── RequestsView — flat item list with per-item supplier assignment ─────────
+function RequestsView({ requests, suppliers, loading, onRefresh }: any) {
+  // Flatten all items from all pending requests
+  const [supplierMap, setSupplierMap] = useState<Record<string, string>>({});
+  const [generating, setGenerating] = useState(false);
+  const [rejecting, setRejecting] = useState<string | null>(null);
+
+  // Build flat item list: { key, requestId, requestedBy, ingredientId, name, qty, unit, estPrice }
+  const allItems = requests.flatMap((req: any) =>
+    req.items.map((item: any) => ({
+      key:         `${req.id}-${item.id}`,
+      requestId:   req.id,
+      itemId:      item.id,
+      requestedBy: req.user?.name || '—',
+      createdAt:   req.createdAt,
+      ingredientId: item.ingredientId,
+      name:        item.ingredient?.name || '—',
+      qty:         item.quantity,
+      unit:        item.unit,
+      estPrice:    (item.ingredient?.latestPrice || 0) * (item.ingredient?.conversionRate || 1) * item.quantity,
+    }))
+  );
+
+  // Auto-assign: if ingredient has a default supplier, pre-fill
+  useEffect(() => {
+    // could be extended with ingredient.defaultSupplierId
+  }, [requests]);
+
+  const setSupplier = (key: string, supplierId: string) =>
+    setSupplierMap(p => ({ ...p, [key]: supplierId }));
+
+  // Preview: group by supplier
+  const assignedItems = allItems.filter(i => supplierMap[i.key]);
+  const unassignedCount = allItems.length - assignedItems.length;
+
+  const preview = assignedItems.reduce((acc: any, item: any) => {
+    const sid = supplierMap[item.key];
+    if (!acc[sid]) acc[sid] = { name: suppliers.find((s: any) => s.id === sid)?.name || sid, items: [] };
+    acc[sid].items.push(item);
+    return acc;
+  }, {} as Record<string, { name: string; items: any[] }>);
+
+  async function generateAll() {
+    if (unassignedCount > 0) {
+      if (!confirm(`${unassignedCount} bahan belum di-assign supplier. Generate PO untuk yang sudah di-assign saja?`)) return;
+    }
+    if (Object.keys(preview).length === 0) { alert('Tidak ada item yang di-assign'); return; }
+    setGenerating(true);
+    try {
+      const poNumbers: string[] = [];
+      const fulfilledRequestIds = new Set<string>();
+
+      for (const [supplierId, group] of Object.entries(preview) as [string, any][]) {
+        // Build PO items
+        const poItems = group.items.map((item: any) => ({
+          ingredientId: item.ingredientId,
+          quantity:     item.qty,
+          unitPrice:    item.estPrice / item.qty || 0,
+        }));
+
+        const po = await api.post<any>('/api/purchase-orders', {
+          supplierId,
+          notes: `Dari request staff: ${[...new Set(group.items.map((i: any) => i.requestedBy))].join(', ')}`,
+          items: poItems,
+        });
+        poNumbers.push(po.poNumber || po.po?.poNumber || supplierId);
+
+        // Mark request IDs fulfilled
+        group.items.forEach((i: any) => fulfilledRequestIds.add(i.requestId));
+      }
+
+      // Mark all fulfilled requests
+      for (const rid of fulfilledRequestIds) {
+        await api.patch('/api/purchase-requests', { id: rid, status: 'FULFILLED' }).catch(() => {});
+      }
+
+      setSupplierMap({});
+      alert(`✅ ${poNumbers.length} PO berhasil dibuat:\n${poNumbers.join(', ')}`);
+      onRefresh();
+    } catch(e: any) {
+      alert('Gagal: ' + e.message);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function rejectRequest(requestId: string) {
+    if (!confirm('Tolak seluruh request ini?')) return;
+    setRejecting(requestId);
+    try {
+      await api.patch('/api/purchase-requests', { id: requestId, status: 'REJECTED' });
+      onRefresh();
+    } catch(e: any) { alert(e.message); }
+    finally { setRejecting(null); }
+  }
+
+  if (loading) return (
+    <div className="flex justify-center py-10">
+      <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor:'var(--brand)', borderTopColor:'transparent' }}/>
+    </div>
+  );
+
+  if (allItems.length === 0) return (
+    <div className="card text-center py-12">
+      <p className="text-3xl mb-2">📋</p>
+      <p style={{ color:'var(--text-3)' }}>Tidak ada request pending dari staff</p>
+    </div>
+  );
 
   return (
-    <div className="card overflow-hidden">
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3 mb-3">
-          <div>
-            <p className="font-bold text-sm" style={{ color:'var(--text-1)' }}>
-              Request dari {req.user?.name}
-            </p>
-            <p className="text-xs mt-0.5" style={{ color:'var(--text-3)' }}>
-              {new Date(req.createdAt).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
-              {req.notes && ` · ${req.notes}`}
-            </p>
-          </div>
-          <button onClick={() => setExpanded(!expanded)} className="text-xs font-medium" style={{ color:'var(--brand)' }}>
-            {expanded ? 'Tutup' : `Lihat ${req.items.length} bahan`}
-          </button>
-        </div>
+    <div className="space-y-4">
+      <p className="text-sm" style={{ color:'var(--text-3)' }}>
+        Assign supplier per bahan, lalu generate PO sekaligus. Bahan dari supplier yang sama otomatis digabung dalam 1 PO.
+      </p>
 
-        {/* Item summary */}
-        <div className="flex flex-wrap gap-1.5 mb-3">
-          {req.items.map((item: any) => (
-            <span key={item.id} className="text-xs px-2 py-1 rounded-full font-medium"
-              style={{ background:'var(--surface-2)', color:'var(--text-2)' }}>
-              {item.ingredient.name} × {item.quantity} {item.unit}
+      {/* Flat item table */}
+      <div className="card overflow-hidden">
+        <div className="px-4 py-3 border-b flex justify-between items-center" style={{ borderColor:'var(--border)', background:'var(--surface-2)' }}>
+          <p className="text-xs font-bold uppercase tracking-wide" style={{ color:'var(--text-3)' }}>
+            {allItems.length} item dari {requests.length} request
+          </p>
+          {unassignedCount > 0 && (
+            <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ background:'var(--surface-1)', color:'var(--text-3)' }}>
+              {unassignedCount} belum di-assign
             </span>
-          ))}
+          )}
         </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr style={{ background:'var(--surface-2)', borderBottom:'1px solid var(--border)' }}>
+              {['Bahan','Qty','Diminta oleh','Est. Harga','Supplier',''].map(h => (
+                <th key={h} className="px-3 py-2.5 text-left text-xs font-bold uppercase" style={{ color:'var(--text-3)' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y" style={{ borderColor:'var(--border)' }}>
+            {allItems.map(item => (
+              <tr key={item.key} className="hover:bg-gray-50 transition-colors">
+                <td className="px-3 py-3 font-semibold" style={{ color:'var(--text-1)' }}>{item.name}</td>
+                <td className="px-3 py-3 font-bold" style={{ color:'var(--brand)' }}>{item.qty} {item.unit}</td>
+                <td className="px-3 py-3">
+                  <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ background:'var(--surface-2)', color:'var(--text-2)' }}>
+                    {item.requestedBy}
+                  </span>
+                </td>
+                <td className="px-3 py-3 text-sm" style={{ color:'var(--text-3)' }}>
+                  {item.estPrice > 0 ? formatCurrency(Math.round(item.estPrice)) : '—'}
+                </td>
+                <td className="px-3 py-3" style={{ minWidth: 180 }}>
+                  <select
+                    value={supplierMap[item.key] || ''}
+                    onChange={e => setSupplier(item.key, e.target.value)}
+                    className="input text-sm w-full"
+                    style={{
+                      borderColor: supplierMap[item.key] ? 'var(--brand)' : 'var(--border)',
+                      color: supplierMap[item.key] ? 'var(--brand)' : 'var(--text-3)',
+                    }}>
+                    <option value="">Pilih supplier...</option>
+                    {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </td>
+                <td className="px-3 py-3">
+                  <button onClick={() => rejectRequest(item.requestId)}
+                    disabled={rejecting === item.requestId}
+                    className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition-colors">
+                    Tolak
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-        {/* Expanded detail */}
-        {expanded && (
-          <div className="mb-3 rounded-xl overflow-hidden border" style={{ borderColor:'var(--border)' }}>
-            <table className="w-full text-xs">
-              <thead>
-                <tr style={{ background:'var(--surface-2)' }}>
-                  <th className="px-3 py-2 text-left font-bold" style={{ color:'var(--text-3)' }}>Bahan</th>
-                  <th className="px-3 py-2 text-right font-bold" style={{ color:'var(--text-3)' }}>Qty</th>
-                  <th className="px-3 py-2 text-right font-bold" style={{ color:'var(--text-3)' }}>Est. Harga</th>
-                </tr>
-              </thead>
-              <tbody>
-                {req.items.map((item: any) => {
-                  const estPrice = (item.ingredient.latestPrice||0) * (item.ingredient.conversionRate||1) * item.quantity;
-                  return (
-                    <tr key={item.id} className="border-t" style={{ borderColor:'var(--border)' }}>
-                      <td className="px-3 py-2" style={{ color:'var(--text-1)' }}>
-                        <p className="font-medium">{item.ingredient.name}</p>
-                        {item.notes && <p className="text-gray-400">{item.notes}</p>}
-                      </td>
-                      <td className="px-3 py-2 text-right font-bold" style={{ color:'var(--text-1)' }}>
-                        {item.quantity} {item.unit}
-                      </td>
-                      <td className="px-3 py-2 text-right" style={{ color:'var(--text-2)' }}>
-                        {estPrice > 0 ? `Rp ${Math.round(estPrice).toLocaleString('id-ID')}` : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+      {/* Preview grouping */}
+      {Object.keys(preview).length > 0 && (
+        <div className="rounded-xl p-4 border" style={{ borderColor:'var(--brand)', background:'var(--brand)08' }}>
+          <p className="text-xs font-bold uppercase tracking-wide mb-3" style={{ color:'var(--brand)' }}>
+            Preview PO yang akan dibuat ({Object.keys(preview).length} PO)
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(preview).map(([sid, group]: [string, any]) => (
+              <div key={sid} className="rounded-xl px-3 py-2 border bg-white" style={{ borderColor:'var(--border)' }}>
+                <p className="text-sm font-bold" style={{ color:'var(--text-1)' }}>{group.name}</p>
+                <p className="text-xs mt-0.5" style={{ color:'var(--text-3)' }}>
+                  {group.items.length} bahan · {formatCurrency(Math.round(group.items.reduce((s: number, i: any) => s + i.estPrice, 0)))}
+                </p>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {group.items.map((i: any) => (
+                    <span key={i.key} className="text-xs px-1.5 py-0.5 rounded" style={{ background:'var(--surface-2)', color:'var(--text-2)' }}>
+                      {i.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {unassignedCount > 0 && (
+              <div className="rounded-xl px-3 py-2 border" style={{ borderColor:'var(--border)', background:'var(--surface-2)' }}>
+                <p className="text-sm font-bold" style={{ color:'var(--text-3)' }}>{unassignedCount} bahan</p>
+                <p className="text-xs mt-0.5" style={{ color:'var(--text-3)' }}>belum di-assign</p>
+              </div>
+            )}
           </div>
-        )}
-
-        {/* Generate PO */}
-        <div className="flex gap-2">
-          <select value={supplierId} onChange={e => setSupplierId(e.target.value)}
-            className="input text-sm flex-1">
-            <option value="">Pilih supplier...</option>
-            {suppliers.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-          <button onClick={() => onGeneratePO(req.id, supplierId)} disabled={!supplierId}
-            className="btn btn-primary btn-sm px-4 disabled:opacity-50">
-            Buat PO
-          </button>
-          <button onClick={() => onReject(req.id)}
-            className="btn btn-sm px-3 text-red-500 border border-red-200 hover:bg-red-50">
-            Tolak
-          </button>
         </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex justify-end gap-3">
+        <button onClick={() => setSupplierMap({})} className="btn btn-secondary btn-md">Reset</button>
+        <Button
+          onClick={generateAll}
+          disabled={generating || Object.keys(preview).length === 0}>
+          {generating ? 'Membuat PO...' : `🛒 Generate ${Object.keys(preview).length} PO`}
+        </Button>
       </div>
     </div>
   );
