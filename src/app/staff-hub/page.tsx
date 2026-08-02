@@ -1,6 +1,5 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store';
 import { api } from '@/lib/fetch';
 import { formatCurrency } from '@/components/ui';
@@ -24,7 +23,6 @@ const TILES = [
 ];
 
 export default function StaffHub() {
-  const router = useRouter();
   const { user, hydrate } = useAuthStore();
   const [sheet, setSheet]         = useState<Sheet>(null);
   const [ingredients, setIngredients] = useState<any[]>([]);
