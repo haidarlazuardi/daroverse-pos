@@ -170,16 +170,10 @@ export default function PurchaseOrdersPage() {
       const convRate = item.ingredient.conversionRate || 1;
       const pu = item.ingredient.purchaseUnit || item.ingredient.unit;
       const numLabels = Math.ceil(item.quantity);
+      const baseUrl = window.location.origin;
       for (let i = 0; i < numLabels; i++) {
-        const qrText = JSON.stringify({
-          ingredientId: item.ingredient.id,
-          name: item.ingredient.name,
-          qty: convRate,
-          unit: item.ingredient.unit,
-          purchaseUnit: pu,
-          batchDate,
-          poNumber: po.poNumber,
-        });
+        // QR = URL yang bisa dibuka di HP langsung
+        const qrText = `${baseUrl}/scan/${item.ingredient.id}`;
         const data = await buildQRLabel({
           name: item.ingredient.name,
           qrText,

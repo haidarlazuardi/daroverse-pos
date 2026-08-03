@@ -222,20 +222,18 @@ export async function buildQRLabel(data: {
 
 async function generateQRBitmap(text: string, _size: number): Promise<number[]> {
   try {
-    const W = 360; // full width 58mm = ~384 dots, leave small margin
-    // Fetch QR at full printer width for maximum readability
-    const url = `https://api.qrserver.com/v1/create-qr-code/?size=${W}x${W}&format=png&margin=4&data=${encodeURIComponent(text)}`;
-    const res  = await fetch(url);
-    const blob = await res.blob();
-    const img  = await createImageBitmap(blob);
-
+    const W = 360;
+    // Generate QR locally via qrcode library — no external fetch needed
+    const QRCode = (await import('qrcode')).default;
     const canvas = document.createElement('canvas');
     canvas.width = W; canvas.height = W;
+    await QRCode.toCanvas(canvas, text, {
+      width: W,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#000000', light: '#ffffff' },
+    });
     const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, W, W);
-    ctx.drawImage(img, 0, 0, W, W);
-
     const imageData = ctx.getImageData(0, 0, W, W);
     return imageDataToESCPOS(imageData, W, W);
   } catch {
