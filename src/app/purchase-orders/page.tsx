@@ -531,10 +531,19 @@ function RequestsView({ requests, suppliers, loading, onRefresh }: any) {
     }))
   );
 
-  // Auto-assign: if ingredient has a default supplier, pre-fill
+  // Auto-assign dari defaultSupplierId per bahan
   useEffect(() => {
-    // could be extended with ingredient.defaultSupplierId
-  }, [requests]);
+    if (!requests.length || !suppliers.length) return;
+    const autoMap: Record<string, string> = {};
+    requests.flatMap((req: any) => req.items).forEach((item: any) => {
+      const key = `${item.requestId || ''}-${item.id}`;
+      const defSup = item.ingredient?.defaultSupplierId;
+      if (defSup) autoMap[key] = defSup;
+    });
+    if (Object.keys(autoMap).length > 0) {
+      setSupplierMap(prev => ({ ...autoMap, ...prev })); // prev wins (user override)
+    }
+  }, [requests, suppliers]);
 
   const setSupplier = (key: string, supplierId: string) =>
     setSupplierMap(p => ({ ...p, [key]: supplierId }));

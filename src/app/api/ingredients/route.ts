@@ -21,6 +21,7 @@ export const GET = withAuth(async (req) => {
     include: {
       stockLevels: true,
       prepRecipe: { include: { items: { include: { ingredient: true } } } },
+      defaultSupplier: { select: { id: true, name: true } },
     },
     orderBy: { name: 'asc' },
   });
@@ -106,6 +107,7 @@ export const PATCH = withAuth(async (req) => {
   if (data.latestPrice !== undefined)     updateData.latestPrice    = parseFloat(data.latestPrice);
   if (data.defaultLocation !== undefined) updateData.defaultLocation = data.defaultLocation || null;
   if (data.isPackaging !== undefined)     updateData.isPackaging    = !!data.isPackaging;
+  if (data.defaultSupplierId !== undefined) updateData.defaultSupplierId = data.defaultSupplierId || null;
 
   const ingredient = await prisma.ingredient.update({ where: { id }, data: updateData, include: { stockLevels: true, prepRecipe: { include: { items: { include: { ingredient: true } } } } } });
 

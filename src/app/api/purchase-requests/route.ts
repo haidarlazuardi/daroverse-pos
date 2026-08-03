@@ -15,7 +15,7 @@ export const GET = withAuth(async (req: NextRequest) => {
       user: { select: { name: true } },
       items: {
         include: {
-          ingredient: { select: { name: true, unit: true, purchaseUnit: true, conversionRate: true, latestPrice: true } }
+          ingredient: { select: { name: true, unit: true, purchaseUnit: true, conversionRate: true, latestPrice: true, defaultSupplierId: true } }
         }
       }
     },

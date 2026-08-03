@@ -26,6 +26,7 @@ interface PrepIngredient extends Ingredient {
 const EMPTY_RAW = {
   name: '', type: 'RAW', unit: 'g', purchaseUnit: '', conversionRate: '',
   latestPrice: '', purchasePrice: '', minStock: '', defaultLocation: 'GUDANG', isPackaging: false,
+  defaultSupplierId: '',
 };
 const EMPTY_PREP = { name: '', unit: 'ml', yieldQty: '', yieldUnit: 'ml', minStock: '', latestPrice: '', shelfLifeDays: '', steps: [] as { title: string; description: string }[] };
 const UNITS = ['g','ml','pcs','kg','liter','botol','pack','kaleng','lembar','buah'];
@@ -58,6 +59,7 @@ export default function BahanBakuPage() {
   const [editingRaw, setEditingRaw] = useState<Ingredient | null>(null);
   const [rawForm, setRawForm]     = useState({ ...EMPTY_RAW });
   const [savingRaw, setSavingRaw] = useState(false);
+  const [suppliers, setSuppliers] = useState<any[]>([]);
 
   // PREPPED form
   const [prepSlide, setPrepSlide]   = useState(false);
@@ -74,12 +76,16 @@ export default function BahanBakuPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<any[]>('/api/ingredients');
+      const [res, sups] = await Promise.all([
+        api.get<any[]>('/api/ingredients'),
+        api.get<any[]>('/api/suppliers').catch(() => []),
+      ]);
       const raw  = res.filter((i: any) => i.type === 'RAW'     && i.active);
       const prep = res.filter((i: any) => i.type === 'PREPPED'  && i.active);
       setRawData(raw);
       setRawAll(raw);
       setPrepData(prep);
+      setSuppliers(Array.isArray(sups) ? sups : (sups as any)?.suppliers || []);
     } catch { /* silent */ }
     finally { setLoading(false); }
   }, []);
@@ -102,6 +108,7 @@ export default function BahanBakuPage() {
       minStock: String(ing.minStock),
       defaultLocation: (ing as any).defaultLocation || (ing.type === 'RAW' ? 'GUDANG' : ''),
       isPackaging: (ing as any).isPackaging || false,
+      defaultSupplierId: (ing as any).defaultSupplierId || '',
     });
     setRawSlide(true);
   }
@@ -124,6 +131,7 @@ export default function BahanBakuPage() {
         minStock: parseFloat(rawForm.minStock) || 0,
         defaultLocation: rawForm.defaultLocation || null,
         isPackaging: rawForm.isPackaging,
+        defaultSupplierId: (rawForm as any).defaultSupplierId || null,
         active: true,
       };
       if (editingRaw) await api.patch('/api/ingredients', { id: editingRaw.id, ...payload });
@@ -565,6 +573,25 @@ export default function BahanBakuPage() {
               className="rounded border-gray-300" />
             <label htmlFor="isPackaging" className="text-sm" style={{ color: 'var(--text-1)' }}>Packaging (cup, box, dll)</label>
           </div>
+
+          {/* Supplier Default */}
+          {suppliers.length > 0 && (
+            <div className="pt-2">
+              <label className="label">Supplier Default</label>
+              <select
+                value={(rawForm as any).defaultSupplierId || ''}
+                onChange={e => setRawForm(p => ({ ...p, defaultSupplierId: e.target.value }))}
+                className="select w-full mt-1">
+                <option value="">Belum ditentukan</option>
+                {suppliers.map((s: any) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-3)' }}>
+                Akan otomatis ter-assign saat generate PO dari request staff
+              </p>
+            </div>
+          )}
 
           {/* Multi-level unit — only show when editing existing ingredient */}
           {editingRaw && (

@@ -347,6 +347,10 @@ model Ingredient {
   isPackaging     Boolean        @default(false) // cup, box, lid — consumable packaging
   active          Boolean        @default(true)
 
+  // ── Supplier default ──
+  defaultSupplierId String?
+  defaultSupplier   Supplier? @relation("IngredientDefaultSupplier", fields: [defaultSupplierId], references: [id])
+
   // ── Relations ──
   prepRecipe      Recipe?               @relation("PrepRecipe") // if PREPPED → batch recipe
   recipeItems     RecipeItem[]          @relation("RecipeUsage") // used in product/batch recipes
@@ -699,6 +703,7 @@ model Supplier {
   address        String?
   active         Boolean         @default(true)
   purchaseOrders PurchaseOrder[]
+  defaultIngredients Ingredient[] @relation("IngredientDefaultSupplier")
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
