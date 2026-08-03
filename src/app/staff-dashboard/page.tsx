@@ -1,6 +1,5 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store';
 import { api } from '@/lib/fetch';
 import { formatCurrency } from '@/components/ui';
@@ -11,7 +10,6 @@ const DAYS = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
 export default function StaffDashboard() {
-  const router = useRouter();
   const { user, hydrate } = useAuthStore();
   const [data, setData]   = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -19,7 +17,6 @@ export default function StaffDashboard() {
   useEffect(() => { hydrate(); }, [hydrate]);
   useEffect(() => {
     if (!user) return;
-    if (['OWNER','MANAGER','SUPER_ADMIN'].includes(user.role)) { router.replace('/dashboard'); return; }
     api.get<any>('/api/staff/me').then(setData).finally(() => setLoading(false));
   }, [user]);
 
@@ -47,7 +44,7 @@ export default function StaffDashboard() {
             <p className="text-green-200 text-xs font-medium tracking-widest uppercase mb-1">{today}</p>
             <h1 className="text-white font-black text-2xl leading-tight">Halo, {user.name.split(' ')[0]} 👋</h1>
           </div>
-          <button onClick={() => { useAuthStore.getState().logout(); router.replace('/login'); }}
+          <button onClick={() => { useAuthStore.getState().logout(); window.location.href = '/login'; }}
             className="w-9 h-9 rounded-full flex items-center justify-center mt-1"
             style={{ background: 'rgba(255,255,255,0.15)' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
