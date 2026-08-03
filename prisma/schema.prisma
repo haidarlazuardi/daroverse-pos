@@ -181,6 +181,7 @@ model User {
   purchaseRequests   PurchaseRequest[]
   voidRequests       VoidRequest[]    @relation("VoidRequests")
   leaves             Leave[]
+  scheduleSlots      ScheduleSlot[]   @relation("ScheduleSlots")
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -1057,10 +1058,14 @@ model WorkSchedule {
   id              String        @id @default(cuid())
   userId          String
   user            User          @relation(fields: [userId], references: [id])
-  shiftTemplateId String
-  shift           ShiftTemplate @relation(fields: [shiftTemplateId], references: [id])
-  date            DateTime      // specific date
+  shiftTemplateId String?
+  shift           ShiftTemplate? @relation(fields: [shiftTemplateId], references: [id])
+  date            DateTime
   isOffDay        Boolean       @default(false)
+  shiftType       String?       // 'PAGI' | 'SORE'
+  scheduleRole    String?       // 'BARISTA' | 'HELPER' | 'KITCHEN' | 'KITCHEN_HELPER' | 'BARISTA_HELPER'
+  needsCover      Boolean       @default(false) // daily worker needed
+  notes           String?
   createdBy       String
   createdAt       DateTime      @default(now())
 
@@ -1252,4 +1257,83 @@ model IngredientUnit {
 
   @@unique([ingredientId, name])
   @@map("ingredient_units")
+}
+
+// ── SCHEDULE SYSTEM ───────────────────────────────────────────────────────────
+enum ScheduleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SlotType {
+  REGULAR    // shift normal sesuai jadwal
+  EXTRA      // shift tambahan (double shift / cross-role)
+  COVER      // cover staff lain yang libur/sakit
+  DAILY_WORKER // daily worker eksternal
+}
+
+enum SlotShift {
+  PAGI
+  SORE
+}
+
+enum SlotRole {
+  BARISTA
+  HELPER
+  KITCHEN
+  KITCHEN_HELPER
+  BARISTA_HELPER  // barista yang jadi helper extra Jum/Sab
+}
+
+model Schedule {
+  id        String         @id @default(cuid())
+  year      Int
+  month     Int            // 1-12
+  status    ScheduleStatus @default(DRAFT)
+  notes     String?
+  slots     ScheduleSlot[]
+  createdBy String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([year, month])
+  @@map("schedules")
+}
+
+model ScheduleSlot {
+  id          String    @id @default(cuid())
+  scheduleId  String
+  schedule    Schedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  date        DateTime  // specific date
+  shift       SlotShift
+  role        SlotRole
+  userId      String?   // null = belum assign / daily worker
+  user        User?     @relation("ScheduleSlots", fields: [userId], references: [id])
+  type        SlotType  @default(REGULAR)
+  isOff       Boolean   @default(false)  // hari libur slot ini
+  isDailyWorker Boolean @default(false)
+  dailyWorkerName String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([scheduleId, date])
+  @@index([userId, date])
+  @@map("schedule_slots")
+}
+
+model ShiftSwap {
+  id           String   @id @default(cuid())
+  scheduleId   String
+  slotId       String   // slot yang mau ditukar
+  requestedBy  String   // userId yang minta tukar
+  swapWithUser String?  // userId yang diajak tukar (null = open request)
+  swapSlotId   String?  // slot milik swapWithUser
+  reason       String?
+  status       String   @default("PENDING") // PENDING | APPROVED | REJECTED
+  approvedBy   String?
+  createdAt    DateTime @default(now())
+
+  @@map("shift_swaps")
 }
