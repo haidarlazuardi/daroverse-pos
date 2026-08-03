@@ -140,11 +140,13 @@ export async function computeOrderRequirements(
   for (const item of items) {
     const product = productMap.get(item.productId);
     if (!product || !product.recipe) {
+      console.log(`[STOCK] SKIP deduction — no recipe for product ${item.productId}`);
       lines.push({ productId: item.productId, unitCost: 0, quantity: item.quantity });
       continue;
     }
 
     const loc = locationForStation(product.station as 'FOOD' | 'DRINK');
+    console.log(`[STOCK] product=${product.name} station=${product.station} loc=${loc} recipe_items=${product.recipe.items.length}`);
 
     // Effective per-portion requirement (serving recipe + modifiers).
     const req = new Map<string, number>();
@@ -197,6 +199,7 @@ export async function applyDeductionsInTx(
   userId: string
 ) {
   const movementRows: any[] = [];
+  console.log(`[STOCK] applyDeductions — ${deductions.size} locations, orderId=${orderId}`);
 
   for (const [location, ingredients] of deductions) {
     for (const [ingredientId, qty] of ingredients) {
