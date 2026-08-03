@@ -196,3 +196,39 @@ input[type="number"] { -moz-appearance: textfield; }
   .receipt .center { text-align: center; }
   .receipt .right { text-align: right; }
 }
+
+/* ── PWA / Installed Web App ─────────────────────────────────────────────── */
+/* Safe area insets untuk notch, home bar, dll */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
+/* Body padding untuk standalone mode */
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+}
+
+/* Bottom nav harus di atas home bar */
+.bottom-nav-safe {
+  padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+}
+
+/* Fixed banner di atas harus account untuk status bar */
+.fixed-top-safe {
+  top: env(safe-area-inset-top, 0px);
+}
+
+/* Staff hub & dashboard min-height fix untuk installed mode */
+@media (display-mode: standalone) {
+  .min-h-screen {
+    min-height: 100svh;
+  }
+}

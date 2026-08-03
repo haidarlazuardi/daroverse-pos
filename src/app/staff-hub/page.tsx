@@ -122,61 +122,112 @@ function BottomSheet({ title, onClose, children }: { title:string; onClose:()=>v
 // ── QR Hook ───────────────────────────────────────────────────────────────────
 function useQR(onScan: (d:any) => void) {
   const [scanning, setScanning] = useState(false);
+  const [camError, setCamError] = useState('');
   const activeRef = useRef(false);
   const streamRef = useRef<MediaStream|null>(null);
+  const rafRef    = useRef<number>(0);
 
   async function start() {
-    setScanning(true); activeRef.current = true;
+    setCamError('');
+    setScanning(true);
+    activeRef.current = true;
     try {
-      const s = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
+      const s = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
       streamRef.current = s;
-      const v = document.createElement('video');
-      v.srcObject=s; v.playsInline=true; v.muted=true; await v.play();
-      loop(v);
-    } catch { stop(); }
+      // Attach to visible video element
+      const v = document.getElementById('qr-video') as HTMLVideoElement;
+      if (v) { v.srcObject = s; v.playsInline = true; v.muted = true; await v.play().catch(()=>{}); loop(v); }
+      else {
+        // fallback headless
+        const vEl = document.createElement('video');
+        vEl.srcObject = s; vEl.playsInline = true; vEl.muted = true; await vEl.play().catch(()=>{});
+        loop(vEl);
+      }
+    } catch(e: any) {
+      setCamError('Izinkan akses kamera di pengaturan browser/HP');
+      setScanning(false); activeRef.current = false;
+    }
+  }
+
+  function stop() {
+    activeRef.current = false;
+    cancelAnimationFrame(rafRef.current);
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    setScanning(false);
+    setCamError('');
   }
 
   async function loop(v: HTMLVideoElement) {
     if (!activeRef.current) return;
+    if (v.readyState < 2) { rafRef.current = requestAnimationFrame(() => loop(v)); return; }
+    const w = v.videoWidth || 640, h = v.videoHeight || 480;
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const ctx = c.getContext('2d')!;
+    ctx.drawImage(v, 0, 0, w, h);
+    let found = false;
+    // Try BarcodeDetector (Chrome Android)
     const BD = (window as any).BarcodeDetector;
-    if (!BD) { stop(); alert('Browser tidak support scan QR'); return; }
-    const c = document.createElement('canvas'); c.width=v.videoWidth||640; c.height=v.videoHeight||480;
-    c.getContext('2d')!.drawImage(v,0,0);
-    try {
-      const r = await new BD({formats:['qr_code']}).detect(c);
-      if (r.length) {
-        const raw = r[0].rawValue;
-        try {
-          // Coba parse JSON dulu (format lama)
-          onScan(JSON.parse(raw)); stop(); return;
-        } catch {
-          // Format baru: URL .../scan/{ingredientId}
-          const match = raw.match(/\/scan\/([a-z0-9]+)$/i);
-          if (match) { onScan({ ingredientId: match[1] }); stop(); return; }
-          // Fallback: raw string sebagai ingredientId
-          onScan({ ingredientId: raw }); stop(); return;
-        }
-      }
-    } catch {}
-    if (activeRef.current) requestAnimationFrame(()=>loop(v));
+    if (BD) {
+      try {
+        const r = await new BD({ formats: ['qr_code'] }).detect(c);
+        if (r.length) { found = true; handleRaw(r[0].rawValue); }
+      } catch {}
+    }
+    // Fallback jsQR (Safari iOS, Firefox)
+    if (!found) {
+      try {
+        const jsQR = (await import('jsqr')).default;
+        const img = ctx.getImageData(0, 0, w, h);
+        const res = jsQR(img.data, w, h, { inversionAttempts: 'dontInvert' });
+        if (res) { found = true; handleRaw(res.data); }
+      } catch {}
+    }
+    if (!found && activeRef.current) rafRef.current = requestAnimationFrame(() => loop(v));
   }
 
-  function stop() { activeRef.current=false; setScanning(false); streamRef.current?.getTracks().forEach(t=>t.stop()); streamRef.current=null; }
-  return { scanning, start, stop };
+  function handleRaw(raw: string) {
+    try { onScan(JSON.parse(raw)); stop(); return; } catch {}
+    const match = raw.match(/\/scan\/([a-z0-9]+)$/i);
+    if (match) { onScan({ ingredientId: match[1] }); stop(); return; }
+    onScan({ ingredientId: raw }); stop();
+  }
+
+  return { scanning, camError, start, stop };
 }
 
 function QRBtn({ onScan }: { onScan:(d:any)=>void }) {
-  const { scanning, start, stop } = useQR(onScan);
+  const { scanning, camError, start, stop } = useQR(onScan);
   return (
-    <button onClick={scanning?stop:start}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold"
-      style={{ background:scanning?'#FEF2F2':'#E8F5E9', color:scanning?'#DC2626':G, border:`1px solid ${scanning?'#DC2626':G}` }}>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/>
-        <rect x="7" y="7" width="4" height="4" rx="1"/><rect x="13" y="7" width="4" height="4" rx="1"/><rect x="7" y="13" width="4" height="4" rx="1"/>
-      </svg>
-      {scanning?'Stop':'Scan QR'}
-    </button>
+    <div>
+      <button onClick={scanning ? stop : start}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold"
+        style={{ background:scanning?'#FEF2F2':'#E8F5E9', color:scanning?'#DC2626':G, border:`1px solid ${scanning?'#DC2626':G}` }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/>
+          <rect x="7" y="7" width="4" height="4" rx="1"/><rect x="13" y="7" width="4" height="4" rx="1"/><rect x="7" y="13" width="4" height="4" rx="1"/>
+        </svg>
+        {scanning ? 'Stop Kamera' : 'Scan QR'}
+      </button>
+      {camError && (
+        <p className="text-xs mt-1.5 text-red-500">{camError}</p>
+      )}
+      {scanning && !camError && (
+        <div className="mt-2 rounded-xl overflow-hidden relative" style={{ background:'#000', aspectRatio:'4/3' }}>
+          <video id="qr-video" autoPlay playsInline muted
+            style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}/>
+          {/* Scan overlay */}
+          <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
+            <div style={{ width:160, height:160, border:`2px solid ${G}`, borderRadius:12, boxShadow:`0 0 0 2000px rgba(0,0,0,0.35)` }}/>
+          </div>
+          <p style={{ position:'absolute', bottom:8, left:0, right:0, textAlign:'center', color:'white', fontSize:11, fontWeight:600, textShadow:'0 1px 2px rgba(0,0,0,0.8)' }}>
+            Arahkan QR ke dalam kotak
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 
