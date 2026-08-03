@@ -142,7 +142,22 @@ function useQR(onScan: (d:any) => void) {
     if (!BD) { stop(); alert('Browser tidak support scan QR'); return; }
     const c = document.createElement('canvas'); c.width=v.videoWidth||640; c.height=v.videoHeight||480;
     c.getContext('2d')!.drawImage(v,0,0);
-    try { const r = await new BD({formats:['qr_code']}).detect(c); if(r.length){try{onScan(JSON.parse(r[0].rawValue));stop();return;}catch{}} } catch {}
+    try {
+      const r = await new BD({formats:['qr_code']}).detect(c);
+      if (r.length) {
+        const raw = r[0].rawValue;
+        try {
+          // Coba parse JSON dulu (format lama)
+          onScan(JSON.parse(raw)); stop(); return;
+        } catch {
+          // Format baru: URL .../scan/{ingredientId}
+          const match = raw.match(/\/scan\/([a-z0-9]+)$/i);
+          if (match) { onScan({ ingredientId: match[1] }); stop(); return; }
+          // Fallback: raw string sebagai ingredientId
+          onScan({ ingredientId: raw }); stop(); return;
+        }
+      }
+    } catch {}
     if (activeRef.current) requestAnimationFrame(()=>loop(v));
   }
 
