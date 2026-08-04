@@ -7,6 +7,7 @@ import { DataTable, Column } from '@/components/ui/DataTable';
 import { Toolbar } from '@/components/ui/Toolbar';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { api } from '@/lib/fetch';
+import IngredientPicker from '@/components/ui/IngredientPicker';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
 
@@ -446,10 +447,11 @@ export default function ProductsPage() {
             </div>
             {form.recipeItems.map((ri,i) => (
               <div key={i} className="flex gap-2 mb-2">
-                <select value={ri.ingredientId} onChange={e=>{const items=[...form.recipeItems];items[i].ingredientId=e.target.value;setForm({...form,recipeItems:items});}} className="select flex-1">
-                  <option value="">Pilih bahan</option>
-                  {ingredients.map(ing=><option key={ing.id} value={ing.id}>{ing.type==='PREPPED'?'🔸 ':''}{ing.name} ({ing.unit})</option>)}
-                </select>
+                <div className="flex-1">
+                  <IngredientPicker ingredients={ingredients} value={ri.ingredientId}
+                    onChange={v=>{const items=[...form.recipeItems];items[i].ingredientId=v;setForm({...form,recipeItems:items});}}
+                    showUnit={true} showType={true}/>
+                </div>
                 <input type="number" placeholder="Qty" value={ri.quantity} onChange={e=>{const items=[...form.recipeItems];items[i].quantity=e.target.value;setForm({...form,recipeItems:items});}} className="input w-24" />
                 <button onClick={()=>setForm({...form,recipeItems:form.recipeItems.filter((_,j)=>j!==i)})} className="p-2 text-red-400 hover:text-red-600">✕</button>
               </div>

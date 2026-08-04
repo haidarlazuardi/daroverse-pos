@@ -7,6 +7,7 @@ import { DataTable, Column } from '@/components/ui/DataTable';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { Toolbar } from '@/components/ui/Toolbar';
 import { api } from '@/lib/fetch';
+import IngredientPicker from '@/components/ui/IngredientPicker';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
 import { isConnected, pairAndConnect, printData } from '@/lib/bluetooth-printer';
@@ -468,10 +469,8 @@ export default function PurchaseOrdersPage() {
                   return (
                     <div key={i} className="grid grid-cols-12 gap-2 items-start">
                       <div className="col-span-5">
-                        <select className="select w-full" value={item.ingredientId} onChange={e => updateItem(i, 'ingredientId', e.target.value)}>
-                          <option value="">Pilih bahan</option>
-                          {ingredients.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
-                        </select>
+                        <IngredientPicker ingredients={ingredients} value={item.ingredientId}
+                          onChange={v => updateItem(i, 'ingredientId', v)} showUnit={true}/>
                         {ing && <p className="text-xs text-gray-400 mt-0.5">Stok: {ing.unit} · Beli: {ing.purchaseUnit || ing.unit}</p>}
                       </div>
                       <div className="col-span-3">

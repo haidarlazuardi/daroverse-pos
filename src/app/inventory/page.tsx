@@ -7,6 +7,7 @@ import { DataTable, Column } from '@/components/ui/DataTable';
 import { SlideOver } from '@/components/ui/SlideOver';
 import { Toolbar } from '@/components/ui/Toolbar';
 import { api } from '@/lib/fetch';
+import IngredientPicker from '@/components/ui/IngredientPicker';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
 
@@ -432,11 +433,10 @@ export default function InventoryPage() {
             </div>
             {form.prepItems.map((ri, i) => (
               <div key={i} className="flex gap-2 items-center">
-                <select value={ri.ingredientId} className="select flex-1"
-                  onChange={e => { const items = [...form.prepItems]; items[i].ingredientId = e.target.value; setForm({ ...form, prepItems: items }); }}>
-                  <option value="">Pilih bahan baku</option>
-                  {rawIngredients.map(r => <option key={r.id} value={r.id}>{r.name} ({r.unit})</option>)}
-                </select>
+                <div className="flex-1">
+                  <IngredientPicker ingredients={rawIngredients} value={ri.ingredientId} showUnit={true}
+                    onChange={v => { const items = [...form.prepItems]; items[i].ingredientId = v; setForm({ ...form, prepItems: items }); }}/>
+                </div>
                 <input type="number" placeholder="Qty" value={ri.quantity} className="input w-24"
                   onChange={e => { const items = [...form.prepItems]; items[i].quantity = e.target.value; setForm({ ...form, prepItems: items }); }} />
                 <button onClick={() => setForm({ ...form, prepItems: form.prepItems.filter((_, j) => j !== i) })}

@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuthStore } from '@/store';
 import { api } from '@/lib/fetch';
+import IngredientPicker from '@/components/ui/IngredientPicker';
 import { formatCurrency } from '@/components/ui';
 import BottomNav from '@/components/staff/BottomNav';
 
@@ -326,7 +327,7 @@ function TransferForm({ ingredients, stockAt, onDone }: any) {
   function onQR(d:any){ if(d.ingredientId){setId(d.ingredientId);if(d.qty)setQty(String(d.qty));} }
   async function submit(){if(!id||!qty)return;setBusy(true);try{await api.post('/api/stock/transfer',{ingredientId:id,fromLocation:from,toLocation:to,quantity:parseFloat(qty)});onDone();}catch(e:any){alert(e.message);}finally{setBusy(false);}}
   return <div className="space-y-4">
-    <Field label="BAHAN"><div className="flex gap-2"><div className="flex-1"><Select value={id} onChange={(e:any)=>setId(e.target.value)}><option value="">Pilih bahan</option>{raw.map((i:any)=><option key={i.id} value={i.id}>{i.name}</option>)}</Select></div><QRBtn onScan={onQR}/></div>{ing&&<p className="text-xs mt-1.5" style={{ color:'#A0A0A0' }}>Stok {from}: <strong>{stockAt(id,from)}</strong> {ing.unit}</p>}</Field>
+    <Field label="BAHAN"><div className="flex gap-2"><div className="flex-1"><IngredientPicker ingredients={raw} value={id} onChange={setId}/></div><QRBtn onScan={onQR}/></div>{ing&&<p className="text-xs mt-1.5" style={{ color:'#A0A0A0' }}>Stok {from}: <strong>{stockAt(id,from)}</strong> {ing.unit}</p>}</Field>
     <Field label="DARI"><LocPicker value={from} set={setFrom}/></Field>
     <Field label="KE"><LocPicker value={to} set={setTo}/></Field>
     <Field label={`JUMLAH (${ing?.unit||'unit'})`}><Input type="number" value={qty} onChange={e=>setQty(e.target.value)} placeholder="0"/></Field>
@@ -353,7 +354,7 @@ function BatchForm({ prepped, onDone }: any) {
     }catch(e:any){alert(e.message);}finally{setBusy(false);}
   }
   return <div className="space-y-4">
-    <Field label="OLAHAN"><Select value={id} onChange={(e:any)=>setId(e.target.value)}><option value="">Pilih olahan</option>{prepped.map((i:any)=><option key={i.id} value={i.id}>{i.name}</option>)}</Select></Field>
+    <Field label="OLAHAN"><IngredientPicker ingredients={prepped} value={id} onChange={setId} placeholder='Pilih olahan...' showUnit={true}/></Field>
     <Field label="MULTIPLIER (1 = 1x resep)"><Input type="number" value={mult} onChange={e=>setMult(e.target.value)}/></Field>
     {selected && stdYield > 0 && (
       <div className="rounded-xl px-4 py-3 text-sm" style={{ background:'#F7F5F2' }}>
@@ -376,7 +377,7 @@ function WasteForm({ ingredients, stockAt, onDone }: any) {
   function onQR(d:any){ if(d.ingredientId){setId(d.ingredientId);if(d.qty)setQty(String(d.qty));} }
   async function submit(){if(!id||!qty)return;setBusy(true);try{await api.post('/api/stock/waste',{ingredientId:id,quantity:parseFloat(qty),location:loc,reason});onDone();}catch(e:any){alert(e.message);}finally{setBusy(false);}}
   return <div className="space-y-4">
-    <Field label="BAHAN"><div className="flex gap-2"><div className="flex-1"><Select value={id} onChange={(e:any)=>setId(e.target.value)}><option value="">Pilih bahan</option>{ingredients.map((i:any)=><option key={i.id} value={i.id}>{i.name}</option>)}</Select></div><QRBtn onScan={onQR}/></div>{ing&&<p className="text-xs mt-1.5" style={{ color:'#A0A0A0' }}>Stok {loc}: <strong>{stockAt(id,loc)}</strong> {ing.unit}</p>}</Field>
+    <Field label="BAHAN"><div className="flex gap-2"><div className="flex-1"><IngredientPicker ingredients={ingredients} value={id} onChange={setId}/></div><QRBtn onScan={onQR}/></div>{ing&&<p className="text-xs mt-1.5" style={{ color:'#A0A0A0' }}>Stok {loc}: <strong>{stockAt(id,loc)}</strong> {ing.unit}</p>}</Field>
     <Field label="LOKASI"><LocPicker value={loc} set={setLoc}/></Field>
     <Field label={`JUMLAH DIBUANG (${ing?.unit||'unit'})`}><Input type="number" value={qty} onChange={e=>setQty(e.target.value)} placeholder="0"/></Field>
     <Field label="ALASAN (OPSIONAL)"><Input value={reason} onChange={e=>setReason(e.target.value)} placeholder="misal: kadaluarsa, tumpah..."/></Field>
@@ -393,7 +394,7 @@ function OpnameForm({ ingredients, onDone }: any) {
   return <div className="space-y-4">
     <div className="flex items-center justify-between"><p className="text-xs font-bold" style={{ color:'#888' }}>BAHAN ({entries.length})</p><QRBtn onScan={onQR}/></div>
     {entries.map((e,i)=>(<div key={i} className="rounded-xl p-3 space-y-2.5" style={{ background:'#F7F5F2' }}>
-      <Select value={e.ingredientId} onChange={(ev:any)=>upd(i,'ingredientId',ev.target.value)}><option value="">Pilih bahan</option>{ingredients.map((ing:any)=><option key={ing.id} value={ing.id}>{ing.name}</option>)}</Select>
+      <IngredientPicker ingredients={ingredients} value={e.ingredientId} onChange={(v:string)=>upd(i,'ingredientId',v)}/>
       <LocPicker value={e.location} set={v=>upd(i,'location',v)}/>
       <Input type="number" value={e.actualQty} onChange={ev=>upd(i,'actualQty',ev.target.value)} placeholder="Qty aktual"/>
     </div>))}
@@ -428,7 +429,7 @@ function RequestForm({ ingredients, onDone }: any) {
     <p className="text-sm" style={{ color:'#888' }}>Manager akan terima notifikasi dan buat PO dari request ini.</p>
     {items.map((item,i)=>{const ing=ingredients.find((x:any)=>x.id===item.ingredientId);return(
       <div key={i} className="rounded-xl p-3.5 space-y-2.5" style={{ background:'#F7F5F2' }}>
-        <Select value={item.ingredientId} onChange={(e:any)=>pick(i,e.target.value)}><option value="">Pilih bahan</option>{ingredients.map((x:any)=><option key={x.id} value={x.id}>{x.name}</option>)}</Select>
+        <IngredientPicker ingredients={ingredients} value={item.ingredientId} onChange={(v:string)=>pick(i,v)}/>
         <div className="flex gap-2"><div className="flex-1"><Input type="number" value={item.quantity} onChange={e=>upd(i,'quantity',e.target.value)} placeholder="Qty"/></div><div className="rounded-xl px-3 flex items-center text-sm" style={{ background:'white', border:'1px solid #E8E2D9', color:'#A0A0A0', minWidth:60 }}>{ing?.purchaseUnit||ing?.unit||'unit'}</div></div>
       </div>);
     })}
