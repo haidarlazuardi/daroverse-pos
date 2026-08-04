@@ -115,8 +115,14 @@ function BottomSheet({ title, onClose, children }: { title:string; onClose:()=>v
   return (
     <>
       <div onClick={onClose} className="fixed inset-0 z-40" style={{ background:'rgba(0,0,0,0.4)' }}/>
-      <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-3xl overflow-hidden"
-        style={{ background:'white', maxHeight:'85vh', display:'flex', flexDirection:'column' }}>
+      <div className="fixed left-0 right-0 z-50 rounded-t-3xl overflow-hidden"
+        style={{
+          background:'white',
+          bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+          maxHeight: 'calc(85vh - 64px - env(safe-area-inset-bottom, 0px))',
+          display:'flex',
+          flexDirection:'column',
+        }}>
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
           <div className="w-10 h-1 rounded-full" style={{ background:'#E0E0E0' }}/>
@@ -126,8 +132,9 @@ function BottomSheet({ title, onClose, children }: { title:string; onClose:()=>v
           <p className="font-black text-base" style={{ color:'#1a1a1a' }}>{title}</p>
           <button onClick={onClose} className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background:'#F5F5F5', color:'#888' }}>✕</button>
         </div>
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 pb-8">
+        {/* Content — padding bottom extra untuk safe area */}
+        <div className="flex-1 overflow-y-auto px-5 py-4"
+          style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom, 24px))' }}>
           {children}
         </div>
       </div>
