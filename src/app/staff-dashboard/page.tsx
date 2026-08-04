@@ -44,13 +44,26 @@ export default function StaffDashboard() {
             <p className="text-green-200 text-xs font-medium tracking-widest uppercase mb-1">{today}</p>
             <h1 className="text-white font-black text-2xl leading-tight">Halo, {user.name.split(' ')[0]} 👋</h1>
           </div>
-          <button onClick={() => { useAuthStore.getState().logout(); window.location.href = '/login'; }}
-            className="w-9 h-9 rounded-full flex items-center justify-center mt-1"
-            style={{ background: 'rgba(255,255,255,0.15)' }}>
+          <div className="flex items-center gap-2 mt-1">
+            {['OWNER','MANAGER','SUPER_ADMIN'].includes(user.role) && (
+              <a href="/dashboard"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold"
+                style={{ background:'rgba(255,255,255,0.15)', color:'white' }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                  <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+                </svg>
+                Dashboard
+              </a>
+            )}
+            <button onClick={() => { useAuthStore.getState().logout(); window.location.href = '/login'; }}
+              className="w-9 h-9 rounded-full flex items-center justify-center"
+              style={{ background: 'rgba(255,255,255,0.15)' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
               <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/>
             </svg>
           </button>
+          </div>
         </div>
 
         {/* Quick stats */}
@@ -85,7 +98,7 @@ export default function StaffDashboard() {
         {kasbons.length > 0 && <KasbonCard kasbons={kasbons}/>}
       </div>
 
-      <BottomNav/>
+      <BottomNav hasPosAccess={['OWNER','MANAGER','SUPER_ADMIN'].includes(user.role) || data?.user?.hasPosAccess === true}/>
     </div>
   );
 }

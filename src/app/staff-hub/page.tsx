@@ -50,8 +50,23 @@ export default function StaffHub() {
 
       {/* Header */}
       <div className="px-5 pt-12 pb-5" style={{ background: G }}>
-        <p className="text-green-200 text-xs font-bold tracking-widest uppercase mb-1">Fitur Kerja</p>
-        <h1 className="text-white font-black text-2xl">Staff Hub</h1>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-green-200 text-xs font-bold tracking-widest uppercase mb-1">Fitur Kerja</p>
+            <h1 className="text-white font-black text-2xl">Staff Hub</h1>
+          </div>
+          {['OWNER','MANAGER','SUPER_ADMIN'].includes(user.role) && (
+            <a href="/dashboard"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold mt-1"
+              style={{ background:'rgba(255,255,255,0.15)', color:'white' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+              </svg>
+              Dashboard
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Cek Stok quick card */}
