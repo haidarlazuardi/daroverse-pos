@@ -182,6 +182,7 @@ model User {
   voidRequests       VoidRequest[]    @relation("VoidRequests")
   leaves             Leave[]
   scheduleSlots      ScheduleSlot[]   @relation("ScheduleSlots")
+  employee           Employee?        @relation("EmployeeUser")
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -1336,4 +1337,45 @@ model ShiftSwap {
   createdAt    DateTime @default(now())
 
   @@map("shift_swaps")
+}
+
+// ── EMPLOYEE (master data HR, terpisah dari User/auth) ────────────────────────
+model Employee {
+  id              String        @id @default(cuid())
+  // Link ke akun login (opsional — bisa ada karyawan tanpa akun)
+  userId          String?       @unique
+  user            User?         @relation("EmployeeUser", fields: [userId], references: [id])
+
+  // Identitas
+  name            String
+  nik             String?       // No KTP
+  phone           String?
+  address         String?
+  emergencyContact String?
+  emergencyPhone  String?
+  photo           String?       // URL foto
+
+  // Posisi & kerja
+  position        String?       // Barista, Helper, Kitchen, dll
+  employeeType    EmployeeType?
+  joinDate        DateTime?
+  endDate         DateTime?
+  active          Boolean       @default(true)
+
+  // Payroll
+  dailyRate       Float         @default(0)
+  serviceChargeEligible Boolean @default(true)
+
+  // Bank
+  bankName        String?
+  bankAccount     String?
+  bankAccountName String?
+
+  // Notes
+  notes           String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@map("employees")
 }
