@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, withAuth } from '@/lib/api-helpers';
 import { authenticate } from '@/lib/auth';
-import { ADMIN_ROLES, SENIOR_ROLES } from '@/lib/auth';
+import { ADMIN_ROLES, SENIOR_ROLES, ALL_ROLES } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {

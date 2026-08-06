@@ -64,8 +64,8 @@ export function calcMonthlyPunishment(
 }
 
 // Hitung level insentif berdasarkan revenue harian
-export function getIncentiveLevel(revenue: number) {
-  let result = null;
+export function getIncentiveLevel(revenue: number): typeof INCENTIVE_LEVELS[number] | null {
+  let result: typeof INCENTIVE_LEVELS[number] | null = null;
   for (const lvl of INCENTIVE_LEVELS) {
     if (revenue >= lvl.target) result = lvl;
   }

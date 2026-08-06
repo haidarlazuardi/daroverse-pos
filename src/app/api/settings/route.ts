@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { success, error, withAuth } from '@/lib/api-helpers';
-import { ADMIN_ROLES, SENIOR_ROLES } from '@/lib/auth';
+import { ADMIN_ROLES, SENIOR_ROLES, ALL_ROLES } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
 // GET — all settings as a { key: value } map (any authenticated user)

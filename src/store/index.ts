@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 // ─── Auth Store ──────────────────────────────────────
-export type Role = 'SUPER_ADMIN' | 'CASHIER';
+export type Role = 'SUPER_ADMIN' | 'OWNER' | 'MANAGER' | 'STAFF';
 
 interface AuthUser {
   userId: string;

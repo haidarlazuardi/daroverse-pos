@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, withAuth } from '@/lib/api-helpers';
-import { ADMIN_ROLES, SENIOR_ROLES } from '@/lib/auth';
+import { ADMIN_ROLES, SENIOR_ROLES, ALL_ROLES } from '@/lib/auth';
 
 // GET — semua role yang login bisa baca (dipakai POS, products, dll)
 export const GET = withAuth(async (req) => {

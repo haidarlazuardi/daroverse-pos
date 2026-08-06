@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest } from 'next/server';
 import prisma from '@/lib/prisma';
 import { success, error, withAuth } from '@/lib/api-helpers';
-import { ALL_ROLES, SENIOR_ROLES } from '@/lib/auth';
+import { ALL_ROLES, SENIOR_ROLES, ADMIN_ROLES } from '@/lib/auth';
 
 // GET — list requests
 export const GET = withAuth(async (req: NextRequest) => {
