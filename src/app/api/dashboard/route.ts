@@ -41,12 +41,13 @@ export const GET = withAuth(async (req, user) => {
     where: { createdAt: { gte: from, lte: to } },
     select: { amount: true, category: true },
   });
+  // Fix: PURCHASE expenses sudah masuk COGS, jangan double count
   const totalExpenses     = expenses.reduce((s, e) => s + e.amount, 0);
   const purchaseExpenses  = expenses.filter(e => e.category === 'PURCHASE').reduce((s, e) => s + e.amount, 0);
   const opExpenses        = expenses.filter(e => e.category !== 'PURCHASE' && e.category !== 'SALARY').reduce((s, e) => s + e.amount, 0);
   const salaryExpenses    = expenses.filter(e => e.category === 'SALARY').reduce((s, e) => s + e.amount, 0);
-  const operatingProfit   = grossProfit - opExpenses;
-  const netProfit         = operatingProfit - salaryExpenses;
+  const operatingProfit   = grossProfit - opExpenses;         // gross profit - operational costs
+  const netProfit         = operatingProfit - salaryExpenses; // sebelum pajak
 
   // Product performance
   const orderItems = await prisma.orderItem.findMany({
@@ -114,7 +115,8 @@ export const GET = withAuth(async (req, user) => {
   // Daily revenue trend
   const dailyMap = new Map<string, { revenue: number; cost: number; profit: number; orders: number }>();
   for (const order of orders) {
-    const day = new Date(order.createdAt).toISOString().slice(0, 10);
+    const wibDate = new Date(new Date(order.createdAt).getTime() + 7 * 60 * 60 * 1000);
+    const day = wibDate.toISOString().slice(0, 10); // WIB date
     const existing = dailyMap.get(day) || { revenue: 0, cost: 0, profit: 0, orders: 0 };
     existing.revenue += order.total;
     existing.cost += order.costTotal;

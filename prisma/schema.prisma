@@ -706,6 +706,8 @@ model Supplier {
   active         Boolean         @default(true)
   purchaseOrders PurchaseOrder[]
   defaultIngredients Ingredient[] @relation("IngredientDefaultSupplier")
+  supplyOrders   SupplyOrder[]   @relation("SupplyOrders")
+  defaultSupplies SupplyItem[]   @relation("SupplyDefaultSupplier")
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
 
@@ -1379,4 +1381,71 @@ model Employee {
   updatedAt       DateTime      @updatedAt
 
   @@map("employees")
+}
+
+// ── SUPPLIES (non-bahan baku: utilities, consumables, dll) ────────────────────
+enum SupplyCategory {
+  UTILITIES     // Gas, listrik, air
+  CONSUMABLES   // Sabun, plastik, tissue
+  PACKAGING     // Box, cup, sedotan
+  CLEANING      // Pembersih, sapu, dll
+  EQUIPMENT     // Peralatan kecil
+  OTHER
+}
+
+model SupplyItem {
+  id          String        @id @default(cuid())
+  name        String
+  unit        String        // pcs, liter, kg, roll, dll
+  category    SupplyCategory
+  defaultSupplierId String?
+  defaultSupplier   Supplier? @relation("SupplyDefaultSupplier", fields: [defaultSupplierId], references: [id])
+  latestPrice Float         @default(0)
+  minStock    Float         @default(0)
+  currentStock Float        @default(0)
+  notes       String?
+  active      Boolean       @default(true)
+  orderItems  SupplyOrderItem[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("supply_items")
+}
+
+enum SupplyOrderStatus {
+  DRAFT
+  ORDERED
+  RECEIVED
+  CANCELLED
+}
+
+model SupplyOrder {
+  id          String            @id @default(cuid())
+  poNumber    String            @unique
+  supplierId  String?
+  supplier    Supplier?         @relation("SupplyOrders", fields: [supplierId], references: [id])
+  status      SupplyOrderStatus @default(DRAFT)
+  totalAmount Float             @default(0)
+  notes       String?
+  items       SupplyOrderItem[]
+  receivedAt  DateTime?
+  createdBy   String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@map("supply_orders")
+}
+
+model SupplyOrderItem {
+  id            String      @id @default(cuid())
+  supplyOrderId String
+  supplyOrder   SupplyOrder @relation(fields: [supplyOrderId], references: [id], onDelete: Cascade)
+  supplyItemId  String
+  supplyItem    SupplyItem  @relation(fields: [supplyItemId], references: [id])
+  quantity      Float
+  unitPrice     Float
+  totalPrice    Float
+  receivedQty   Float       @default(0)
+
+  @@map("supply_order_items")
 }

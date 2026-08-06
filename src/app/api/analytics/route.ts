@@ -28,7 +28,9 @@ export const GET = withAuth(async (req: NextRequest) => {
     // Group by date
     const byDate = new Map<string, { revenue: number; cost: number; orders: number }>();
     for (const o of orders) {
-      const d = o.createdAt.toISOString().slice(0, 10);
+      // Fix: group by WIB date, bukan UTC date
+      const wibDate = new Date(o.createdAt.getTime() + 7 * 60 * 60 * 1000);
+      const d = wibDate.toISOString().slice(0, 10);
       const existing = byDate.get(d) || { revenue: 0, cost: 0, orders: 0 };
       byDate.set(d, {
         revenue: existing.revenue + o.total,
@@ -75,7 +77,8 @@ export const GET = withAuth(async (req: NextRequest) => {
 
     const byHour = Array.from({ length: 24 }, (_, h) => ({ hour: h, orders: 0, revenue: 0 }));
     for (const o of orders) {
-      const h = new Date(o.createdAt).getHours();
+      // Fix: pakai WIB (UTC+7), bukan UTC
+      const h = (new Date(o.createdAt).getUTCHours() + 7) % 24;
       byHour[h].orders++;
       byHour[h].revenue += o.total;
     }
@@ -146,6 +149,9 @@ export const GET = withAuth(async (req: NextRequest) => {
 
     const revenue  = orders.reduce((s, o) => s + o.total, 0);
     const cogs     = orders.reduce((s, o) => s + (o.costTotal || 0), 0);
+    // Fix: exclude PURCHASE expenses dari netProfit — sudah masuk COGS
+    const opExpenses = expenses.filter((e: any) => e.category !== 'PURCHASE').reduce((s, e) => s + e.amount, 0);
+    const purchaseExp = expenses.filter((e: any) => e.category === 'PURCHASE').reduce((s, e) => s + e.amount, 0);
     const expense  = expenses.reduce((s, e) => s + e.amount, 0);
     const purchase = poValue.reduce((s, p) => s + p.totalAmount, 0);
 
@@ -154,7 +160,7 @@ export const GET = withAuth(async (req: NextRequest) => {
       cogs:        Math.round(cogs),
       grossProfit: Math.round(revenue - cogs),
       grossMargin: revenue > 0 ? Math.round(((revenue - cogs) / revenue) * 100) : 0,
-      netProfit:   Math.round(revenue - cogs - expense),
+      netProfit:   Math.round(revenue - cogs - opExpenses), // hanya operational expenses
       orders:      orders.length,
       avgOrder:    orders.length > 0 ? Math.round(revenue / orders.length) : 0,
       expense:     Math.round(expense),
@@ -165,7 +171,7 @@ export const GET = withAuth(async (req: NextRequest) => {
   // ── Transactions list ──────────────────────────────────────────────────────
   if (type === 'transactions') {
     const orders = await prisma.order.findMany({
-      where: { createdAt: { gte: from, lte: to } },
+      where: { createdAt: { gte: from, lte: to }, status: { in: ['COMPLETED', 'OPEN', 'VOIDED'] } },
       include: {
         payment: { select: { method: true } },
         customer: { select: { name: true } },
