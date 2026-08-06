@@ -15,49 +15,25 @@ export const GET = withAuth(async () => {
 }, SENIOR_ROLES);
 
 export const POST = withAuth(async (req) => {
-  const { name, email, password, role, pin, employeeType, dailyRate, bankName, bankAccount, bankAccountName, joinDate } = await req.json();
-
-  if (!name || !email || !password) return error('Name, email, and password are required');
-
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) return error('Email already exists');
-
-  const user = await prisma.user.create({
-    data: {
-      name, email,
-      password: await hashPassword(password),
-      role: role || 'CASHIER',
-      pin: pin || null,
-      employeeType: employeeType || null,
-      dailyRate: dailyRate || null,
-      bankName: bankName || null,
-      bankAccount: bankAccount || null,
-      bankAccountName: bankAccountName || null,
-      joinDate: joinDate ? new Date(joinDate) : null,
-    } as any,
-    select: { id: true, name: true, email: true, role: true },
-  });
-
-  return success(user, 201);
+  // POST langsung disabled — buat user via /api/employees action:create_account
+  return error('Gunakan menu Karyawan → Buat Akun untuk membuat akun baru', 400);
 }, SENIOR_ROLES);
 
 export const PATCH = withAuth(async (req) => {
-  const { id, name, email, role, password, active, employeeType, dailyRate, bankName, bankAccount, bankAccountName, joinDate } = await req.json();
+  const { id, name, email, role, password, active, hasPosAccess } = await req.json();
   if (!id) return error('ID wajib diisi');
+
+  // Hanya auth fields — HR data dikelola di /api/employees
   const updateData: any = {};
-  if (name !== undefined)            updateData.name            = name;
-  if (email !== undefined)           updateData.email           = email;
-  if (role !== undefined)            updateData.role            = role;
-  if (active !== undefined)          updateData.active          = active;
-  if (employeeType !== undefined)    updateData.employeeType    = employeeType;
-  if (dailyRate !== undefined)       updateData.dailyRate       = dailyRate;
-  if (bankName !== undefined)        updateData.bankName        = bankName;
-  if (bankAccount !== undefined)     updateData.bankAccount     = bankAccount;
-  if (bankAccountName !== undefined) updateData.bankAccountName = bankAccountName;
-  if (joinDate !== undefined)        updateData.joinDate        = joinDate ? new Date(joinDate) : null;
+  if (name !== undefined)        updateData.name        = name;
+  if (email !== undefined)       updateData.email       = email;
+  if (role !== undefined)        updateData.role        = role;
+  if (active !== undefined)      updateData.active      = active;
+  if (hasPosAccess !== undefined) updateData.hasPosAccess = !!hasPosAccess;
   if (password) {
     updateData.password = await hashPassword(password);
   }
+
   const user = await prisma.user.update({ where: { id }, data: updateData });
   const { password: _, ...safe } = user as any;
   return success(safe);

@@ -2,193 +2,263 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
-import { Badge, Button, Modal } from '@/components/ui';
-import { SlideOver } from '@/components/ui/SlideOver';
-import { DataTable, Column } from '@/components/ui/DataTable';
-import { Toolbar } from '@/components/ui/Toolbar';
 import { api } from '@/lib/fetch';
-import * as XLSX from 'xlsx';
 
-interface User { id: string; name: string; email: string; role: string; active: boolean; createdAt: string; }
+interface User {
+  id: string; name: string; email: string; role: string;
+  active: boolean; hasPosAccess: boolean;
+  employee?: { id: string; name: string; position?: string };
+}
 
 const ROLES = [
-  { value:'STAFF',     label:'Kasir' },
-  { value:'STAFF',    label:'Staff' },
-  { value:'INVENTORY',   label:'Inventory' },
-  { value:'MANAGER',     label:'Manager' },
-  { value:'OWNER',       label:'Owner' },
-  { value:'SUPER_ADMIN', label:'Super Admin' },
+  { value: 'STAFF',       label: 'Staff' },
+  { value: 'MANAGER',     label: 'Manager' },
+  { value: 'OWNER',       label: 'Owner' },
+  { value: 'SUPER_ADMIN', label: 'Super Admin' },
 ];
-const ROLE_LABEL: Record<string,string> = { SUPER_ADMIN:'Super Admin', OWNER:'Owner', MANAGER:'Manager', STAFF:'Staff', KITCHEN:'Dapur', INVENTORY:'Inventory' };
-const ROLE_VARIANT: Record<string,any> = { SUPER_ADMIN:'danger', OWNER:'info', MANAGER:'success', STAFF:'default', KITCHEN:'warning', INVENTORY:'default' };
-const EMPTY_FORM = { name:'', email:'', password:'', role:'STAFF' };
+
+const ROLE_COLOR: Record<string, string> = {
+  SUPER_ADMIN: '#DC2626', OWNER: '#2563EB', MANAGER: '#7C3AED', STAFF: '#374151',
+};
+const ROLE_BG: Record<string, string> = {
+  SUPER_ADMIN: '#FEF2F2', OWNER: '#EFF6FF', MANAGER: '#F5F3FF', STAFF: '#F9FAFB',
+};
 
 export default function UsersPage() {
-  const [users, setUsers]     = useState<User[]>([]);
+  const [users, setUsers]   = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
-  const [filterRole, setFilterRole] = useState('');
-  const [slideOpen, setSlideOpen] = useState(false);
-  const [editing, setEditing] = useState<User | null>(null);
-  const [form, setForm]       = useState({ ...EMPTY_FORM });
-  const [saving, setSaving]   = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [editModal, setEditModal] = useState(false);
+  const [editing, setEditing]     = useState<User | null>(null);
+  const [form, setForm] = useState({ email: '', password: '', role: 'STAFF', hasPosAccess: false });
+  const [saving, setSaving] = useState(false);
+  const [resetPwModal, setResetPwModal] = useState(false);
+  const [newPw, setNewPw] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setUsers(await api.get<User[]>('/api/users')); }
-    catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    try {
+      const r = await api.get<any>('/api/users');
+      setUsers(Array.isArray(r) ? r : r?.users || []);
+    } catch {} finally { setLoading(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  function openAdd() { setEditing(null); setForm({ ...EMPTY_FORM }); setSlideOpen(true); }
+  const filtered = users.filter(u =>
+    !search || u.name.toLowerCase().includes(search.toLowerCase()) ||
+    u.email.toLowerCase().includes(search.toLowerCase())
+  );
+
   function openEdit(u: User) {
     setEditing(u);
-    setForm({ name: u.name, email: u.email, password: '', role: u.role });
-    setSlideOpen(true);
+    setForm({ email: u.email, password: '', role: u.role, hasPosAccess: u.hasPosAccess || false });
+    setEditModal(true);
   }
 
-  async function handleSave() {
-    if (!form.name || !form.email) return;
-    if (!editing && !form.password) { alert('Password wajib diisi untuk user baru'); return; }
+  async function save() {
+    if (!editing) return;
     setSaving(true);
     try {
-      if (editing) {
-        const payload: any = { id: editing.id, name: form.name, email: form.email, role: form.role };
-        if (form.password) payload.password = form.password;
-        await api.patch('/api/users', payload);
-      } else {
-        await api.post('/api/users', form);
-      }
-      setSlideOpen(false); load();
-    } catch (e: any) { alert(e.message || 'Gagal'); }
+      await api.patch('/api/users', {
+        id: editing.id,
+        email: form.email,
+        role: form.role,
+        hasPosAccess: form.hasPosAccess,
+        ...(form.password ? { password: form.password } : {}),
+      });
+      await load();
+      setEditModal(false);
+    } catch(e: any) { alert(e.message); }
     finally { setSaving(false); }
   }
 
-  async function handleDelete() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try { await api.delete(`/api/users?id=${deleteTarget.id}`); setDeleteTarget(null); load(); }
-    catch (e: any) { alert(e.message || 'Gagal'); }
-    finally { setDeleting(false); }
-  }
-
-  async function togglePosAccess(u: any) {
-    try {
-      await api.patch('/api/users', { id: u.id, hasPosAccess: !u.hasPosAccess });
-      setUsers((prev: any[]) => prev.map(x => x.id === u.id ? { ...x, hasPosAccess: !u.hasPosAccess } : x));
-    } catch(e: any) { alert(e.message); }
-  }
-
   async function toggleActive(u: User) {
-    try { await api.patch('/api/users', { id: u.id, active: !u.active }); load(); }
-    catch (e) { console.error(e); }
+    if (!confirm(`${u.active ? 'Nonaktifkan' : 'Aktifkan'} akun ${u.name}?`)) return;
+    await api.patch('/api/users', { id: u.id, active: !u.active });
+    load();
   }
 
-  function handleExport() {
-    const rows = users.map(u => ({ Nama: u.name, Email: u.email, Role: ROLE_LABEL[u.role]||u.role, Status: u.active ? 'Aktif' : 'Nonaktif', 'Bergabung': new Date(u.createdAt).toLocaleDateString('id-ID') }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Users');
-    XLSX.writeFile(wb, 'users-soeka.xlsx');
+  async function togglePosAccess(u: User) {
+    await api.patch('/api/users', { id: u.id, hasPosAccess: !u.hasPosAccess });
+    setUsers(prev => prev.map(x => x.id === u.id ? { ...x, hasPosAccess: !u.hasPosAccess } : x));
   }
 
-  const filtered = users.filter(u => {
-    const matchSearch = !search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
-    const matchRole   = !filterRole || u.role === filterRole;
-    return matchSearch && matchRole;
-  });
-
-  const f = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
-
-  const columns: Column<User>[] = [
-    { key:'name', label:'Staff', sortable:true, render: u => (
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-bold text-sm flex-shrink-0">{u.name.charAt(0).toUpperCase()}</div>
-        <div><p className="font-semibold text-gray-900">{u.name}</p><p className="text-xs text-gray-400">{u.email}</p></div>
-      </div>
-    )},
-    { key:'role', label:'Role', render: u => <Badge variant={ROLE_VARIANT[u.role]}>{ROLE_LABEL[u.role]||u.role}</Badge> },
-    { key:'active', label:'Status', render: u => <Badge variant={u.active ? 'success' : 'danger'}>{u.active ? 'Aktif' : 'Nonaktif'}</Badge> },
-    { key:'createdAt', label:'Bergabung', sortable:true, render: u => <span className="text-gray-400 text-sm">{new Date(u.createdAt).toLocaleDateString('id-ID')}</span> },
-  ];
+  async function resetPassword() {
+    if (!editing || !newPw) return;
+    setSaving(true);
+    try {
+      await api.patch('/api/users', { id: editing.id, password: newPw });
+      setResetPwModal(false);
+      setNewPw('');
+      alert('Password berhasil direset');
+    } catch(e: any) { alert(e.message); }
+    finally { setSaving(false); }
+  }
 
   return (
     <AdminLayout>
-      <div className="max-w-4xl mx-auto">
-        <div className="page-header">
-          <div><h1 className="page-title">Pengguna</h1><p className="page-subtitle">Kelola akun staff dan hak akses</p></div>
-          <div className="flex items-center gap-2">
-            <span className="badge badge-default">{users.filter(u=>u.active).length} aktif</span>
-          </div>
-        </div>
-
-        <Toolbar
-          search={search} onSearch={setSearch} searchPlaceholder="Cari nama atau email..."
-          filters={[{ key:'role', label:'Role', value:filterRole, onChange:setFilterRole, options: ROLES }]}
-          onExport={handleExport} onAdd={openAdd} addLabel="Tambah User"
-        />
-
-        <DataTable data={filtered} columns={columns} keyField="id" loading={loading} emptyMessage="Belum ada pengguna"
-          rowActions={u => (
-            <div className="flex gap-1">
-              {(u as any).role === 'STAFF' && (
-                <button onClick={() => togglePosAccess(u)}
-                  title={(u as any).hasPosAccess ? 'Cabut akses POS' : 'Beri akses POS'}
-                  className={`p-1.5 rounded-lg text-xs font-bold transition-colors ${(u as any).hasPosAccess ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400 hover:bg-green-50 hover:text-green-500'}`}>
-                  POS
-                </button>
-              )}
-              <button onClick={() => toggleActive(u)} title={u.active ? 'Nonaktifkan' : 'Aktifkan'}
-                className={`p-1.5 rounded-lg text-gray-400 transition-colors ${u.active ? 'hover:bg-red-50 hover:text-red-500' : 'hover:bg-emerald-50 hover:text-emerald-600'}`}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  {u.active ? <><path d="M18.36 6.64a9 9 0 11-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></> : <polyline points="20 6 9 17 4 12"/>}
-                </svg>
-              </button>
-              <button onClick={() => openEdit(u)} className="p-1.5 hover:bg-brand-50 rounded-lg text-gray-400 hover:text-brand-600">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              </button>
-              <button onClick={() => setDeleteTarget(u)} className="p-1.5 hover:bg-red-50 rounded-lg text-gray-400 hover:text-red-500">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
-              </button>
-            </div>
-          )}
-        />
-      </div>
-
-      <SlideOver open={slideOpen} onClose={() => setSlideOpen(false)}
-        title={editing ? `Edit: ${editing.name}` : 'Tambah User'}
-        footer={<div className="flex justify-end gap-3"><button onClick={() => setSlideOpen(false)} className="btn btn-secondary btn-md">Batal</button><Button onClick={handleSave} disabled={saving||!form.name||!form.email}>{saving ? 'Menyimpan...' : 'Simpan'}</Button></div>}>
-        <div className="space-y-4">
-          <div><label className="label">Nama Lengkap *</label><input className="input" value={form.name} onChange={e => f('name',e.target.value)} placeholder="cth. Budi Santoso" /></div>
-          <div><label className="label">Email *</label><input className="input" type="email" value={form.email} onChange={e => f('email',e.target.value)} placeholder="budi@soeka.id" /></div>
-          <div><label className="label">{editing ? 'Password Baru (kosongkan jika tidak diubah)' : 'Password *'}</label><input className="input" type="password" value={form.password} onChange={e => f('password',e.target.value)} placeholder="••••••••" /></div>
-          <div><label className="label">Role *</label>
-            <select className="select" value={form.role} onChange={e => f('role',e.target.value)}>
-              {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-            </select>
-            <p className="text-xs text-gray-400 mt-1">
-              {form.role === 'STAFF' ? 'Hanya bisa akses POS' :
-               form.role === 'STAFF' ? 'Akses Staff Hub + Logbook' :
-               form.role === 'INVENTORY' ? 'Akses POS + Stok & Transfer' :
-               form.role === 'MANAGER' ? 'Semua akses kecuali Settings' :
-               'Akses penuh ke semua fitur'}
+      <div className="max-w-3xl mx-auto space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl font-black" style={{ color:'var(--text-1)' }}>Akun Pengguna</h1>
+            <p className="text-sm mt-0.5" style={{ color:'var(--text-3)' }}>
+              Kelola akun login — data karyawan ada di menu Karyawan
             </p>
           </div>
         </div>
-      </SlideOver>
 
-      <Modal open={!!deleteTarget} onClose={() => setDeleteTarget(null)} title="Hapus Pengguna">
-        <div className="space-y-4">
-          <p className="text-sm text-gray-600">Yakin hapus akun <span className="font-bold">{deleteTarget?.name}</span>? Data transaksi yang dibuat user ini tetap tersimpan.</p>
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setDeleteTarget(null)} className="btn btn-secondary btn-md">Batal</button>
-            <button onClick={handleDelete} disabled={deleting} className="btn btn-danger btn-md">{deleting ? 'Menghapus...' : 'Hapus'}</button>
+        {/* Info box */}
+        <div className="rounded-xl p-3 text-sm" style={{ background:'#EFF6FF', border:'1px solid #BFDBFE', color:'#1D4ED8' }}>
+          💡 Untuk tambah akun baru, buka menu <strong>Karyawan</strong> → pilih karyawan → klik "Buat Akun"
+        </div>
+
+        {/* Search */}
+        <input value={search} onChange={e => setSearch(e.target.value)}
+          className="input w-full" placeholder="Cari nama atau email..."/>
+
+        {/* List */}
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <div className="w-5 h-5 border-2 border-t-transparent rounded-full animate-spin"
+              style={{ borderColor:'var(--brand)', borderTopColor:'transparent' }}/>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filtered.map(u => (
+              <div key={u.id} className="card p-4">
+                <div className="flex items-center gap-4">
+                  {/* Avatar */}
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center font-black text-sm flex-shrink-0"
+                    style={{ background: ROLE_BG[u.role] || '#F9FAFB', color: ROLE_COLOR[u.role] || '#374151' }}>
+                    {u.name.charAt(0).toUpperCase()}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-bold text-sm" style={{ color:'var(--text-1)' }}>{u.name}</p>
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                        style={{ background: ROLE_BG[u.role], color: ROLE_COLOR[u.role] }}>
+                        {ROLES.find(r => r.value === u.role)?.label || u.role}
+                      </span>
+                      {!u.active && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-medium">Nonaktif</span>
+                      )}
+                      {u.hasPosAccess && u.role === 'STAFF' && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background:'#E1F5EE', color:'#0F6E56' }}>POS</span>
+                      )}
+                    </div>
+                    <p className="text-xs mt-0.5" style={{ color:'var(--text-3)' }}>{u.email}</p>
+                    {u.employee && (
+                      <p className="text-xs mt-0.5" style={{ color:'var(--text-3)' }}>
+                        📋 {u.employee.position || 'Karyawan'}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2 flex-shrink-0 flex-wrap justify-end">
+                    {u.role === 'STAFF' && (
+                      <button onClick={() => togglePosAccess(u)}
+                        title={u.hasPosAccess ? 'Cabut akses POS' : 'Beri akses POS'}
+                        className="btn btn-sm text-xs"
+                        style={u.hasPosAccess
+                          ? { background:'#E1F5EE', color:'#0F6E56', border:'1px solid #9FE1CB' }
+                          : { background:'var(--surface-2)', color:'var(--text-3)', border:'1px solid var(--border)' }}>
+                        POS {u.hasPosAccess ? 'ON' : 'OFF'}
+                      </button>
+                    )}
+                    <button onClick={() => openEdit(u)} className="btn btn-sm btn-secondary text-xs">Edit</button>
+                    <button onClick={() => toggleActive(u)}
+                      className="btn btn-sm text-xs"
+                      style={u.active
+                        ? { background:'#FEF2F2', color:'#DC2626', border:'1px solid #FECACA' }
+                        : { background:'#F0FDF4', color:'#16A34A', border:'1px solid #BBF7D0' }}>
+                      {u.active ? 'Nonaktif' : 'Aktif'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {filtered.length === 0 && (
+              <div className="card text-center py-10 text-gray-400">
+                {search ? `Tidak ada hasil untuk "${search}"` : 'Tidak ada akun'}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Edit Modal */}
+      {editModal && editing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background:'rgba(0,0,0,0.5)' }}>
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden">
+            <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor:'var(--border)' }}>
+              <p className="font-black text-base" style={{ color:'var(--text-1)' }}>Edit Akun — {editing.name}</p>
+              <button onClick={() => setEditModal(false)} className="text-gray-400 text-xl hover:text-gray-600">×</button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="label">Email</label>
+                <input value={form.email} onChange={e => setForm(p => ({...p, email: e.target.value}))}
+                  className="input w-full mt-1" type="email"/>
+              </div>
+              <div>
+                <label className="label">Role</label>
+                <select value={form.role} onChange={e => setForm(p => ({...p, role: e.target.value}))} className="select w-full mt-1">
+                  {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </div>
+              {form.role === 'STAFF' && (
+                <div className="flex items-center gap-2">
+                  <input type="checkbox" id="posAccess" checked={form.hasPosAccess}
+                    onChange={e => setForm(p => ({...p, hasPosAccess: e.target.checked}))} className="rounded"/>
+                  <label htmlFor="posAccess" className="text-sm" style={{ color:'var(--text-1)' }}>
+                    Akses POS (bisa buka kasir)
+                  </label>
+                </div>
+              )}
+              <div className="pt-1 border-t" style={{ borderColor:'var(--border)' }}>
+                <button onClick={() => { setResetPwModal(true); setNewPw(''); }}
+                  className="text-sm font-medium" style={{ color:'var(--brand)' }}>
+                  🔑 Reset Password
+                </button>
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t flex gap-3" style={{ borderColor:'var(--border)' }}>
+              <button onClick={() => setEditModal(false)} className="btn btn-secondary flex-1">Batal</button>
+              <button onClick={save} disabled={saving} className="btn btn-primary flex-1">
+                {saving ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
           </div>
         </div>
-      </Modal>
+      )}
+
+      {/* Reset Password Modal */}
+      {resetPwModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background:'rgba(0,0,0,0.5)' }}>
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
+            <div className="px-5 py-4 border-b" style={{ borderColor:'var(--border)' }}>
+              <p className="font-black" style={{ color:'var(--text-1)' }}>Reset Password — {editing?.name}</p>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-sm" style={{ color:'var(--text-3)' }}>Password baru untuk akun ini:</p>
+              <input value={newPw} onChange={e => setNewPw(e.target.value)}
+                className="input w-full" type="text" placeholder="Password baru..."/>
+            </div>
+            <div className="px-5 py-4 border-t flex gap-3" style={{ borderColor:'var(--border)' }}>
+              <button onClick={() => setResetPwModal(false)} className="btn btn-secondary flex-1">Batal</button>
+              <button onClick={resetPassword} disabled={saving || !newPw} className="btn btn-primary flex-1">
+                {saving ? 'Mereset...' : 'Reset Password'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }
