@@ -427,22 +427,87 @@ function ReceiveForm({ onDone }: any) {
 }
 
 function RequestForm({ ingredients, onDone }: any) {
-  const [items,setItems]=useState([{ingredientId:'',quantity:'',unit:''}]);
-  const [notes,setNotes]=useState('');const [busy,setBusy]=useState(false);
-  const upd=(i:number,k:string,v:string)=>setItems(p=>p.map((e,j)=>j===i?{...e,[k]:v}:e));
-  function pick(idx:number,id:string){const ing=ingredients.find((i:any)=>i.id===id);setItems(p=>p.map((e,j)=>j===idx?{...e,ingredientId:id,unit:ing?.purchaseUnit||ing?.unit||''}:e));}
-  async function submit(){const v=items.filter(i=>i.ingredientId&&i.quantity);if(!v.length)return;setBusy(true);try{await api.post('/api/purchase-requests',{items:v.map(i=>({ingredientId:i.ingredientId,quantity:parseFloat(i.quantity),unit:i.unit})),notes});onDone();}catch(e:any){alert(e.message);}finally{setBusy(false);}}
+  const [reqType, setReqType] = useState<'bahan'|'supply'>('bahan');
+  const [supplies, setSupplies] = useState<any[]>([]);
+  const [items, setItems] = useState([{ingredientId:'', quantity:'', unit:''}]);
+  const [supplyItems, setSupplyItems] = useState([{supplyItemId:'', quantity:'', unit:''}]);
+  const [notes, setNotes] = useState(''); const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.get<any[]>('/api/supplies').then(r => setSupplies(Array.isArray(r) ? r : [])).catch(() => {});
+  }, []);
+
+  const upd = (i:number,k:string,v:string) => setItems(p=>p.map((e,j)=>j===i?{...e,[k]:v}:e));
+  function pick(idx:number, id:string) { const ing=ingredients.find((i:any)=>i.id===id); setItems(p=>p.map((e,j)=>j===idx?{...e,ingredientId:id,unit:ing?.purchaseUnit||ing?.unit||''}:e)); }
+
+  const updSupply = (i:number,k:string,v:string) => setSupplyItems(p=>p.map((e,j)=>j===i?{...e,[k]:v}:e));
+  function pickSupply(idx:number, id:string) { const s=supplies.find((i:any)=>i.id===id); setSupplyItems(p=>p.map((e,j)=>j===idx?{...e,supplyItemId:id,unit:s?.unit||''}:e)); }
+
+  async function submit() {
+    setBusy(true);
+    try {
+      if (reqType === 'bahan') {
+        const v = items.filter(i=>i.ingredientId&&i.quantity);
+        if (!v.length) return;
+        await api.post('/api/purchase-requests', { items: v.map(i=>({ingredientId:i.ingredientId,quantity:parseFloat(i.quantity),unit:i.unit})), notes });
+      } else {
+        const v = supplyItems.filter(i=>i.supplyItemId&&i.quantity);
+        if (!v.length) return;
+        // Submit sebagai supply request — kirim ke purchase-requests dengan flag supply
+        await api.post('/api/purchase-requests', {
+          items: v.map(i=>({ supplyItemId: i.supplyItemId, quantity: parseFloat(i.quantity), unit: i.unit })),
+          type: 'SUPPLY', notes,
+        });
+      }
+      onDone();
+    } catch(e:any) { alert(e.message); } finally { setBusy(false); }
+  }
+
   return <div className="space-y-4">
+    {/* Type toggle */}
+    <div className="flex gap-1 p-1 rounded-xl" style={{ background:'#F0EDE8' }}>
+      {[['bahan','🥬 Bahan Baku'],['supply','⚡ Supplies']].map(([t,label])=>(
+        <button key={t} onClick={()=>setReqType(t as any)}
+          className="flex-1 py-2 rounded-lg text-sm font-bold transition-all"
+          style={reqType===t?{background:'white',color:G}:{color:'#A0A0A0'}}>
+          {label}
+        </button>
+      ))}
+    </div>
+
     <p className="text-sm" style={{ color:'#888' }}>Manager akan terima notifikasi dan buat PO dari request ini.</p>
-    {items.map((item,i)=>{const ing=ingredients.find((x:any)=>x.id===item.ingredientId);return(
-      <div key={i} className="rounded-xl p-3.5 space-y-2.5" style={{ background:'#F7F5F2' }}>
-        <IngredientPicker ingredients={ingredients} value={item.ingredientId} onChange={(v:string)=>pick(i,v)}/>
-        <div className="flex gap-2"><div className="flex-1"><Input type="number" value={item.quantity} onChange={e=>upd(i,'quantity',e.target.value)} placeholder="Qty"/></div><div className="rounded-xl px-3 flex items-center text-sm" style={{ background:'white', border:'1px solid #E8E2D9', color:'#A0A0A0', minWidth:60 }}>{ing?.purchaseUnit||ing?.unit||'unit'}</div></div>
-      </div>);
-    })}
-    <button onClick={()=>setItems(p=>[...p,{ingredientId:'',quantity:'',unit:''}])} className="w-full py-2.5 rounded-xl text-sm font-bold border" style={{ borderColor:'#E8E2D9', color:'#888' }}>+ Tambah Bahan</button>
+
+    {reqType === 'bahan' ? <>
+      {items.map((item,i)=>{ const ing=ingredients.find((x:any)=>x.id===item.ingredientId); return (
+        <div key={i} className="rounded-xl p-3.5 space-y-2.5" style={{ background:'#F7F5F2' }}>
+          <IngredientPicker ingredients={ingredients} value={item.ingredientId} onChange={(v:string)=>pick(i,v)}/>
+          <div className="flex gap-2">
+            <div className="flex-1"><Input type="number" value={item.quantity} onChange={e=>upd(i,'quantity',e.target.value)} placeholder="Qty"/></div>
+            <div className="rounded-xl px-3 flex items-center text-sm" style={{ background:'white', border:'1px solid #E8E2D9', color:'#A0A0A0', minWidth:60 }}>{ing?.purchaseUnit||ing?.unit||'unit'}</div>
+          </div>
+        </div>);
+      })}
+      <button onClick={()=>setItems(p=>[...p,{ingredientId:'',quantity:'',unit:''}])} className="w-full py-2.5 rounded-xl text-sm font-bold border" style={{ borderColor:'#E8E2D9', color:'#888' }}>+ Tambah Bahan</button>
+    </> : <>
+      {supplyItems.map((item,i)=>{ const s=supplies.find((x:any)=>x.id===item.supplyItemId); return (
+        <div key={i} className="rounded-xl p-3.5 space-y-2.5" style={{ background:'#F7F5F2' }}>
+          <select value={item.supplyItemId} onChange={e=>pickSupply(i,e.target.value)} className="select w-full">
+            <option value="">Pilih supplies...</option>
+            {supplies.map((s:any)=><option key={s.id} value={s.id}>{s.name} ({s.unit})</option>)}
+          </select>
+          <div className="flex gap-2">
+            <div className="flex-1"><Input type="number" value={item.quantity} onChange={e=>updSupply(i,'quantity',e.target.value)} placeholder="Qty"/></div>
+            <div className="rounded-xl px-3 flex items-center text-sm" style={{ background:'white', border:'1px solid #E8E2D9', color:'#A0A0A0', minWidth:60 }}>{s?.unit||'unit'}</div>
+          </div>
+        </div>);
+      })}
+      <button onClick={()=>setSupplyItems(p=>[...p,{supplyItemId:'',quantity:'',unit:''}])} className="w-full py-2.5 rounded-xl text-sm font-bold border" style={{ borderColor:'#E8E2D9', color:'#888' }}>+ Tambah Item</button>
+    </>}
+
     <Field label="CATATAN"><Input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Untuk manager (opsional)"/></Field>
-    <SubmitBtn busy={busy} label="Kirim Request" onClick={submit} disabled={!items.some(i=>i.ingredientId&&i.quantity)} color="#EA580C"/>
+    <SubmitBtn busy={busy} label="Kirim Request" onClick={submit}
+      disabled={reqType==='bahan'?!items.some(i=>i.ingredientId&&i.quantity):!supplyItems.some(i=>i.supplyItemId&&i.quantity)}
+      color="#EA580C"/>
   </div>;
 }
 
