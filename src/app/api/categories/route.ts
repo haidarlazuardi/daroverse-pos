@@ -33,7 +33,7 @@ export const POST = withAuth(async (req) => {
   });
 
   return success(category, 201);
-}, ADMIN_ROLES);
+}, ALL_ROLES);
 
 // PATCH — update
 export const PATCH = withAuth(async (req) => {

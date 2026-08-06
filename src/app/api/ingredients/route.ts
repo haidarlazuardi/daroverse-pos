@@ -92,7 +92,7 @@ export const POST = withAuth(async (req) => {
   } catch (e: any) {
     return error(e?.message || 'Gagal membuat bahan', 500);
   }
-}, ADMIN_ROLES);
+}, ALL_ROLES);
 
 export const PATCH = withAuth(async (req) => {
   const { id, prepRecipe, ...data } = await req.json();

@@ -36,7 +36,7 @@ export const GET = withAuth(async (req: NextRequest) => {
     },
   });
   return success(customers);
-}, ADMIN_ROLES);
+}, ALL_ROLES);
 
 export const PATCH = withAuth(async (req: NextRequest) => {
   const { id, name, phone } = await req.json();

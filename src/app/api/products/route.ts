@@ -119,7 +119,7 @@ export const POST = withAuth(async (req) => {
     console.error('Product create error:', e);
     return error(e.message || 'Failed to create product', 500);
   }
-}, ADMIN_ROLES);
+}, ALL_ROLES);
 
 export const PUT = withAuth(async (req) => {
   try {

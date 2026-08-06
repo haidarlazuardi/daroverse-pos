@@ -163,6 +163,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const user = authenticate(req);
   if (!user) return error('Unauthorized', 401);
+  // Staff harus punya hasPosAccess untuk buat order
+  if (user.role === 'STAFF') {
+    const u = await prisma.user.findUnique({ where: { id: user.userId }, select: { hasPosAccess: true } });
+    if (!u?.hasPosAccess) return error('Tidak ada akses POS', 403);
+  }
 
   try {
     const body = await req.json();

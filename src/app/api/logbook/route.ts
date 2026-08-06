@@ -79,4 +79,4 @@ export const DELETE = withAuth(async (req: NextRequest, user) => {
   }
   await (prisma as any).logbookEntry.delete({ where: { id } });
   return success({ deleted: true });
-}, ALL_ROLES);
+}, ADMIN_ROLES);

@@ -204,4 +204,4 @@ export const PATCH = withAuth(async (req: NextRequest, user) => {
   }
 
   return error('Action tidak valid');
-}, ALL_ROLES);
+}, ALL_ROLES); // ALL: staff can request_close; approve/force/reopen checked internally

@@ -48,7 +48,7 @@ export const POST = withAuth(async (req) => {
     },
   });
   return success(discount, 201);
-}, ADMIN_ROLES);
+}, ALL_ROLES);
 
 export const PUT = withAuth(async (req) => {
   const { id, ...data } = await req.json();

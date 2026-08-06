@@ -28,4 +28,4 @@ export const PUT = withAuth(async (req) => {
     )
   );
   return success({ saved: entries.length });
-}, ADMIN_ROLES);
+}, ALL_ROLES);

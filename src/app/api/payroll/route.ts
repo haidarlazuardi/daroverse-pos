@@ -120,7 +120,22 @@ export const POST = withAuth(async (req: NextRequest) => {
     const userKasbon = kasbons.find((k: any) => k.userId === user.id);
     const kasbonDeduction = userKasbon?.monthlyInstallment || 0;
 
-    const totalAmount = baseSalary + scShare - kasbonDeduction;
+    // Late punishment — import dari late-engine
+    const userLateRecords = await (prisma as any).lateRecord.findMany({
+      where: { userId: user.id, date: { gte: from, lte: to } },
+      select: { status: true, confirmed: true, minutesLate: true },
+    });
+    const { calcMonthlyPunishment } = await import('@/lib/late-engine');
+    const punishment = calcMonthlyPunishment(userLateRecords, dailyRate);
+
+    // Incentive earned this month
+    const incentiveEntries = await (prisma as any).incentiveEntry.findMany({
+      where: { userId: user.id, incentive: { date: { gte: from, lte: to } } },
+      select: { amount: true, status: true },
+    });
+    const totalIncentive = incentiveEntries.reduce((s: number, e: any) => s + e.amount, 0);
+
+    const totalAmount = baseSalary + scShare - kasbonDeduction - punishment.totalDeduction + totalIncentive;
     totalPayout += totalAmount;
 
     await (prisma as any).payrollRecord.upsert({
@@ -131,6 +146,11 @@ export const POST = withAuth(async (req: NextRequest) => {
         scheduledDays, presentDays,
         baseSalary, serviceCharge: Math.round(scShare),
         kasbonDeduction, totalAmount: Math.round(totalAmount),
+        lateCount: punishment.lateCount,
+        lateDeduction: punishment.lateDeduction,
+        veryLateDeduction: punishment.veryLateDeduction,
+        absentDeduction: punishment.absentDeduction,
+        incentiveAmount: totalIncentive,
         bankName: emp?.bankName || user.bankName,
         bankAccount: emp?.bankAccount || user.bankAccount,
         bankAccountName: emp?.bankAccountName || user.bankAccountName,

@@ -183,6 +183,8 @@ model User {
   leaves             Leave[]
   scheduleSlots      ScheduleSlot[]   @relation("ScheduleSlots")
   employee           Employee?        @relation("EmployeeUser")
+  lateRecords        LateRecord[]     @relation("LateRecords")
+  incentiveEntries   IncentiveEntry[] @relation("IncentiveEntries")
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -1448,4 +1450,64 @@ model SupplyOrderItem {
   receivedQty   Float       @default(0)
 
   @@map("supply_order_items")
+}
+
+// ── LATE TRACKING & INCENTIVE SYSTEM ─────────────────────────────────────────
+
+enum LateStatus {
+  LATE          // terlambat dalam batas (di atas toleransi)
+  VERY_LATE     // telat > 1.5 jam tanpa konfirmasi
+  ABSENT_NO_INFO // tidak masuk tanpa kabar
+}
+
+model LateRecord {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation("LateRecords", fields: [userId], references: [id])
+  date        DateTime
+  shift       String     // '1' or '2'
+  minutesLate Int        @default(0)
+  status      LateStatus
+  confirmed   Boolean    @default(false) // manager konfirmasi ada alasan
+  note        String?
+  punishment  String?    // deskripsi potongan yang dikenakan
+  createdBy   String
+  createdAt   DateTime   @default(now())
+
+  @@map("late_records")
+}
+
+enum IncentiveStatus {
+  PENDING   // belum dicairkan
+  PAID      // sudah dicairkan (Jumat)
+}
+
+model DailyIncentive {
+  id          String          @id @default(cuid())
+  date        DateTime        // tanggal omset tercapai
+  revenue     Float           // omset hari itu
+  level       Int             // 1, 2, atau 3
+  totalPool   Float           // total insentif (120k/240k/360k)
+  perPerson   Float           // pool / jumlah crew hadir
+  crewCount   Int             // jumlah crew yang dapat
+  status      IncentiveStatus @default(PENDING)
+  paidAt      DateTime?
+  paidBy      String?
+  entries     IncentiveEntry[]
+  createdAt   DateTime        @default(now())
+
+  @@unique([date])
+  @@map("daily_incentives")
+}
+
+model IncentiveEntry {
+  id          String         @id @default(cuid())
+  incentiveId String
+  incentive   DailyIncentive @relation(fields: [incentiveId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User           @relation("IncentiveEntries", fields: [userId], references: [id])
+  amount      Float
+  status      IncentiveStatus @default(PENDING)
+
+  @@map("incentive_entries")
 }

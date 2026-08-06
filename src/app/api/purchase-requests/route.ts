@@ -58,4 +58,4 @@ export const PATCH = withAuth(async (req: NextRequest) => {
     data: { status },
   });
   return success(updated);
-}, SENIOR_ROLES);
+}, ADMIN_ROLES);
