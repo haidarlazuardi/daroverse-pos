@@ -733,27 +733,33 @@ export default function POSPage() {
     if (!activeShift) return;
     // Cek open bill yang belum ditutup
     try {
-      const now = new Date();
-      const wibOffset = 7 * 60 * 60 * 1000;
-      const todayWIB = new Date(now.getTime() + wibOffset);
-      const dateStr = todayWIB.toISOString().slice(0, 10);
-      const fromUTC = new Date(dateStr + 'T00:00:00+07:00').toISOString();
-      const toUTC   = new Date(dateStr + 'T23:59:59+07:00').toISOString();
-      const data = await api.get<any>(`/api/orders?status=OPEN&limit=10&from=${fromUTC}&to=${toUTC}`);
+      const wib = new Date(Date.now() + 7*60*60*1000);
+      const dateStr = wib.toISOString().slice(0, 10);
+      const data = await api.get<any>(`/api/orders?status=OPEN&limit=10&from=${dateStr}T00:00:00%2B07:00&to=${dateStr}T23:59:59%2B07:00`);
       const pending = data.orders || [];
       if (pending.length > 0) {
         const names = pending.map((o: any) => o.billName || o.orderNumber).join(', ');
-        const confirm = window.confirm(
-          `⚠️ Ada ${pending.length} open bill yang belum ditutup:\n${names}\n\nTutup shift tetap dilanjutkan?`
-        );
-        if (!confirm) return;
+        if (!window.confirm(`⚠️ Ada ${pending.length} open bill yang belum ditutup:\n${names}\n\nLanjutkan?`)) return;
       }
     } catch {}
+
+    // Fix #3: gunakan PATCH request_close (satu jalur)
     try {
-      const r = await api.post<any>('/api/shifts', { action: 'close', shiftId: activeShift.id, closingCash: closingCash || '0' });
+      const r = await api.patch<any>('/api/shifts', {
+        id: activeShift.id,
+        action: 'request_close',
+        closingCash: closingCash || '0',
+      });
+      // Kalau OWNER/MANAGER, langsung force close
+      if (['OWNER','MANAGER','SUPER_ADMIN'].includes(user?.role || '')) {
+        await api.patch('/api/shifts', { id: activeShift.id, action: 'approve_close' });
+      }
       setActiveShift(null); setClosingCash(''); setShowShift(false);
-      alert(`Shift ditutup. Selisih: ${formatCurrency(r.difference || 0)}`);
-    } catch (e: any) { alert(e.message || 'Gagal'); }
+      const selisih = r.difference || 0;
+      const sign = selisih >= 0 ? '+' : '';
+      alert(`Shift ditutup.\nTotal Sales: ${formatCurrency(r.totalSales || 0)}\nKas diharapkan: ${formatCurrency(r.expectedCash || 0)}\nKas aktual: ${formatCurrency(r.closingCash || 0)}\nSelisih: ${sign}${formatCurrency(selisih)}`);
+      loadData();
+    } catch (e: any) { alert(e.message || 'Gagal menutup shift'); }
   };
 
   const receiptLines = (o: any) => [
@@ -1338,6 +1344,13 @@ export default function POSPage() {
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Status badge */}
+            {activeShift.status === 'PENDING_CLOSE' && (
+              <div className="rounded-xl p-3 text-sm font-bold text-center"
+                style={{ background:'#FFFBEB', color:'#854F0B', border:'1px solid #F59E0B40' }}>
+                ⏳ Menunggu approval manager untuk ditutup
+              </div>
+            )}
             <div className="rounded-xl p-4 space-y-2" style={{ background: 'var(--brand)08', border: '1px solid var(--brand)20' }}>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Dibuka oleh</span>
@@ -1351,13 +1364,37 @@ export default function POSPage() {
                 <span className="text-gray-500">Kas awal</span>
                 <span className="font-bold">{formatCurrency(activeShift.openingCash)}</span>
               </div>
+              {activeShift.totalSales > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Total penjualan</span>
+                  <span className="font-bold" style={{ color:'var(--brand)' }}>{formatCurrency(activeShift.totalSales)}</span>
+                </div>
+              )}
+              {activeShift.expectedCash != null && (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Kas diharapkan</span>
+                    <span className="font-bold">{formatCurrency(activeShift.expectedCash)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Selisih</span>
+                    <span className="font-bold" style={{ color: (activeShift.difference || 0) < 0 ? '#DC2626' : '#16A34A' }}>
+                      {(activeShift.difference || 0) >= 0 ? '+' : ''}{formatCurrency(activeShift.difference || 0)}
+                    </span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Durasi</span>
                 <span className="font-bold">{Math.round((Date.now() - new Date(activeShift.openedAt).getTime()) / 60000)} menit</span>
               </div>
             </div>
-            <Input label="Kas akhir (hitung laci)" type="number" value={closingCash} onChange={(e) => setClosingCash(e.target.value)} placeholder="Jumlah uang di laci"/>
-            <Button onClick={closeShift} variant="danger" className="w-full">🔴 Tutup Shift</Button>
+            {activeShift.status === 'OPEN' && (
+              <>
+                <Input label="Kas akhir (hitung laci)" type="number" value={closingCash} onChange={(e) => setClosingCash(e.target.value)} placeholder="Jumlah uang di laci"/>
+                <Button onClick={closeShift} variant="danger" className="w-full">🔴 Tutup Shift</Button>
+              </>
+            )}
           </div>
         )}
       </Modal>
