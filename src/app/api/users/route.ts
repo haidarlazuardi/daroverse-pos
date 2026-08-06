@@ -60,24 +60,37 @@ export const DELETE = withAuth(async (req) => {
     return success({ deleted: false, deactivated: true, reason: `User punya ${orderCount} order — dinonaktifkan untuk menjaga data historis transaksi` });
   }
 
-  // Hapus semua relasi dulu
-  try { await (prisma as any).attendance.deleteMany({ where: { userId: id } }); } catch {}
-  try { await (prisma as any).leave.deleteMany({ where: { userId: id } }); } catch {}
-  try { await (prisma as any).kasbon.deleteMany({ where: { userId: id } }); } catch {}
-  try { await (prisma as any).voidRequest.deleteMany({ where: { requestedBy: id } }); } catch {}
-  try { await (prisma as any).scheduleSlot.deleteMany({ where: { userId: id } }); } catch {}
-  try { await (prisma as any).shiftSwap.deleteMany({ where: { requestedBy: id } }); } catch {}
-  try { await (prisma as any).auditLog.deleteMany({ where: { userId: id } }); } catch {}
-  try { await (prisma as any).loyaltyLedger.deleteMany({ where: { userId: id } }); } catch {}
-  try { await (prisma as any).employee.updateMany({ where: { userId: id }, data: { userId: null } }); } catch {}
-  try { await (prisma as any).shift.updateMany({ where: { userId: id }, data: { userId: id } }); } catch {}
+  // Hapus/nullify semua relasi pakai Prisma ORM
+  // Nullify (set null) dulu untuk yang optional
+  const nullifyPromises = [
+    prisma.order.updateMany({ where: { userId: id }, data: { userId: id } }).catch(() => {}),
+    prisma.shift.updateMany({ where: { userId: id }, data: { userId: id } }).catch(() => {}),
+    (prisma as any).auditLog?.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {}),
+    (prisma as any).loyaltyLedger?.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {}),
+    (prisma as any).payrollRecord?.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {}),
+    (prisma as any).workSchedule?.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {}),
+    (prisma as any).scheduleSlot?.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {}),
+    (prisma as any).logbookEntry?.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {}),
+    (prisma as any).employee?.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {}),
+  ];
+  await Promise.allSettled(nullifyPromises);
+
+  // Hapus child records
+  const deletePromises = [
+    (prisma as any).attendance?.deleteMany({ where: { userId: id } }).catch(() => {}),
+    (prisma as any).leave?.deleteMany({ where: { userId: id } }).catch(() => {}),
+    (prisma as any).kasbon?.deleteMany({ where: { userId: id } }).catch(() => {}),
+    (prisma as any).voidRequest?.deleteMany({ where: { requestedBy: id } }).catch(() => {}),
+    (prisma as any).shiftSwap?.deleteMany({ where: { requestedBy: id } }).catch(() => {}),
+    (prisma as any).scheduleSlot?.deleteMany({ where: { userId: id } }).catch(() => {}),
+  ];
+  await Promise.allSettled(deletePromises);
 
   try {
     await prisma.user.delete({ where: { id } });
     return success({ deleted: true });
   } catch (e: any) {
-    // Kalau masih gagal karena relasi, nonaktifkan saja
     await prisma.user.update({ where: { id }, data: { active: false } }).catch(() => {});
-    return success({ deleted: false, deactivated: true, reason: `Gagal hapus permanen (${e.message?.slice(0,100)}) — dinonaktifkan` });
+    return success({ deleted: false, deactivated: true, reason: 'Masih ada relasi yang tidak bisa dihapus — akun dinonaktifkan' });
   }
 }, SENIOR_ROLES);
