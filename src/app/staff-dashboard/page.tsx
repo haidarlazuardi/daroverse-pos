@@ -31,6 +31,7 @@ export default function StaffDashboard() {
 
   const attendance = data?.attendance;
   const payroll    = data?.payroll?.current;
+  const emp        = data?.employee; // data HR dari Employee model
   const kasbons    = data?.kasbons || [];
   const schedules  = data?.schedules || [];
 
@@ -93,6 +94,9 @@ export default function StaffDashboard() {
 
         {/* Payroll Breakdown */}
         {payroll && <PayrollCard payroll={payroll} record={data?.payroll?.record} month={MONTHS[now.getMonth()]} year={now.getFullYear()}/>}
+
+        {/* Info Karyawan */}
+        {emp && <InfoKaryawanCard emp={emp}/>}
 
         {/* Kasbon */}
         {kasbons.length > 0 && <KasbonCard kasbons={kasbons}/>}
@@ -381,6 +385,50 @@ function KasbonCard({ kasbons }: any) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function InfoKaryawanCard({ emp }: any) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mx-4 rounded-2xl bg-white overflow-hidden" style={{ boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
+      <button onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3.5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background:'#E8F0E9' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#48654D" strokeWidth="2">
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+          <p className="font-bold text-sm" style={{ color:'#1a1a1a' }}>Info Karyawan</p>
+        </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A0A0A0" strokeWidth="2"
+          style={{ transform: open ? 'rotate(180deg)' : 'none', transition:'transform 0.2s' }}>
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </button>
+      {open && (
+        <div className="px-4 pb-4 border-t" style={{ borderColor:'#F0EDE8' }}>
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            {[
+              ['Posisi', emp.position || '—'],
+              ['Tipe', emp.employeeType || '—'],
+              ['Bergabung', emp.joinDate ? new Date(emp.joinDate).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}) : '—'],
+              ['Daily Rate', `Rp ${Number(emp.dailyRate||0).toLocaleString('id-ID')}`],
+              ['Bank', emp.bankName || '—'],
+              ['No. Rekening', emp.bankAccount || '—'],
+              ['Nama Rekening', emp.bankAccountName || '—'],
+              ['No. HP', emp.phone || '—'],
+            ].map(([label, val]) => (
+              <div key={label as string}>
+                <p className="text-xs" style={{ color:'#A0A0A0' }}>{label}</p>
+                <p className="text-sm font-semibold mt-0.5" style={{ color:'#1a1a1a' }}>{val}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

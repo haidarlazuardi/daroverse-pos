@@ -15,7 +15,10 @@ export const GET = withAuth(async (_req: NextRequest, user) => {
     prisma.user.findUnique({
       where: { id: user.userId },
       select: { id:true, name:true, role:true, employeeType:true, dailyRate:true,
-                bankName:true, bankAccount:true, hasPosAccess:true, joinDate:true },
+                bankName:true, bankAccount:true, hasPosAccess:true, joinDate:true,
+                employee: { select: { id:true, dailyRate:true, bankName:true, bankAccount:true,
+                  bankAccountName:true, employeeType:true, position:true,
+                  joinDate:true, serviceChargeEligible:true, phone:true } } },
     }),
     (prisma as any).attendance.findMany({
       where: { userId: user.userId, type: 'CHECK_IN', createdAt: { gte: monthStart, lte: monthEnd } },
@@ -67,13 +70,15 @@ export const GET = withAuth(async (_req: NextRequest, user) => {
   if (!me) return error('User tidak ditemukan', 404);
 
   const presentDays = attendances.length;
-  const dailyRate   = (me as any).dailyRate || 0;
+  const emp        = (me as any).employee;
+  const dailyRate  = emp?.dailyRate || (me as any).dailyRate || 0;
   const baseSalary  = presentDays * dailyRate;
   const scEstimate  = revenueData.totalDays > 0 ? (revenueData.scPool / revenueData.totalDays) * presentDays : 0;
   const kasbonTotal = kasbons.reduce((s: number, k: any) => s + k.remaining, 0);
 
   return success({
     user: me,
+    employee: emp || null,  // data HR dari tabel Employee
     attendance: {
       today: {
         checkedIn:  todayAttendances.some((a:any) => a.type === 'CHECK_IN'),

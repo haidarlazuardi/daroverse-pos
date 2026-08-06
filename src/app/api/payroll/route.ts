@@ -49,10 +49,14 @@ export const POST = withAuth(async (req: NextRequest) => {
   // SC pool = total service charge yang benar-benar dikumpulkan dari customer
   const serviceChargePool = orders.reduce((s, o) => s + (o.serviceCharge || 0), 0);
 
-  // Get all active users with employeeType
+  // Get all active users — prefer Employee data if linked
   const users = await prisma.user.findMany({
-    where: { active: true, employeeType: { not: null } },
-    select: { id: true, name: true, employeeType: true, dailyRate: true, bankName: true, bankAccount: true, bankAccountName: true },
+    where: { active: true, role: 'STAFF' },
+    select: { id: true, name: true, employeeType: true, dailyRate: true,
+              bankName: true, bankAccount: true, bankAccountName: true,
+              employee: { select: { dailyRate: true, bankName: true, bankAccount: true,
+                bankAccountName: true, employeeType: true, position: true,
+                serviceChargeEligible: true } } },
   });
 
   // Count attendance per user
@@ -94,7 +98,9 @@ export const POST = withAuth(async (req: NextRequest) => {
   for (const user of users) {
     const presentDays  = presentMap[user.id] || 0;
     const scheduledDays = scheduledMap[user.id] || 0;
-    const dailyRate    = (user.dailyRate as number) || (user.employeeType === 'HELPER' ? 50000 : 60000);
+    const emp          = (user as any).employee;
+    const dailyRate    = emp?.dailyRate || (user.dailyRate as number) || 0;
+    const scEligible   = emp?.serviceChargeEligible !== false;
     const baseSalary   = dailyRate * presentDays;
     const scShare      = totalPresentDays > 0 ? (serviceChargePool / totalPresentDays) * presentDays : 0;
 
@@ -113,7 +119,10 @@ export const POST = withAuth(async (req: NextRequest) => {
         scheduledDays, presentDays,
         baseSalary, serviceCharge: scShare,
         kasbonDeduction, totalAmount,
-        bankName: user.bankName, bankAccount: user.bankAccount, bankAccountName: user.bankAccountName,
+        bankName: emp?.bankName || user.bankName, 
+        bankAccount: emp?.bankAccount || user.bankAccount, 
+        bankAccountName: emp?.bankAccountName || user.bankAccountName,
+        scEligible,
       },
       update: {
         scheduledDays, presentDays, baseSalary,
