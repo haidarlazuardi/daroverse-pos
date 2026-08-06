@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
         select: { id: true, name: true, price: true, station: true, takeawayCharge: true },
       }),
       computeOrderRequirements(toEngineItems(items), orderType),
-      prisma.shift.findFirst({ where: { userId: user.userId, closedAt: null } }),
+      prisma.shift.findFirst({ where: { status: { in: ['OPEN', 'PENDING_CLOSE'] } }, orderBy: { openedAt: 'desc' } }),
       discountId ? prisma.discount.findUnique({ where: { id: discountId } }) : Promise.resolve(null),
       getSettings(),
     ]);

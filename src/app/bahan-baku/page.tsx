@@ -6,6 +6,7 @@ import { Badge, Button, Modal, formatCurrency, formatNumber } from '@/components
 import { SlideOver } from '@/components/ui/SlideOver';
 import { Toolbar } from '@/components/ui/Toolbar';
 import { api } from '@/lib/fetch';
+import IngredientPicker from '@/components/ui/IngredientPicker';
 import clsx from 'clsx';
 import * as XLSX from 'xlsx';
 

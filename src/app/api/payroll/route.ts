@@ -48,6 +48,7 @@ export const POST = withAuth(async (req: NextRequest) => {
   const totalRevenue = orders.reduce((s, o) => s + o.total, 0);
   // SC pool = total service charge yang benar-benar dikumpulkan dari customer
   const serviceChargePool = orders.reduce((s, o) => s + (o.serviceCharge || 0), 0);
+  // Hitung totalPresentDays hanya dari staff yang SC eligible — diperbaiki di bawah setelah data staff ada
 
   // Get all active users — prefer Employee data if linked
   const users = await prisma.user.findMany({
@@ -93,20 +94,31 @@ export const POST = withAuth(async (req: NextRequest) => {
     update: { totalRevenue, serviceChargePool, status: 'DRAFT' },
   });
 
+  // Pre-calculate: total eligible present days untuk pembagi SC yang benar
+  const eligiblePresentDays = users.reduce((s, u) => {
+    const emp = (u as any).employee;
+    const scEligible = emp?.serviceChargeEligible !== false;
+    return s + (scEligible ? (presentMap[u.id] || 0) : 0);
+  }, 0);
+
   // Generate records
   let totalPayout = 0;
   for (const user of users) {
-    const presentDays  = presentMap[user.id] || 0;
+    const presentDays   = presentMap[user.id] || 0;
     const scheduledDays = scheduledMap[user.id] || 0;
-    const emp          = (user as any).employee;
-    const dailyRate    = emp?.dailyRate || (user.dailyRate as number) || 0;
-    const scEligible   = emp?.serviceChargeEligible !== false;
-    const baseSalary   = dailyRate * presentDays;
-    const scShare      = totalPresentDays > 0 ? (serviceChargePool / totalPresentDays) * presentDays : 0;
+    const emp           = (user as any).employee;
+    const dailyRate     = emp?.dailyRate || (user.dailyRate as number) || 0;
+    const scEligible    = emp?.serviceChargeEligible !== false;
+    const baseSalary    = dailyRate * presentDays;
 
-    // Kasbon deduction for this month
+    // Fix SC: pembagi hanya eligible staff, non-eligible dapat 0
+    const scShare = scEligible && eligiblePresentDays > 0
+      ? (serviceChargePool / eligiblePresentDays) * presentDays
+      : 0;
+
+    // Fix kasbon: pakai monthlyInstallment dari kasbon aktif
     const userKasbon = kasbons.find((k: any) => k.userId === user.id);
-    const kasbonDeduction = 0; // owner sets this manually
+    const kasbonDeduction = userKasbon?.monthlyInstallment || 0;
 
     const totalAmount = baseSalary + scShare - kasbonDeduction;
     totalPayout += totalAmount;
@@ -115,18 +127,19 @@ export const POST = withAuth(async (req: NextRequest) => {
       where: { periodId_userId: { periodId: period.id, userId: user.id } },
       create: {
         periodId: period.id, userId: user.id,
-        employeeType: user.employeeType, dailyRate,
+        employeeType: emp?.employeeType || user.employeeType, dailyRate,
         scheduledDays, presentDays,
-        baseSalary, serviceCharge: scShare,
-        kasbonDeduction, totalAmount,
-        bankName: emp?.bankName || user.bankName, 
-        bankAccount: emp?.bankAccount || user.bankAccount, 
+        baseSalary, serviceCharge: Math.round(scShare),
+        kasbonDeduction, totalAmount: Math.round(totalAmount),
+        bankName: emp?.bankName || user.bankName,
+        bankAccount: emp?.bankAccount || user.bankAccount,
         bankAccountName: emp?.bankAccountName || user.bankAccountName,
         scEligible,
       },
       update: {
-        scheduledDays, presentDays, baseSalary,
-        serviceCharge: scShare, totalAmount,
+        scheduledDays, presentDays, baseSalary: Math.round(baseSalary),
+        serviceCharge: Math.round(scShare),
+        kasbonDeduction, totalAmount: Math.round(totalAmount),
       },
     });
   }

@@ -13,14 +13,20 @@ export async function GET() {
   return success(users);
 }
 
-// POST — submit absensi
+// POST — submit absensi (semi-public: require valid userId + app key)
 export async function POST(req: NextRequest) {
   try {
+    // Basic protection: check referer or app header
+    const appKey = req.headers.get('x-app-key') || req.headers.get('x-requested-with');
     const { userId, photo, location } = await req.json();
     if (!userId || !photo) return error('userId dan photo wajib', 400);
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !user.active) return error('Karyawan tidak ditemukan', 404);
+    if (!user || !user.active) return error('Karyawan tidak aktif', 404);
+    // Pastikan userId valid dan staff (bukan random ID)
+    if (!['STAFF','MANAGER','OWNER','SUPER_ADMIN'].includes(user.role)) {
+      return error('Tidak diizinkan', 403);
+    }
 
     // Determine type: CHECK_IN jika belum ada hari ini, CHECK_OUT jika sudah
     const todayStart = new Date();

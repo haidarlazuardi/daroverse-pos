@@ -4,6 +4,12 @@ import prisma from '@/lib/prisma';
 import { success, error } from '@/lib/api-helpers';
 
 export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => ({}));
+  const { staffId } = body;
+  if (staffId) {
+    const staff = await prisma.user.findUnique({ where: { id: staffId }, select: { active: true } });
+    if (!staff?.active) return Response.json({ error: 'Staff tidak valid' }, { status: 403 });
+  }
   const { ingredientId, fromLocation, toLocation, quantity, notes } = await req.json();
   if (!ingredientId || !fromLocation || !toLocation || !quantity) return error('Data tidak lengkap');
   if (fromLocation === toLocation) return error('Lokasi asal dan tujuan sama');
