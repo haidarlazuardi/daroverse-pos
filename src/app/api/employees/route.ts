@@ -21,7 +21,7 @@ export const GET = withAuth(async (req: NextRequest) => {
 // POST — tambah karyawan baru
 export const POST = withAuth(async (req: NextRequest) => {
   const body = await req.json();
-  const { name, nik, phone, address, position, employeeType, joinDate, dailyRate,
+  const { name, email, nik, phone, address, position, employeeType, joinDate, dailyRate,
           bankName, bankAccount, bankAccountName, emergencyContact, emergencyPhone,
           serviceChargeEligible, notes } = body;
 
@@ -30,6 +30,7 @@ export const POST = withAuth(async (req: NextRequest) => {
   const emp = await (prisma as any).employee.create({
     data: {
       name: name.trim(),
+      email: email?.trim() || null,
       nik: nik || null,
       phone: phone || null,
       address: address || null,
@@ -58,12 +59,13 @@ export const PATCH = withAuth(async (req: NextRequest) => {
 
   // Action: buat akun login dari data karyawan
   if (action === 'create_account') {
-    const { email, password, role } = body;
-    if (!email || !password) return error('email dan password wajib');
-
     const emp = await (prisma as any).employee.findUnique({ where: { id } });
     if (!emp) return error('Karyawan tidak ditemukan');
     if (emp.userId) return error('Karyawan sudah punya akun');
+    // Pakai email dari Employee kalau tidak di-override
+    const { password, role } = body;
+    const email = body.email || emp.email;
+    if (!email || !password) return error('email dan password wajib');
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) return error('Email sudah digunakan');
@@ -98,7 +100,7 @@ export const PATCH = withAuth(async (req: NextRequest) => {
   }
 
   // Default: update data karyawan
-  const { name, nik, phone, address, position, employeeType, joinDate, dailyRate,
+  const { name, email, nik, phone, address, position, employeeType, joinDate, dailyRate,
           bankName, bankAccount, bankAccountName, emergencyContact, emergencyPhone,
           serviceChargeEligible, notes, active, endDate } = body;
 
@@ -106,6 +108,7 @@ export const PATCH = withAuth(async (req: NextRequest) => {
     where: { id },
     data: {
       ...(name !== undefined        && { name }),
+      ...(email !== undefined       && { email: email?.trim() || null }),
       ...(nik !== undefined         && { nik: nik || null }),
       ...(phone !== undefined       && { phone: phone || null }),
       ...(address !== undefined     && { address: address || null }),

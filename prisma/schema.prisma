@@ -1348,6 +1348,7 @@ model Employee {
 
   // Identitas
   name            String
+  email           String?       // email karyawan (dipakai untuk buat akun login)
   nik             String?       // No KTP
   phone           String?
   address         String?

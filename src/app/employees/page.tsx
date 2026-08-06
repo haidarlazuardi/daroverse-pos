@@ -31,7 +31,7 @@ const POSITIONS = ['Barista','Helper','Kitchen','Kitchen Helper','Barista Helper
 const BANKS = ['BCA','Mandiri','BNI','BRI','BSI','OCBC','Jago','SeaBank','Dana','GoPay','OVO','Lainnya'];
 
 const EMPTY = {
-  name:'', nik:'', phone:'', address:'',
+  name:'', email:'', nik:'', phone:'', address:'',
   position:'', employeeType:'STAFF',
   joinDate: new Date().toISOString().slice(0,10),
   dailyRate: 0, serviceChargeEligible: true,
@@ -77,7 +77,7 @@ export default function EmployeesPage() {
   function openEdit(emp: any) {
     setEditing(emp);
     setForm({
-      name: emp.name, nik: emp.nik || '', phone: emp.phone || '',
+      name: emp.name, email: emp.email || '', nik: emp.nik || '', phone: emp.phone || '',
       address: emp.address || '', position: emp.position || '',
       employeeType: emp.employeeType || 'STAFF',
       joinDate: emp.joinDate ? new Date(emp.joinDate).toISOString().slice(0,10) : '',
@@ -110,17 +110,19 @@ export default function EmployeesPage() {
   }
 
   async function createAccount() {
-    if (!detail || !accEmail || !accPass) return;
+    if (!detail) return;
+    const emailToUse = accEmail || detail.email;
+    if (!emailToUse || !accPass) { alert('Email dan password wajib'); return; }
     setAccSaving(true);
     try {
       const updated = await api.patch<any>('/api/employees', {
         id: detail.id, action: 'create_account',
-        email: accEmail, password: accPass, role: accRole,
+        email: emailToUse, password: accPass, role: accRole,
       });
       setDetail(updated);
       setEmployees(prev => prev.map(e => e.id === updated.id ? updated : e));
       setAccountModal(false);
-      alert(`✅ Akun berhasil dibuat\nEmail: ${accEmail}\nPassword: ${accPass}`);
+      alert(`✅ Akun berhasil dibuat\nEmail: ${emailToUse}\nPassword: ${accPass}`);
     } catch(e: any) { alert(e.message); }
     finally { setAccSaving(false); }
   }
@@ -218,6 +220,15 @@ export default function EmployeesPage() {
                   </div>
                   {/* Actions */}
                   <div className="flex gap-2 flex-shrink-0" onClick={e=>e.stopPropagation()}>
+                    {!emp.user && (
+                      <button onClick={() => {
+                        setDetail(emp);
+                        setAccEmail('');
+                        setAccPass('soeka2024');
+                        setAccRole('STAFF');
+                        setAccountModal(true);
+                      }} className="btn btn-sm btn-primary text-xs">+ Akun</button>
+                    )}
                     <button onClick={() => openEdit(emp)}
                       className="btn btn-sm btn-secondary text-xs">Edit</button>
                     <button onClick={() => toggleActive(emp)}
@@ -241,6 +252,10 @@ export default function EmployeesPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2"><label className="label">Nama Lengkap *</label>
               <input value={form.name} onChange={e=>f('name',e.target.value)} className="input w-full mt-1" placeholder="Nama sesuai KTP"/>
+            </div>
+            <div className="col-span-2"><label className="label">Email</label>
+              <input type="email" value={form.email} onChange={e=>f('email',e.target.value)} className="input w-full mt-1" placeholder="email@gmail.com"/>
+              <p className="text-xs mt-1" style={{ color:'var(--text-3)' }}>Dipakai untuk buat akun login — tidak perlu input ulang saat buat akun</p>
             </div>
             <div><label className="label">No. HP</label>
               <input value={form.phone} onChange={e=>f('phone',e.target.value)} className="input w-full mt-1" placeholder="08xx"/>
@@ -389,9 +404,26 @@ export default function EmployeesPage() {
       {/* Create Account Modal */}
       <Modal open={accountModal} onClose={() => setAccountModal(false)} title={`Buat Akun — ${detail?.name}`}>
         <div className="space-y-3">
-          <p className="text-sm" style={{ color:'var(--text-3)' }}>Data karyawan akan langsung tersimpan di akun ini.</p>
-          <div><label className="label">Email *</label>
-            <input value={accEmail} onChange={e=>setAccEmail(e.target.value)} className="input w-full mt-1" placeholder="email@gmail.com"/>
+          <p className="text-sm" style={{ color:'var(--text-3)' }}>
+            Akun login akan otomatis terhubung ke data karyawan <strong>{detail?.name}</strong>.
+          </p>
+
+          {detail?.email ? (
+            <div className="rounded-xl p-3" style={{ background:'#E1F5EE' }}>
+              <p className="text-xs font-bold" style={{ color:'#0F6E56' }}>Email dari data karyawan</p>
+              <p className="text-sm font-semibold mt-0.5" style={{ color:'#0F6E56' }}>{detail.email}</p>
+              <p className="text-xs mt-1" style={{ color:'#48907A' }}>Email ini akan dipakai untuk login. Ubah di bawah kalau perlu ganti.</p>
+            </div>
+          ) : (
+            <div className="rounded-xl p-3" style={{ background:'#FFFBEB' }}>
+              <p className="text-xs font-bold" style={{ color:'#854F0B' }}>⚠ Email belum diisi di data karyawan</p>
+              <p className="text-xs mt-0.5" style={{ color:'#A0660E' }}>Isi email di bawah, atau update dulu data karyawan.</p>
+            </div>
+          )}
+
+          <div><label className="label">Email Login {detail?.email ? '(opsional — kosongkan untuk pakai email di atas)' : '*'}</label>
+            <input value={accEmail} onChange={e=>setAccEmail(e.target.value)} className="input w-full mt-1"
+              placeholder={detail?.email || 'email@gmail.com'}/>
           </div>
           <div><label className="label">Password awal *</label>
             <input value={accPass} onChange={e=>setAccPass(e.target.value)} className="input w-full mt-1"/>
@@ -405,7 +437,7 @@ export default function EmployeesPage() {
           </div>
           <div className="flex gap-3 pt-2">
             <button onClick={() => setAccountModal(false)} className="btn btn-secondary flex-1">Batal</button>
-            <button onClick={createAccount} disabled={accSaving||!accEmail||!accPass} className="btn btn-primary flex-1">
+            <button onClick={createAccount} disabled={accSaving || (!accEmail && !detail?.email) || !accPass} className="btn btn-primary flex-1">
               {accSaving ? 'Membuat...' : 'Buat Akun Login'}
             </button>
           </div>
