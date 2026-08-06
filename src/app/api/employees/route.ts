@@ -70,15 +70,17 @@ export const PATCH = withAuth(async (req: NextRequest) => {
     const existing = await prisma.user.findUnique({ where: { email }, select: { id: true, name: true, active: true } });
     if (existing) {
       if (body.forceReplace && !existing.active) {
-        // Hapus akun nonaktif lama, lanjut buat baru
+        // Ganti email akun lama jadi placeholder agar tidak conflict
+        await prisma.user.update({
+          where: { id: existing.id },
+          data: { email: `deleted_${existing.id}@deleted.local`, active: false },
+        }).catch(() => {});
+        // Unlink dari employee lain
         await (prisma as any).employee.updateMany({ where: { userId: existing.id }, data: { userId: null } }).catch(() => {});
-        await (prisma as any).attendance.deleteMany({ where: { userId: existing.id } }).catch(() => {});
-        await (prisma as any).leave.deleteMany({ where: { userId: existing.id } }).catch(() => {});
-        await prisma.user.delete({ where: { id: existing.id } }).catch(() => {});
       } else if (existing.active) {
-        return error(`Email sudah dipakai akun "${existing.name}". Gunakan email lain atau hapus akun lama di menu Pengguna.`);
+        return error(`Email sudah dipakai akun aktif "${existing.name}". Gunakan email lain atau hapus akun lama di menu Pengguna.`);
       } else {
-        return error(`Email sudah dipakai akun "${existing.name}" yang nonaktif. Hapus dulu akun lama di menu Pengguna.`);
+        return error(`Email sudah dipakai akun nonaktif "${existing.name}". Klik OK untuk hapus dan buat ulang.`);
       }
     }
 

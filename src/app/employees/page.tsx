@@ -113,41 +113,33 @@ export default function EmployeesPage() {
     if (!detail) return;
     const emailToUse = accEmail || detail.email;
     if (!emailToUse || !accPass) { alert('Email dan password wajib'); return; }
+    await doCreate(emailToUse, false);
+  }
+
+  async function doCreate(emailToUse: string, force: boolean) {
     setAccSaving(true);
     try {
       const updated = await api.patch<any>('/api/employees', {
-        id: detail.id, action: 'create_account',
+        id: detail!.id, action: 'create_account',
         email: emailToUse, password: accPass, role: accRole,
+        ...(force ? { forceReplace: true } : {}),
       });
       setDetail(updated);
       setEmployees(prev => prev.map(e => e.id === updated.id ? updated : e));
       setAccountModal(false);
       alert(`✅ Akun berhasil dibuat\nEmail: ${emailToUse}\nPassword: ${accPass}`);
     } catch(e: any) {
-      const msg = e.message || '';
-      // Kalau email dipakai akun nonaktif — tawarkan hapus otomatis
-      if (msg.includes('nonaktif')) {
-        const ok = confirm(`${msg}\n\nHapus akun lama secara otomatis dan buat ulang?`);
-        if (ok) {
-          setAccSaving(true);
-          try {
-            // Cari dan hapus akun lama dulu
-            await api.patch('/api/employees', {
-              id: detail.id, action: 'create_account',
-              email: emailToUse, password: accPass, role: accRole,
-              forceReplace: true,
-            });
-            const updated = await api.get<any>(`/api/employees/${detail.id}`).catch(() => detail);
-            setDetail(updated);
-            setAccountModal(false);
-            alert(`✅ Akun berhasil dibuat\nEmail: ${emailToUse}\nPassword: ${accPass}`);
-          } catch(e2: any) { alert(e2.message); }
-          finally { setAccSaving(false); }
+      const msg: string = e.message || '';
+      if (msg.includes('nonaktif') && !force) {
+        if (confirm(`${msg}\n\nHapus akun lama dan buat ulang dengan email ini?`)) {
+          await doCreate(emailToUse, true);
         }
       } else {
         alert(msg);
       }
-    } finally { setAccSaving(false); }
+    } finally {
+      setAccSaving(false);
+    }
   }
 
   function openDetail(emp: any) { setDetail(emp); setDetailOpen(true); }
