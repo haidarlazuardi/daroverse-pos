@@ -61,8 +61,9 @@ function computeCalcStack(p: {
   taxRate: number;
   serviceRate: number;
 }) {
-  const tax = p.taxEnabled ? round(p.subtotal * p.taxRate) : 0;
-  const serviceCharge = p.serviceEnabled ? round(p.subtotal * p.serviceRate) : 0;
+  const taxableAmount = Math.max(0, p.subtotal - p.discountAmount);
+  const tax = p.taxEnabled ? round(taxableAmount * p.taxRate) : 0;
+  const serviceCharge = p.serviceEnabled ? round(taxableAmount * p.serviceRate) : 0;
   const total = round(
     p.subtotal + tax + serviceCharge + p.takeawayCharge - p.discountAmount - p.redeemDiscount
   );
@@ -283,7 +284,7 @@ export async function POST(req: NextRequest) {
     }
 
     const totalCost = round(requirements.totalCost);
-    const profit = round(total - totalCost);
+    const profit = round(subtotal - totalCost); // gross profit dari produk, exclude tax/SC
     const pointsEarned = open ? 0 : Math.floor(total / settings.earnDivisor);
     const paymentReceived = received ?? total;
     const change = Math.max(0, round(paymentReceived - total));
@@ -470,7 +471,7 @@ export async function PATCH(req: NextRequest) {
           where: { id: order.id },
           data: {
             status: 'COMPLETED', taxEnabled, serviceEnabled, tax, serviceCharge,
-            total, profit: round(total - order.costTotal), pointsEarned,
+            total, profit: round(order.subtotal - order.costTotal), pointsEarned,
             payment: {
               create: {
                 method: (body.paymentMethod as any) || 'CASH', status: 'PAID',

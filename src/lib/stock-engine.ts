@@ -42,7 +42,11 @@ const MAX_RECIPE_DEPTH = 6;
 //  Helpers
 // ─────────────────────────────────────────────────────────
 
-// A DRINK is made/stocked at the BAR; FOOD at the KITCHEN.
+// Location untuk deduction stok:
+// PRODUCTION INTENT: deduct dari lokasi aktual bahan (BAR atau KITCHEN),
+// bukan dari station produk. Bahan harus sudah di-transfer sebelum bisa dijual.
+// Untuk sekarang: fallback ke station produk (DRINK→BAR, FOOD→KITCHEN).
+// Kalau bahan belum di-transfer → stok negatif → health check akan alert.
 function locationForStation(station: 'FOOD' | 'DRINK'): StockLocation {
   return station === 'FOOD' ? StockLocation.KITCHEN : StockLocation.BAR;
 }
@@ -140,13 +144,11 @@ export async function computeOrderRequirements(
   for (const item of items) {
     const product = productMap.get(item.productId);
     if (!product || !product.recipe) {
-      console.log(`[STOCK] SKIP deduction — no recipe for product ${item.productId}`);
       lines.push({ productId: item.productId, unitCost: 0, quantity: item.quantity });
       continue;
     }
 
     const loc = locationForStation(product.station as 'FOOD' | 'DRINK');
-    console.log(`[STOCK] product=${product.name} station=${product.station} loc=${loc} recipe_items=${product.recipe.items.length}`);
 
     // Effective per-portion requirement (serving recipe + modifiers).
     const req = new Map<string, number>();
@@ -199,12 +201,11 @@ export async function applyDeductionsInTx(
   userId: string
 ) {
   const movementRows: any[] = [];
-  console.log(`[STOCK] applyDeductions — ${deductions.size} locations, orderId=${orderId}`);
 
   for (const [location, ingredients] of deductions) {
     for (const [ingredientId, qty] of ingredients) {
       if (qty <= 0) continue;
-      // TRIAL MODE: skip stock check, allow negative stock
+      // Deduct stock — allow negative (cafe can still operate with negative stock)
       const currentLevel = await tx.stockLevel.findFirst({
         where: { ingredientId, location },
       });
@@ -217,11 +218,6 @@ export async function applyDeductionsInTx(
         await tx.stockLevel.create({
           data: { ingredientId, location, quantity: -qty, lastUpdated: new Date() },
         });
-      }
-      const res = { count: 1 }; // always succeed
-      if (false) { // disabled for trial
-        const ing = await tx.ingredient.findUnique({ where: { id: ingredientId }, select: { name: true } });
-        throw new Error(`Stok tidak cukup: ${ing?.name || ingredientId} di ${location}`);
       }
       movementRows.push({
         ingredientId,
@@ -400,7 +396,9 @@ export async function receivePurchaseOrder(poId: string, userId: string) {
   await prisma.$transaction(async (tx) => {
     const rows: any[] = [];
     for (const item of po.items) {
-      const conv = item.ingredient.conversionRate && item.ingredient.purchaseUnit ? item.ingredient.conversionRate : 1;
+      const conv = (item.ingredient.conversionRate && item.ingredient.conversionRate > 0 && item.ingredient.purchaseUnit)
+        ? item.ingredient.conversionRate
+        : 1; // fallback: 1 purchase unit = 1 base unit
       const baseQty = item.quantity * conv; // carton → base unit
       const pricePerBase = item.unitPrice / conv;
 
