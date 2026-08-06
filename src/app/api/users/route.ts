@@ -61,10 +61,12 @@ export const DELETE = withAuth(async (req) => {
   }
 
   // Hapus/nullify semua relasi pakai Prisma ORM
-  // Nullify (set null) dulu untuk yang optional
+  // requestedBy sekarang nullable di schema — nullify dulu sebelum delete
   const nullifyPromises = [
     prisma.order.updateMany({ where: { userId: id }, data: { userId: id } }).catch(() => {}),
     prisma.shift.updateMany({ where: { userId: id }, data: { userId: id } }).catch(() => {}),
+    (prisma as any).purchaseRequest?.updateMany({ where: { requestedBy: id }, data: { requestedBy: null } }).catch(() => {}),
+    (prisma as any).voidRequest?.updateMany({ where: { requestedBy: id }, data: { requestedBy: null } }).catch(() => {}),
     (prisma as any).auditLog?.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {}),
     (prisma as any).loyaltyLedger?.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {}),
     (prisma as any).payrollRecord?.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {}),
@@ -80,7 +82,6 @@ export const DELETE = withAuth(async (req) => {
     (prisma as any).attendance?.deleteMany({ where: { userId: id } }).catch(() => {}),
     (prisma as any).leave?.deleteMany({ where: { userId: id } }).catch(() => {}),
     (prisma as any).kasbon?.deleteMany({ where: { userId: id } }).catch(() => {}),
-    (prisma as any).voidRequest?.deleteMany({ where: { requestedBy: id } }).catch(() => {}),
     (prisma as any).shiftSwap?.deleteMany({ where: { requestedBy: id } }).catch(() => {}),
     (prisma as any).scheduleSlot?.deleteMany({ where: { userId: id } }).catch(() => {}),
   ];

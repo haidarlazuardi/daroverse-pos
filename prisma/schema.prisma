@@ -1164,8 +1164,8 @@ model PurchaseRequest {
   id          String                @id @default(cuid())
   status      PurchaseRequestStatus @default(PENDING)
   notes       String?
-  requestedBy String
-  user        User                  @relation(fields: [requestedBy], references: [id])
+  requestedBy String?
+  user        User?                 @relation(fields: [requestedBy], references: [id])
   items       PurchaseRequestItem[]
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt
@@ -1199,8 +1199,8 @@ model VoidRequest {
   id          String            @id @default(cuid())
   orderId     String
   order       Order             @relation(fields: [orderId], references: [id])
-  requestedBy String
-  user        User              @relation("VoidRequests", fields: [requestedBy], references: [id])
+  requestedBy String?
+  user        User?             @relation("VoidRequests", fields: [requestedBy], references: [id])
   reason      String
   status      VoidRequestStatus @default(PENDING)
   reviewedBy  String?
