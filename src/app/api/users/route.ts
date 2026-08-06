@@ -61,13 +61,23 @@ export const DELETE = withAuth(async (req) => {
   }
 
   // Hapus semua relasi dulu
-  await (prisma as any).attendance.deleteMany({ where: { userId: id } }).catch(() => {});
-  await (prisma as any).leave.deleteMany({ where: { userId: id } }).catch(() => {});
-  await (prisma as any).kasbon.deleteMany({ where: { userId: id } }).catch(() => {});
-  await (prisma as any).voidRequest.deleteMany({ where: { requestedBy: id } }).catch(() => {});
-  await (prisma as any).scheduleSlot.deleteMany({ where: { userId: id } }).catch(() => {});
-  await (prisma as any).employee.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {});
+  try { await (prisma as any).attendance.deleteMany({ where: { userId: id } }); } catch {}
+  try { await (prisma as any).leave.deleteMany({ where: { userId: id } }); } catch {}
+  try { await (prisma as any).kasbon.deleteMany({ where: { userId: id } }); } catch {}
+  try { await (prisma as any).voidRequest.deleteMany({ where: { requestedBy: id } }); } catch {}
+  try { await (prisma as any).scheduleSlot.deleteMany({ where: { userId: id } }); } catch {}
+  try { await (prisma as any).shiftSwap.deleteMany({ where: { requestedBy: id } }); } catch {}
+  try { await (prisma as any).auditLog.deleteMany({ where: { userId: id } }); } catch {}
+  try { await (prisma as any).loyaltyLedger.deleteMany({ where: { userId: id } }); } catch {}
+  try { await (prisma as any).employee.updateMany({ where: { userId: id }, data: { userId: null } }); } catch {}
+  try { await (prisma as any).shift.updateMany({ where: { userId: id }, data: { userId: id } }); } catch {}
 
-  await prisma.user.delete({ where: { id } });
-  return success({ deleted: true });
+  try {
+    await prisma.user.delete({ where: { id } });
+    return success({ deleted: true });
+  } catch (e: any) {
+    // Kalau masih gagal karena relasi, nonaktifkan saja
+    await prisma.user.update({ where: { id }, data: { active: false } }).catch(() => {});
+    return success({ deleted: false, deactivated: true, reason: `Gagal hapus permanen (${e.message?.slice(0,100)}) — dinonaktifkan` });
+  }
 }, SENIOR_ROLES);
