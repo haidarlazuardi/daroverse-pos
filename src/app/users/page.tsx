@@ -98,12 +98,17 @@ export default function UsersPage() {
 
   async function deleteUser(u: User) {
     if (!confirm(`Hapus permanen akun "${u.name}"?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
-    if (!confirm(`Yakin? Akun ${u.name} akan dihapus permanen.`)) return;
     try {
       const r = await api.delete<any>(`/api/users?id=${u.id}`);
       if (r?.deactivated) {
-        alert(`ℹ️ ${r.reason}`);
-        setUsers(prev => prev.map(x => x.id === u.id ? { ...x, active: false } : x));
+        // Punya order penting — tawarkan force delete
+        const force = confirm(`⚠️ ${r.reason}\n\nHapus paksa tetap? (data transaksi akan tetap ada)`);
+        if (force) {
+          await api.delete(`/api/users?id=${u.id}&force=1`);
+          setUsers(prev => prev.filter(x => x.id !== u.id));
+        } else {
+          setUsers(prev => prev.map(x => x.id === u.id ? { ...x, active: false } : x));
+        }
       } else {
         setUsers(prev => prev.filter(x => x.id !== u.id));
       }

@@ -41,10 +41,10 @@ export const PATCH = withAuth(async (req) => {
 
 export const DELETE = withAuth(async (req) => {
   const { searchParams } = new URL(req.url);
-  const id = searchParams.get('id');
+  const id    = searchParams.get('id');
+  const force = searchParams.get('force') === '1';
   if (!id) return error('ID wajib diisi');
 
-  // Cek apakah ini akun owner/super admin terakhir
   const u = await prisma.user.findUnique({ where: { id }, select: { role: true } });
   if (!u) return error('User tidak ditemukan', 404);
   if (u.role === 'SUPER_ADMIN' || u.role === 'OWNER') {
@@ -52,26 +52,21 @@ export const DELETE = withAuth(async (req) => {
     if (count <= 1) return error('Tidak bisa hapus satu-satunya akun Owner/Super Admin', 400);
   }
 
-  // Cek apakah user punya data historis (order, absensi, shift)
-  const [orderCount, attendanceCount] = await Promise.all([
-    prisma.order.count({ where: { userId: id } }),
-    (prisma as any).attendance.count({ where: { userId: id } }),
-  ]);
+  // Cek data historis yang penting (order saja — absensi bisa ikut dihapus)
+  const orderCount = await prisma.order.count({ where: { userId: id } });
 
-  if (orderCount > 0 || attendanceCount > 0) {
-    // Ada data historis — nonaktifkan saja, tidak hapus permanen
+  if (orderCount > 0 && !force) {
     await prisma.user.update({ where: { id }, data: { active: false } });
-    return success({ deleted: false, deactivated: true, reason: `User punya ${orderCount} order dan ${attendanceCount} data absensi — dinonaktifkan saja untuk menjaga data historis` });
+    return success({ deleted: false, deactivated: true, reason: `User punya ${orderCount} order — dinonaktifkan untuk menjaga data historis transaksi` });
   }
 
-  // Tidak ada data historis — bisa hapus permanen
-  // Unlink dari Employee dulu
-  await (prisma as any).employee.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {});
-  // Nullify relasi lain yang mungkin ada
-  await (prisma as any).shift.updateMany({ where: { userId: id }, data: { userId: id } }).catch(() => {});
-  await (prisma as any).voidRequest.updateMany({ where: { requestedBy: id }, data: {} }).catch(() => {});
+  // Hapus semua relasi dulu
+  await (prisma as any).attendance.deleteMany({ where: { userId: id } }).catch(() => {});
   await (prisma as any).leave.deleteMany({ where: { userId: id } }).catch(() => {});
   await (prisma as any).kasbon.deleteMany({ where: { userId: id } }).catch(() => {});
+  await (prisma as any).voidRequest.deleteMany({ where: { requestedBy: id } }).catch(() => {});
+  await (prisma as any).scheduleSlot.deleteMany({ where: { userId: id } }).catch(() => {});
+  await (prisma as any).employee.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {});
 
   await prisma.user.delete({ where: { id } });
   return success({ deleted: true });
