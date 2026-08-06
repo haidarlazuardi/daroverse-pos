@@ -100,8 +100,13 @@ export default function UsersPage() {
     if (!confirm(`Hapus permanen akun "${u.name}"?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
     if (!confirm(`Yakin? Akun ${u.name} akan dihapus permanen.`)) return;
     try {
-      await api.delete(`/api/users?id=${u.id}`);
-      setUsers(prev => prev.filter(x => x.id !== u.id));
+      const r = await api.delete<any>(`/api/users?id=${u.id}`);
+      if (r?.deactivated) {
+        alert(`ℹ️ ${r.reason}`);
+        setUsers(prev => prev.map(x => x.id === u.id ? { ...x, active: false } : x));
+      } else {
+        setUsers(prev => prev.filter(x => x.id !== u.id));
+      }
     } catch (e: any) {
       alert(e.message);
     }

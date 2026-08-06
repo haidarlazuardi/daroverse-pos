@@ -46,15 +46,33 @@ export const DELETE = withAuth(async (req) => {
 
   // Cek apakah ini akun owner/super admin terakhir
   const u = await prisma.user.findUnique({ where: { id }, select: { role: true } });
-  if (u?.role === 'SUPER_ADMIN' || u?.role === 'OWNER') {
+  if (!u) return error('User tidak ditemukan', 404);
+  if (u.role === 'SUPER_ADMIN' || u.role === 'OWNER') {
     const count = await prisma.user.count({ where: { role: { in: ['SUPER_ADMIN', 'OWNER'] }, active: true } });
     if (count <= 1) return error('Tidak bisa hapus satu-satunya akun Owner/Super Admin', 400);
   }
 
-  // Unlink dari Employee dulu kalau ada
-  await (prisma as any).employee.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {});
+  // Cek apakah user punya data historis (order, absensi, shift)
+  const [orderCount, attendanceCount] = await Promise.all([
+    prisma.order.count({ where: { userId: id } }),
+    (prisma as any).attendance.count({ where: { userId: id } }),
+  ]);
 
-  // Hapus permanen
+  if (orderCount > 0 || attendanceCount > 0) {
+    // Ada data historis — nonaktifkan saja, tidak hapus permanen
+    await prisma.user.update({ where: { id }, data: { active: false } });
+    return success({ deleted: false, deactivated: true, reason: `User punya ${orderCount} order dan ${attendanceCount} data absensi — dinonaktifkan saja untuk menjaga data historis` });
+  }
+
+  // Tidak ada data historis — bisa hapus permanen
+  // Unlink dari Employee dulu
+  await (prisma as any).employee.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {});
+  // Nullify relasi lain yang mungkin ada
+  await (prisma as any).shift.updateMany({ where: { userId: id }, data: { userId: id } }).catch(() => {});
+  await (prisma as any).voidRequest.updateMany({ where: { requestedBy: id }, data: {} }).catch(() => {});
+  await (prisma as any).leave.deleteMany({ where: { userId: id } }).catch(() => {});
+  await (prisma as any).kasbon.deleteMany({ where: { userId: id } }).catch(() => {});
+
   await prisma.user.delete({ where: { id } });
   return success({ deleted: true });
 }, SENIOR_ROLES);
