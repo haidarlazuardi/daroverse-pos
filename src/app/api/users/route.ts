@@ -43,6 +43,18 @@ export const DELETE = withAuth(async (req) => {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
   if (!id) return error('ID wajib diisi');
-  await prisma.user.update({ where: { id }, data: { active: false } });
+
+  // Cek apakah ini akun owner/super admin terakhir
+  const u = await prisma.user.findUnique({ where: { id }, select: { role: true } });
+  if (u?.role === 'SUPER_ADMIN' || u?.role === 'OWNER') {
+    const count = await prisma.user.count({ where: { role: { in: ['SUPER_ADMIN', 'OWNER'] }, active: true } });
+    if (count <= 1) return error('Tidak bisa hapus satu-satunya akun Owner/Super Admin', 400);
+  }
+
+  // Unlink dari Employee dulu kalau ada
+  await (prisma as any).employee.updateMany({ where: { userId: id }, data: { userId: null } }).catch(() => {});
+
+  // Hapus permanen
+  await prisma.user.delete({ where: { id } });
   return success({ deleted: true });
 }, SENIOR_ROLES);

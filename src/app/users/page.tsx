@@ -73,7 +73,14 @@ export default function UsersPage() {
     finally { setSaving(false); }
   }
 
-  async function toggleActive(u: User) {
+  async function deleteUser(u: User) {
+    if (!confirm(`Hapus permanen akun "${u.name}" (${u.email})?\n\nTindakan ini tidak bisa dibatalkan.`)) return;
+    if (!confirm(`Yakin? Akun ${u.name} akan dihapus permanen dari sistem.`)) return;
+    try {
+      await api.delete(`/api/users?id=${u.id}`);
+      setUsers(prev => prev.filter(x => x.id !== u.id));
+    } catch(e: any) { alert(e.message); }
+  }
     if (!confirm(`${u.active ? 'Nonaktifkan' : 'Aktifkan'} akun ${u.name}?`)) return;
     await api.patch('/api/users', { id: u.id, active: !u.active });
     load();
@@ -177,6 +184,12 @@ export default function UsersPage() {
                         ? { background:'#FEF2F2', color:'#DC2626', border:'1px solid #FECACA' }
                         : { background:'#F0FDF4', color:'#16A34A', border:'1px solid #BBF7D0' }}>
                       {u.active ? 'Nonaktif' : 'Aktif'}
+                    </button>
+                    <button onClick={() => deleteUser(u)}
+                      title="Hapus permanen"
+                      className="btn btn-sm text-xs"
+                      style={{ background:'#FEF2F2', color:'#DC2626', border:'1px solid #FECACA' }}>
+                      🗑
                     </button>
                   </div>
                 </div>
