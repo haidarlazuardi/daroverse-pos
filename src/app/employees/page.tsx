@@ -123,8 +123,31 @@ export default function EmployeesPage() {
       setEmployees(prev => prev.map(e => e.id === updated.id ? updated : e));
       setAccountModal(false);
       alert(`✅ Akun berhasil dibuat\nEmail: ${emailToUse}\nPassword: ${accPass}`);
-    } catch(e: any) { alert(e.message); }
-    finally { setAccSaving(false); }
+    } catch(e: any) {
+      const msg = e.message || '';
+      // Kalau email dipakai akun nonaktif — tawarkan hapus otomatis
+      if (msg.includes('nonaktif')) {
+        const ok = confirm(`${msg}\n\nHapus akun lama secara otomatis dan buat ulang?`);
+        if (ok) {
+          setAccSaving(true);
+          try {
+            // Cari dan hapus akun lama dulu
+            await api.patch('/api/employees', {
+              id: detail.id, action: 'create_account',
+              email: emailToUse, password: accPass, role: accRole,
+              forceReplace: true,
+            });
+            const updated = await api.get<any>(`/api/employees/${detail.id}`).catch(() => detail);
+            setDetail(updated);
+            setAccountModal(false);
+            alert(`✅ Akun berhasil dibuat\nEmail: ${emailToUse}\nPassword: ${accPass}`);
+          } catch(e2: any) { alert(e2.message); }
+          finally { setAccSaving(false); }
+        }
+      } else {
+        alert(msg);
+      }
+    } finally { setAccSaving(false); }
   }
 
   function openDetail(emp: any) { setDetail(emp); setDetailOpen(true); }
