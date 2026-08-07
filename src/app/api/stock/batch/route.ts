@@ -79,4 +79,4 @@ export const POST = withAuth(async (req: NextRequest, user) => {
   } catch (e: any) {
     return error(`Gagal batch: ${e.message}`, 500);
   }
-}, ADMIN_ROLES);
+}, ALL_ROLES);
