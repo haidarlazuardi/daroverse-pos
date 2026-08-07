@@ -7,12 +7,11 @@ import { success, error, withAuth } from '@/lib/api-helpers';
 import { ALL_ROLES, ADMIN_ROLES } from '@/lib/auth';
 
 export const POST = withAuth(async (req: NextRequest, user) => {
-  const { entries, apply = false } = await req.json();
+  const { entries, apply = true } = await req.json(); // default apply: true
   if (!entries?.length) return error('entries wajib');
 
-  if (apply && !ADMIN_ROLES.includes(user.role as any)) {
-    return error('Hanya admin yang bisa apply opname', 403);
-  }
+  // Staff bisa apply opname mereka sendiri, ADMIN bisa apply untuk semua
+  // Tidak perlu restrict apply — opname adalah koreksi stok yang sah
 
   const results: any[] = [];
   for (const entry of entries) {

@@ -397,7 +397,7 @@ function OpnameForm({ ingredients, onDone }: any) {
   const [busy,setBusy]=useState(false);
   const upd=(i:number,k:string,v:string)=>setEntries(p=>p.map((e,j)=>j===i?{...e,[k]:v}:e));
   function onQR(d:any){ if(d.ingredientId){setEntries(p=>{const last=p[p.length-1];if(!last.ingredientId)return p.map((e,i)=>i===p.length-1?{...e,ingredientId:d.ingredientId}:e);return [...p,{ingredientId:d.ingredientId,location:'BAR',actualQty:''}];});} }
-  async function submit(){const v=entries.filter(e=>e.ingredientId&&e.actualQty);if(!v.length)return;setBusy(true);try{await api.post('/api/stock/opname',{entries:v.map(e=>({...e,actualQty:parseFloat(e.actualQty)})),apply:false});onDone();}catch(e:any){alert(e.message);}finally{setBusy(false);}}
+  async function submit(){const v=entries.filter(e=>e.ingredientId&&e.actualQty);if(!v.length)return;setBusy(true);try{await api.post('/api/stock/opname',{entries:v.map(e=>({...e,actualQty:parseFloat(e.actualQty)})),apply:true});onDone();}catch(e:any){alert(e.message);}finally{setBusy(false);}}
   return <div className="space-y-4">
     <div className="flex items-center justify-between"><p className="text-xs font-bold" style={{ color:'#888' }}>BAHAN ({entries.length})</p><QRBtn onScan={onQR}/></div>
     {entries.map((e,i)=>(<div key={i} className="rounded-xl p-3 space-y-2.5" style={{ background:'#F7F5F2' }}>
