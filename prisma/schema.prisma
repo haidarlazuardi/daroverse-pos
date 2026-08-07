@@ -1179,10 +1179,12 @@ model PurchaseRequestItem {
   id                String          @id @default(cuid())
   requestId         String
   request           PurchaseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  ingredientId      String
-  ingredient        Ingredient      @relation(fields: [ingredientId], references: [id])
+  ingredientId      String?
+  ingredient        Ingredient?     @relation(fields: [ingredientId], references: [id])
+  supplyItemId      String?
+  supplyItem        SupplyItem?     @relation("SupplyRequestItems", fields: [supplyItemId], references: [id])
   quantity          Float
-  unit              String          // purchase unit
+  unit              String
   notes             String?
 
   @@map("purchase_request_items")
@@ -1408,6 +1410,7 @@ model SupplyItem {
   notes       String?
   active      Boolean       @default(true)
   orderItems  SupplyOrderItem[]
+  requestItems PurchaseRequestItem[] @relation("SupplyRequestItems")
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 

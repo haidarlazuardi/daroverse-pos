@@ -15,7 +15,8 @@ export const GET = withAuth(async (req: NextRequest) => {
       user: { select: { name: true } },
       items: {
         include: {
-          ingredient: { select: { name: true, unit: true, purchaseUnit: true, conversionRate: true, latestPrice: true, defaultSupplierId: true } }
+          ingredient: { select: { name: true, unit: true, purchaseUnit: true, conversionRate: true, latestPrice: true, defaultSupplierId: true } },
+          supplyItem: { select: { name: true, unit: true } },
         }
       }
     },
@@ -26,23 +27,35 @@ export const GET = withAuth(async (req: NextRequest) => {
 
 // POST — create request (staff)
 export const POST = withAuth(async (req: NextRequest, user) => {
-  const { items, notes } = await req.json();
+  const { items, notes, type } = await req.json();
   if (!items?.length) return error('Minimal 1 item');
+
+  // Validasi: setiap item harus punya ingredientId atau supplyItemId
+  for (const i of items) {
+    if (!i.ingredientId && !i.supplyItemId) return error('Setiap item harus punya ingredientId atau supplyItemId');
+    if (!i.quantity || parseFloat(i.quantity) <= 0) return error('Quantity harus lebih dari 0');
+  }
 
   const request = await (prisma as any).purchaseRequest.create({
     data: {
       requestedBy: user.userId,
-      notes: notes || null,
+      notes: notes ? `${type === 'SUPPLY' ? '[SUPPLY] ' : ''}${notes}` : (type === 'SUPPLY' ? '[SUPPLY REQUEST]' : null),
       items: {
         create: items.map((i: any) => ({
-          ingredientId: i.ingredientId,
+          ...(i.ingredientId  ? { ingredientId: i.ingredientId }   : {}),
+          ...(i.supplyItemId  ? { supplyItemId: i.supplyItemId }   : {}),
           quantity: parseFloat(i.quantity),
-          unit: i.unit,
+          unit: i.unit || 'pcs',
         })),
       },
     },
     include: {
-      items: { include: { ingredient: { select: { name: true, unit: true } } } }
+      items: {
+        include: {
+          ingredient: { select: { name: true, unit: true } },
+          supplyItem: { select: { name: true, unit: true } },
+        },
+      },
     },
   });
   return success(request, 201);
