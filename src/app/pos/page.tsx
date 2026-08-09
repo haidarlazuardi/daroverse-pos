@@ -540,15 +540,30 @@ export default function POSPage() {
 
   useEffect(() => { if (user) loadData(); }, [user, loadData]);
 
-  // Auto-buka modal input kas kalau tidak ada shift hari ini
-  useEffect(() => {
-    if (!loading && !activeShift && user) {
-      setShowShift(true);
-    }
-  }, [loading, activeShift, user]);
-
   // Shift warning — cek tiap menit
   useEffect(() => {
+    function checkShiftWarning() {
+      if (!activeShift) { setShiftWarning(null); return; }
+      const wib = new Date(Date.now() + 7 * 60 * 60 * 1000);
+      const h = wib.getHours(), m = wib.getMinutes();
+      const totalMin = h * 60 + m;
+      // Shift pagi close 17:00, shift sore close 23:30
+      const warningTimes = [
+        { warn: 16 * 60 + 30, overdue: 17 * 60 },      // Pagi: warning 16:30, overdue 17:00
+        { warn: 23 * 60,      overdue: 23 * 60 + 30 },  // Sore: warning 23:00, overdue 23:30
+      ];
+      let warning: 'approaching'|'overdue'|null = null;
+      for (const t of warningTimes) {
+        if (totalMin >= t.overdue) { warning = 'overdue'; break; }
+        if (totalMin >= t.warn)    { warning = 'approaching'; break; }
+      }
+      setShiftWarning(warning);
+    }
+    checkShiftWarning();
+    const interval = setInterval(checkShiftWarning, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [activeShift]);
+
   useEffect(() => {
     if (!selectedDiscount) { cart.setDiscount(0, null, null); return; }
     const d = discounts.find((x) => x.id === selectedDiscount);
@@ -714,41 +729,24 @@ export default function POSPage() {
   };
 
   const openShift = async () => {
-    if (!openingCash && openingCash !== '0') {
-      alert('Masukkan jumlah kas awal terlebih dahulu');
-      return;
-    }
-    try {
-      await api.post('/api/shifts', { openingCash });
-      setOpeningCash('');
-      setShowShift(false);
-      loadData();
-    } catch (e: any) { alert(e.message || 'Gagal buka shift'); }
+    if (!openingCash && openingCash !== '0') { alert('Masukkan jumlah kas awal'); return; }
+    try { await api.post('/api/shifts', { openingCash }); setOpeningCash(''); loadData(); setShowShift(false); }
+    catch (e: any) { alert(e.message || 'Gagal buka shift'); }
   };
-
   const closeShift = async () => {
     if (!activeShift) return;
-    if (!closingCash && closingCash !== '0') {
-      alert('Masukkan jumlah kas aktual (hitung fisik laci)');
-      return;
-    }
+    if (!closingCash && closingCash !== '0') { alert('Masukkan jumlah kas aktual (hitung fisik laci)'); return; }
     if (!confirm(`Tutup shift hari ini?\nKas aktual: Rp ${Number(closingCash).toLocaleString('id-ID')}`)) return;
     try {
-      const r = await api.patch<any>('/api/shifts', {
-        id: activeShift.id,
-        action: 'close',
-        closingCash,
-      });
-      setActiveShift(null);
-      setClosingCash('');
-      setShowShift(false);
+      const r = await api.patch<any>('/api/shifts', { id: activeShift.id, action: 'close', closingCash });
+      setActiveShift(null); setClosingCash(''); setShowShift(false);
       const diff = r.difference || 0;
       const sign = diff >= 0 ? '+' : '';
       alert(`✅ Shift ditutup\nTotal Sales: Rp ${Number(r.totalSales||0).toLocaleString('id-ID')}\nKas diharapkan: Rp ${Number(r.expectedCash||0).toLocaleString('id-ID')}\nKas aktual: Rp ${Number(r.closingCash||0).toLocaleString('id-ID')}\nSelisih: ${sign}Rp ${Math.abs(diff).toLocaleString('id-ID')}`);
       loadData();
     } catch (e: any) { alert(e.message || 'Gagal tutup shift'); }
   };
-
+      const sign = selisih >= 0 ? '+' : '';
   const receiptLines = (o: any) => [
     '🧾 *Soeka House*', '', `Order: ${o.orderNumber}`, `Tanggal: ${new Date(o.createdAt).toLocaleString('id-ID')}`,
     custName ? `Pelanggan: ${custName}` : '', '',
@@ -819,15 +817,17 @@ export default function POSPage() {
       {/* LEFT: Staff Icon Rail */}
       <StaffSidebar />
 
-      {/* No Shift Banner — auto trigger modal */}
+      {/* Shift Warning Banner — dihapus, tidak ada lagi warning otomatis */}
+
+      {/* No Shift Banner */}
       {!activeShift && !loading && (
         <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4 py-2.5 text-sm font-bold"
           style={{ background: '#1D4ED8', color: 'white' }}>
-          <span>💰 Input kas awal untuk mulai transaksi hari ini</span>
+          <span>📋 Belum ada shift aktif. Buka shift untuk mulai transaksi.</span>
           <button onClick={() => setShowShift(true)}
             className="px-3 py-1 rounded-lg text-xs font-black"
             style={{ background: 'rgba(255,255,255,0.25)' }}>
-            Input Kas →
+            Buka Shift →
           </button>
         </div>
       )}
@@ -843,38 +843,20 @@ export default function POSPage() {
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
             <input ref={searchRef} type="text" placeholder="Cari menu..." value={search} onChange={(e) => setSearch(e.target.value)} className="filter-input pl-9" />
           </div>
-          {/* Open Bill button */}
-          <button onClick={loadBills}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors"
-            style={{ background:'#FFFBEB', color:'#B45309', borderColor:'#FCD34D' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-            </svg>
-            Open Bill
-            {openBills.length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full text-white text-xs font-black" style={{ background:'#B45309', fontSize:10 }}>
-                {openBills.length}
-              </span>
-            )}
+          <button onClick={loadBills} className="btn btn-sm btn-ghost text-amber-600" title="Bill terbuka">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
           </button>
-          {/* Shift buttons — explicit open/close */}
           {!activeShift ? (
             <button onClick={() => setShowShift(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border"
               style={{ background:'#E1F5EE', color:'#0F6E56', borderColor:'#9FE1CB' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>
-              </svg>
-              Buka Shift
+              ✅ Buka Shift
             </button>
           ) : (
             <button onClick={() => setShowShift(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border"
               style={{ background:'#FEF2F2', color:'#DC2626', borderColor:'#FECACA' }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/>
-              </svg>
-              Tutup Shift
+              🔴 Tutup Shift
             </button>
           )}
           <button onClick={() => setShowCart(true)} className="lg:hidden relative p-2.5 bg-green-600 text-white rounded-xl">
@@ -1087,9 +1069,6 @@ export default function POSPage() {
                       alert('⚠️ Shift belum dibuka. Buka shift dulu sebelum transaksi.');
                       setShowShift(true);
                       return;
-                    }
-                    if (shiftWarning === 'overdue') {
-                      // warning dihapus - lanjut saja
                     }
                     setStep('payment');
                   }} className="btn btn-md btn-primary text-sm">Bayar</button>
@@ -1313,29 +1292,48 @@ export default function POSPage() {
       </Modal>
 
       {/* Shift */}
-      <Modal open={showShift} onClose={() => !activeShift ? null : setShowShift(false)} title={activeShift ? 'Tutup Shift' : 'Input Kas Awal'}>
+      <Modal open={showShift} onClose={() => setShowShift(false)} title={activeShift ? 'Shift Aktif' : 'Buka Shift'}>
         {!activeShift ? (
           <div className="space-y-4">
-            <div className="rounded-xl p-3 text-sm" style={{ background:'#E1F5EE', color:'#0F6E56' }}>
-              Hitung uang di laci kasir, lalu masukkan jumlahnya.
-            </div>
-            <Input
-              label="Kas Awal (Rp)"
-              type="number"
-              value={openingCash}
-              onChange={(e) => setOpeningCash(e.target.value)}
-              placeholder="cth. 500000"
-              autoFocus
-            />
-            <Button onClick={openShift} className="w-full" disabled={!openingCash}>
-              ✅ Mulai Hari Ini
-            </Button>
+            <p className="text-sm text-gray-600">Pilih shift dan masukkan kas awal untuk memulai.</p>
+            {shiftTemplates.length > 0 && (
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Tipe Shift</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {shiftTemplates.map((t: any) => (
+                    <button key={t.id} onClick={() => setSelectedTemplate(t.id)}
+                      className="p-3 rounded-xl border text-sm font-bold text-left transition-all"
+                      style={{
+                        borderColor: selectedTemplate === t.id ? 'var(--brand)' : '#e5e7eb',
+                        background: selectedTemplate === t.id ? 'var(--brand)10' : 'white',
+                        color: selectedTemplate === t.id ? 'var(--brand)' : '#374151',
+                      }}>
+                      <p>{t.name}</p>
+                      <p className="font-normal text-xs text-gray-400 mt-0.5">{t.startTime} – {t.endTime}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <Input label="Kas awal (Rp)" type="number" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} placeholder="cth. 500000"/>
+            <Button onClick={openShift} className="w-full">🟢 Buka Shift</Button>
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="rounded-xl p-4 space-y-2" style={{ background:'var(--surface-2)' }}>
+            {/* Status badge */}
+            {activeShift.status === 'PENDING_CLOSE' && (
+              <div className="rounded-xl p-3 text-sm font-bold text-center"
+                style={{ background:'#FFFBEB', color:'#854F0B', border:'1px solid #F59E0B40' }}>
+                ⏳ Menunggu approval manager untuk ditutup
+              </div>
+            )}
+            <div className="rounded-xl p-4 space-y-2" style={{ background: 'var(--brand)08', border: '1px solid var(--brand)20' }}>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Dibuka</span>
+                <span className="text-gray-500">Dibuka oleh</span>
+                <span className="font-bold">{activeShift.user?.name || '—'}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Waktu buka</span>
                 <span className="font-bold">{new Date(activeShift.openedAt).toLocaleString('id-ID', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}</span>
               </div>
               <div className="flex justify-between text-sm">
@@ -1348,21 +1346,31 @@ export default function POSPage() {
                   <span className="font-bold" style={{ color:'var(--brand)' }}>{formatCurrency(activeShift.totalSales)}</span>
                 </div>
               )}
+              {activeShift.expectedCash != null && (
+                <>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Kas diharapkan</span>
+                    <span className="font-bold">{formatCurrency(activeShift.expectedCash)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Selisih</span>
+                    <span className="font-bold" style={{ color: (activeShift.difference || 0) < 0 ? '#DC2626' : '#16A34A' }}>
+                      {(activeShift.difference || 0) >= 0 ? '+' : ''}{formatCurrency(activeShift.difference || 0)}
+                    </span>
+                  </div>
+                </>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Durasi</span>
                 <span className="font-bold">{Math.round((Date.now() - new Date(activeShift.openedAt).getTime()) / 60000)} menit</span>
               </div>
             </div>
-            <Input
-              label="Kas Aktual (hitung fisik laci)"
-              type="number"
-              value={closingCash}
-              onChange={(e) => setClosingCash(e.target.value)}
-              placeholder="Jumlah uang di laci sekarang"
-            />
-            <Button onClick={closeShift} variant="danger" className="w-full" disabled={!closingCash}>
-              🔴 Tutup & Simpan
-            </Button>
+            {activeShift.status === 'OPEN' && (
+              <>
+                <Input label="Kas akhir (hitung laci)" type="number" value={closingCash} onChange={(e) => setClosingCash(e.target.value)} placeholder="Jumlah uang di laci"/>
+                <Button onClick={closeShift} variant="danger" className="w-full">🔴 Tutup Shift</Button>
+              </>
+            )}
           </div>
         )}
       </Modal>
