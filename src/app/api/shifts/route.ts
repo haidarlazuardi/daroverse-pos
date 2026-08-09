@@ -39,26 +39,17 @@ export const GET = withAuth(async (req: NextRequest, user) => {
   const limit  = parseInt(searchParams.get('limit') || '20');
 
   if (active === 'true') {
-    // Fix #5: return OPEN atau PENDING_CLOSE sebagai "aktif"
     const shift = await prisma.shift.findFirst({
       where: { status: { in: ['OPEN', 'PENDING_CLOSE'] } },
       include: { user: { select: { name: true } } },
       orderBy: { openedAt: 'desc' },
     });
 
-    // Auto-close shift stale > 24 jam
-    if (shift && shift.status === 'OPEN') {
-      const ageH = (Date.now() - new Date(shift.openedAt).getTime()) / 3600000;
-      if (ageH > 24) {
-        await prisma.shift.update({
-          where: { id: shift.id },
-          data: { status: 'CLOSED', closedAt: new Date(), notes: 'Auto-closed: shift melebihi 24 jam' },
-        });
-        return success([]);
-      }
-    }
+    if (!shift) return success([]);
 
-    return success(shift ? [shift] : []);
+    // Hanya kasih warning kalau shift sudah sangat lama — TIDAK auto-close
+    const ageH = (Date.now() - new Date(shift.openedAt).getTime()) / 3600000;
+    return success([{ ...shift, ageHours: Math.round(ageH), staleWarning: ageH > 18 }]);
   }
 
   const shifts = await prisma.shift.findMany({
