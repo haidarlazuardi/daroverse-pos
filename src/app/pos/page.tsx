@@ -744,13 +744,34 @@ export default function POSPage() {
       const diff = r.difference || 0;
       const sign = diff >= 0 ? '+' : '';
       alert(`✅ Shift ditutup\nTotal Sales: Rp ${Number(r.totalSales||0).toLocaleString('id-ID')}\nKas diharapkan: Rp ${Number(r.expectedCash||0).toLocaleString('id-ID')}\nKas aktual: Rp ${Number(r.closingCash||0).toLocaleString('id-ID')}\nSelisih: ${sign}Rp ${Math.abs(diff).toLocaleString('id-ID')}`);
-      // Auto-print shift report
-      try {
-        const report = await api.get<any>(`/api/shifts/report?shiftId=${shiftId}`);
-        const ticket = buildShiftReport({ date: report.date, cashierName: report.cashierName, openingCash: report.openingCash, closingCash: report.closingCash, expectedCash: report.expectedCash, difference: report.difference, cashSales: report.cashSales, qrisSales: report.qrisSales, cardSales: report.cardSales, totalSales: report.totalSales, totalExpenses: report.totalExpenses, orderCount: report.orderCount, items: report.items });
-        if (!isConnected()) { const saved = getSavedPrinter(); if (saved) await pairAndConnect(); }
-        await printData(ticket);
-      } catch { /* print gagal tidak block */ }
+      // Mandatory print shift report
+      const report = await api.get<any>(`/api/shifts/report?shiftId=${shiftId}`);
+      const ticket = buildShiftReport({ date: report.date, cashierName: report.cashierName, openingCash: report.openingCash, closingCash: report.closingCash, expectedCash: report.expectedCash, difference: report.difference, cashSales: report.cashSales, qrisSales: report.qrisSales, cardSales: report.cardSales, totalSales: report.totalSales, totalExpenses: report.totalExpenses, orderCount: report.orderCount, items: report.items });
+      
+      let printed = false;
+      while (!printed) {
+        try {
+          if (!isConnected()) {
+            const saved = getSavedPrinter();
+            if (saved) {
+              await pairAndConnect();
+            } else {
+              alert('⚠️ Printer belum terpasang. Pasangkan printer thermal dulu untuk mencetak laporan kasir.');
+              const info = await pairAndConnect();
+              setPrinterName(info.name);
+              setPrinterReady(true);
+            }
+          }
+          await printData(ticket);
+          printed = true;
+        } catch {
+          const retry = confirm('❌ Gagal cetak laporan kasir.\n\nPastikan printer menyala dan dalam jangkauan.\n\nCoba lagi?');
+          if (!retry) {
+            const skip = confirm('Lewati print laporan? Data shift tetap tersimpan.');
+            if (skip) break;
+          }
+        }
+      }
       loadData();
     } catch (e: any) { alert(e.message || 'Gagal tutup shift'); }
   };
