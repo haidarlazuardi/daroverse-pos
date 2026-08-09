@@ -7,7 +7,7 @@ import { api } from '@/lib/fetch';
 import { formatCurrency, Modal, Button, Input } from '@/components/ui';
 import clsx from 'clsx';
 import { getSavedPrinter, isConnected, pairAndConnect, printData, disconnect } from '@/lib/bluetooth-printer';
-import { buildReceipt, buildKitchenTicket, buildStaffReceipt } from '@/lib/escpos';
+import { buildReceipt, buildKitchenTicket, buildStaffReceipt, buildShiftReport } from '@/lib/escpos';
 import StaffSidebar from '@/components/pos/StaffSidebar';
 
 interface ModOption {
@@ -739,10 +739,18 @@ export default function POSPage() {
     if (!confirm(`Tutup shift hari ini?\nKas aktual: Rp ${Number(closingCash).toLocaleString('id-ID')}`)) return;
     try {
       const r = await api.patch<any>('/api/shifts', { id: activeShift.id, action: 'close', closingCash });
+      const shiftId = activeShift.id;
       setActiveShift(null); setClosingCash(''); setShowShift(false);
       const diff = r.difference || 0;
       const sign = diff >= 0 ? '+' : '';
       alert(`✅ Shift ditutup\nTotal Sales: Rp ${Number(r.totalSales||0).toLocaleString('id-ID')}\nKas diharapkan: Rp ${Number(r.expectedCash||0).toLocaleString('id-ID')}\nKas aktual: Rp ${Number(r.closingCash||0).toLocaleString('id-ID')}\nSelisih: ${sign}Rp ${Math.abs(diff).toLocaleString('id-ID')}`);
+      // Auto-print shift report
+      try {
+        const report = await api.get<any>(`/api/shifts/report?shiftId=${shiftId}`);
+        const ticket = buildShiftReport({ date: report.date, cashierName: report.cashierName, openingCash: report.openingCash, closingCash: report.closingCash, expectedCash: report.expectedCash, difference: report.difference, cashSales: report.cashSales, qrisSales: report.qrisSales, cardSales: report.cardSales, totalSales: report.totalSales, totalExpenses: report.totalExpenses, orderCount: report.orderCount, items: report.items });
+        if (!isConnected()) { const saved = getSavedPrinter(); if (saved) await pairAndConnect(); }
+        await printData(ticket);
+      } catch { /* print gagal tidak block */ }
       loadData();
     } catch (e: any) { alert(e.message || 'Gagal tutup shift'); }
   };

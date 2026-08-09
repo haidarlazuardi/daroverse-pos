@@ -336,3 +336,97 @@ export function buildStaffReceipt(data: {
   push(GS, 0x56, 0x42, 0x10); // partial cut
   return new Uint8Array(cmds);
 }
+
+// ── Shift Report untuk kasir ──────────────────────────────────────────────────
+export interface ShiftReportData {
+  date:         string;    // tanggal WIB
+  cashierName:  string;
+  openingCash:  number;
+  closingCash:  number;
+  expectedCash: number;
+  difference:   number;
+  cashSales:    number;
+  qrisSales:    number;
+  cardSales:    number;
+  totalSales:   number;
+  totalExpenses:number;
+  orderCount:   number;
+  items: Array<{ name: string; qty: number; subtotal: number }>;
+}
+
+export function buildShiftReport(data: ShiftReportData): Uint8Array {
+  const ESC = 0x1B, GS = 0x1D, LF = 0x0A;
+  const buf: number[] = [];
+  const push = (...b: number[]) => b.forEach(x => buf.push(x));
+  const nl   = (n = 1) => { for (let i = 0; i < n; i++) push(LF); };
+  const cut  = () => push(GS, 0x56, 0x42, 0x10);
+  const center = () => push(ESC, 0x61, 0x01);
+  const left   = () => push(ESC, 0x61, 0x00);
+  const bold   = (on: boolean) => push(ESC, 0x45, on ? 1 : 0);
+  const W = 32; // lebar karakter 58mm
+
+  const enc = new TextEncoder();
+  const text = (s: string) => push(...enc.encode(s));
+
+  const pad = (l: string, r: string, w = W) => {
+    const gap = w - l.length - r.length;
+    return l + ' '.repeat(Math.max(1, gap)) + r;
+  };
+  const line = (s: string) => { left(); text(s); nl(); };
+  const divider = () => { line('='.repeat(W)); };
+  const dashed = () => { line('-'.repeat(W)); };
+  const fmt = (n: number) => `Rp${Math.round(n).toLocaleString('id-ID')}`;
+
+  push(ESC, 0x40); // init
+  push(ESC, 0x74, 0x00); // charset
+
+  // Header
+  center(); bold(true);
+  text('SOEKA HOUSE'); nl();
+  text('LAPORAN KASIR'); nl();
+  bold(false);
+  text(data.date); nl();
+  text(`Kasir: ${data.cashierName}`); nl();
+  divider();
+
+  // Ringkasan kas
+  left(); bold(true); text('RINGKASAN KAS'); nl(); bold(false);
+  line(pad('Kas Awal', fmt(data.openingCash)));
+  line(pad('Total Penjualan', fmt(data.totalSales)));
+  line(pad('Pengeluaran', fmt(data.totalExpenses)));
+  dashed();
+  line(pad('Kas Diharapkan', fmt(data.expectedCash)));
+  line(pad('Kas Aktual', fmt(data.closingCash)));
+  bold(true);
+  const diffSign = data.difference >= 0 ? '+' : '';
+  line(pad('Selisih', `${diffSign}${fmt(data.difference)}`));
+  bold(false);
+  divider();
+
+  // Metode pembayaran
+  bold(true); text('METODE PEMBAYARAN'); nl(); bold(false);
+  if (data.cashSales > 0)  line(pad('Cash', fmt(data.cashSales)));
+  if (data.qrisSales > 0)  line(pad('QRIS', fmt(data.qrisSales)));
+  if (data.cardSales > 0)  line(pad('Card', fmt(data.cardSales)));
+  line(pad('Total Transaksi', `${data.orderCount} order`));
+  divider();
+
+  // Item terjual
+  bold(true); text('ITEM TERJUAL'); nl(); bold(false);
+  const sorted = [...data.items].sort((a, b) => b.qty - a.qty);
+  for (const item of sorted) {
+    const name = item.name.length > 18 ? item.name.slice(0, 17) + '.' : item.name;
+    const right = `${item.qty}x ${fmt(item.subtotal)}`;
+    line(pad(name, right));
+  }
+  divider();
+
+  // Footer
+  center();
+  const now = new Date(Date.now() + 7 * 60 * 60 * 1000);
+  text(`Dicetak: ${now.toLocaleString('id-ID', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' })}`);
+  nl(3);
+  cut();
+
+  return new Uint8Array(buf);
+}
