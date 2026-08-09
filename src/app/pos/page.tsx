@@ -545,17 +545,17 @@ export default function POSPage() {
     function checkShiftWarning() {
       if (!activeShift) { setShiftWarning(null); return; }
       const wib = new Date(Date.now() + 7 * 60 * 60 * 1000);
-      const h = wib.getHours(), m = wib.getMinutes();
-      const totalMin = h * 60 + m;
-      // Shift pagi close 17:00, shift sore close 23:30
+      const totalMin = wib.getUTCHours() * 60 + wib.getUTCMinutes();
+      // Shift 1: 09:30-16:00 → warning 15:30, overdue 16:00
+      // Shift 2: 16:00-24:00 → warning 23:00, overdue 24:00 (00:00)
       const warningTimes = [
-        { warn: 16 * 60 + 30, overdue: 17 * 60 },      // Pagi: warning 16:30, overdue 17:00
-        { warn: 23 * 60,      overdue: 23 * 60 + 30 },  // Sore: warning 23:00, overdue 23:30
+        { warn: 15 * 60 + 30, overdue: 16 * 60 },       // Shift 1: warning 15:30, tutup 16:00
+        { warn: 23 * 60,      overdue: 24 * 60 },        // Shift 2: warning 23:00, tutup 00:00
       ];
       let warning: 'approaching'|'overdue'|null = null;
       for (const t of warningTimes) {
-        if (totalMin >= t.overdue) { warning = 'overdue'; break; }
-        if (totalMin >= t.warn)    { warning = 'approaching'; break; }
+        if (totalMin >= t.overdue || totalMin < 1) { warning = 'overdue'; break; }  // 00:00 = shift 2 tutup
+        if (totalMin >= t.warn) { warning = 'approaching'; break; }
       }
       setShiftWarning(warning);
     }
@@ -838,13 +838,13 @@ export default function POSPage() {
           style={{ background: shiftWarning === 'overdue' ? '#DC2626' : '#F59E0B', color: 'white' }}>
           <span>
             {shiftWarning === 'overdue'
-              ? '🚨 Shift sudah melewati waktu tutup! Segera close shift.'
-              : '⚠️ Shift akan segera berakhir. Siapkan untuk close shift.'}
+              ? '🕐 Sudah waktunya tutup shift — minta manager untuk close shift.'
+              : '⏰ 30 menit lagi shift berakhir.'}
           </span>
           <button onClick={() => setShowShift(true)}
             className="px-3 py-1 rounded-lg text-xs font-black"
             style={{ background: 'rgba(255,255,255,0.25)' }}>
-            Close Shift →
+            Lihat Shift →
           </button>
         </div>
       )}
