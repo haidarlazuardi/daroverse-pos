@@ -746,7 +746,6 @@ export default function POSPage() {
       loadData();
     } catch (e: any) { alert(e.message || 'Gagal tutup shift'); }
   };
-      const sign = selisih >= 0 ? '+' : '';
   const receiptLines = (o: any) => [
     '🧾 *Soeka House*', '', `Order: ${o.orderNumber}`, `Tanggal: ${new Date(o.createdAt).toLocaleString('id-ID')}`,
     custName ? `Pelanggan: ${custName}` : '', '',
