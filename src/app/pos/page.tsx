@@ -1334,13 +1334,38 @@ export default function POSPage() {
 
       {/* Open bills */}
       <Modal open={showBills} onClose={() => setShowBills(false)} title="Bill terbuka" maxWidth="max-w-lg">
-        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+        <div className="space-y-3 max-h-[60vh] overflow-y-auto">
           {openBills.map((o) => (
-            <div key={o.id} className="warn-box">
-              <div className="flex justify-between text-sm"><span className="font-medium">{o.billName || o.orderNumber}</span><span className="font-bold">{formatCurrency(o.total)}</span></div>
-              <p className="text-xs text-gray-500 mt-1">{o.items?.length || 0} item · {new Date(o.createdAt).toLocaleString('id-ID')}</p>
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <button onClick={() => startAddingToBill(o)} className="btn btn-sm btn-secondary">Tambah item</button>
+            <div key={o.id} className="rounded-xl border overflow-hidden" style={{ borderColor:'var(--border)' }}>
+              {/* Header bill */}
+              <div className="flex justify-between items-center px-4 py-3" style={{ background:'var(--surface-2)' }}>
+                <div>
+                  <p className="font-bold text-sm" style={{ color:'var(--text-1)' }}>{o.billName || o.orderNumber}</p>
+                  <p className="text-xs" style={{ color:'var(--text-3)' }}>{new Date(o.createdAt).toLocaleString('id-ID', { hour:'2-digit', minute:'2-digit' })}</p>
+                </div>
+                <p className="font-black text-base" style={{ color:'var(--brand)' }}>{formatCurrency(o.total)}</p>
+              </div>
+              {/* Item list */}
+              {o.items && o.items.length > 0 && (
+                <div className="px-4 py-2 space-y-1 border-b" style={{ borderColor:'var(--border)' }}>
+                  {o.items.map((item: any, idx: number) => (
+                    <div key={idx} className="flex justify-between text-sm">
+                      <span style={{ color:'var(--text-2)' }}>
+                        {item.quantity}× {item.product?.name || item.name || '?'}
+                        {item.modifiers?.length > 0 && (
+                          <span className="text-xs ml-1" style={{ color:'var(--text-3)' }}>
+                            ({item.modifiers.map((m: any) => m.optionName).join(', ')})
+                          </span>
+                        )}
+                      </span>
+                      <span style={{ color:'var(--text-3)' }}>{formatCurrency(item.subtotal)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Actions */}
+              <div className="grid grid-cols-2 gap-2 p-3">
+                <button onClick={() => startAddingToBill(o)} className="btn btn-sm btn-secondary">+ Tambah item</button>
                 <button onClick={() => closeBill(o)} className="btn btn-sm btn-primary">Tutup & bayar</button>
               </div>
             </div>
